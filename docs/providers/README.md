@@ -1,21 +1,23 @@
-# Dokumentacja integracji API (lokalnie)
+# Provider Integration Docs (Local)
 
-Celem tego folderu jest trzymanie **lokalnej, wersjonowanej** dokumentacji integracji z zewnętrznymi serwisami (np. wakacje.pl, tui.pl, travellead). To jest „źródło prawdy” dla zespołu i dla agenta.
+This folder holds **locally versioned** documentation for external service integrations (e.g., wakacje.pl, tui.pl, travellead). This is the single source of truth for the team and for AI agents.
 
-Dlaczego lokalnie?
-- Linki do zewnętrznych docs potrafią się zmieniać albo znikać.
-- Agent działa najlepiej na krótkich, konkretnych plikach z przykładami request/response.
-- Możesz łatwo śledzić zmiany (git) i mieć historię kompatybilności.
+## Why local?
 
-## Struktura
+- External docs can change or disappear.
+- AI agents work best with short, concrete files containing request/response examples.
+- Changes are tracked via git, providing a compatibility history.
 
-- `docs/api/index.md` – spis integracji i szybkie linki.
-- `docs/api/<provider>/contract.md` – opis kontraktu: endpointy, parametry, przykłady, błędy.
-- `docs/api/<provider>/openapi.yaml` (opcjonalnie) – jeśli da się utrzymać OpenAPI jako formalną specyfikację.
+## Structure
 
-## Zasady jakości (pod agenta)
+- `docs/providers/index.md` — Integration index and quick links.
+- `docs/providers/<provider>/contract.md` — Contract description: endpoints, parameters, examples, errors.
+- `docs/providers/<provider>/openapi.yaml` (optional) — Formal OpenAPI spec if maintainable.
+- `docs/providers/<provider>/<provider>_filters.json` — Filter/mapping dictionaries for request construction.
 
-- Krótkie sekcje, nagłówki H2/H3: "Auth", "Endpointy", "Przykłady", "Błędy", "Uwagi".
-- Konkretne przykłady JSON (request/response) + statusy HTTP.
-- Na górze pliku metadane: "Źródło URL", "Ostatnio zweryfikowano", "Zakres".
-- Nigdy nie zapisuj sekretów: tokenów, kluczy API, cookies. Używaj placeholderów i `.env.example`.
+## Quality guidelines (agent-friendly)
+
+- Short sections with H2/H3 headings: "Auth", "Endpoints", "Examples", "Errors", "Notes".
+- Concrete JSON examples (request/response) with HTTP status codes.
+- Metadata at the top of each file: "Source URL", "Last verified", "Scope".
+- Never store secrets: tokens, API keys, cookies. Use placeholders and `.env.example`.

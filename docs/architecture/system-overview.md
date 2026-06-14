@@ -1,0 +1,104 @@
+# System Overview
+
+## Runtime model: Lambdalith
+
+The entire backend runs as **one AWS Lambda function** behind API Gateway. FastAPI is exposed via [Mangum](https://mangum.io/).
+
+Scheduled jobs (scraping, matching) run in the **same Lambda** — not as separate functions. Job code lives under `src/app/jobs/` but shares the deployment artifact with the HTTP API.
+
+The codebase is split into two top-level packages under `src/`: `core/` (domain layer) and `app/` (entrypoints). See [code-structure.md](code-structure.md) for the full layering.
+
+### Dual entry handler
+
+```python
+def handler(event, context):
+    if event.get("triggerSource", "").startswith("PostConfirmation"):
+        asyncio.run(provision_user(event))   # Cognito post-confirmation
+        return event                          # Cognito triggers must echo the event
+    if is_http_event(event):
+        return Mangum(app)(event, context)    # Mangum drives the async app
+    if event.get("source") == "aws.events" or "type" in event:
+        return asyncio.run(run_scheduled_job(event))  # cron + Scheduler match jobs
+    raise ValueError(f"Unknown event type: {event}")
+```
+
+### Event Payload Routing
+
+The scheduled job router (`run_scheduled_job(event)`) dispatches tasks based on the following input payloads:
+
+| Event Source | Payload / Structure | Handler Path | Description |
+| :--- | :--- | :--- | :--- |
+| **API Gateway** | HTTP request | Mangum → FastAPI routers (async) | All `/api/v2/*` HTTP traffic |
+| **EventBridge Cron (Scrape)** | `{ "type": "scrape_offers" }` | `asyncio.run` → `app.jobs.coordinator` | Orchestrates cell scraping (3× daily) |
+| **EventBridge Cron (Avail)** | `{ "type": "check_availability" }` | `asyncio.run` → `app.jobs.availability` | Checks active offer availability (1× daily) |
+| **EventBridge Scheduler** | `{ "type": "match_user", "user_id": "usr_123" }` | `asyncio.run` → `app.jobs.match_users(user_id)` | Debounced per-user re-match (one-time schedule) |
+| **Cognito Post-Confirm** | Cognito `PostConfirmation` event payload | `asyncio.run` → `provision_user(event)` | Creates `Users` row + default cells + first match |
+
+## Application modules
+
+`src/app/` holds **entrypoints only** — controllers and job orchestrators. Aligned with `src/app/main.py`:
+
+| Module   | Prefix           | Responsibility                          |
+| -------- | ---------------- | --------------------------------------- |
+| `auth`   | `/api/v2/auth`   | Delete account (Cognito + data cascade) |
+| `user`   | `/api/v2/user`   | Preferences, push notification settings |
+| `offers` | `/api/v2/offers` | Read-only paginated offer feed          |
+| `jobs`   | _(no HTTP)_      | Orchestrate scrape, match, availability |
+
+### `core/` package
+
+The domain layer, shared between API and jobs. Holds all business logic and infra adapters behind ports:
+
+- Pydantic domain models (preferences, offers, market cells)
+- Provider port + adapters (wakacje.pl, tui.pl)
+- Repository ports + DynamoDB/Redis adapters
+- Services: ingest (normalize + dedup + fingerprint), scoring, matching, activation
+- Composition root (`container.py`)
+
+`core` never imports `app`. See [code-structure.md](code-structure.md).
+
+## External systems
+
+```mermaid
+flowchart LR
+    PWA[PWA Frontend] -->|JWT| APIGW[API Gateway]
+    APIGW --> Lambda[Lambda Lambdalith]
+    Lambda --> DDB[(DynamoDB)]
+    Lambda --> Redis[(Redis Cloud)]
+    Lambda --> Cognito[AWS Cognito]
+    Lambda --> WAK[wakacje.pl API]
+    Lambda --> TUI[tui.pl API]
+    EB[EventBridge] -->|cron| Lambda
+    Lambda --> Grafana[Grafana / Powertools]
+```
+
+## Authentication flow
+
+| Operation      | Where                       | Notes                                                     |
+| -------------- | --------------------------- | --------------------------------------------------------- |
+| Sign up        | PWA → Cognito               | Hosted UI or Amplify Auth                                 |
+| Sign in        | PWA → Cognito               | Returns JWT                                               |
+| API calls      | PWA → Backend               | `Authorization: Bearer <JWT>`                             |
+| Delete account | PWA → `/api/v2/auth/delete` | Backend deletes Cognito user + DynamoDB data + Redis keys |
+
+Protected routes: `/api/v2/user/*`, `/api/v2/offers/*`.
+
+## Concurrency model for jobs
+
+The stack is **asynchronous end-to-end**: FastAPI route handlers are `async def`, repositories use `aioboto3` (async DynamoDB), provider clients use `httpx.AsyncClient`, and the feed cache uses `redis.asyncio`. Mangum drives the FastAPI app on the event loop.
+
+The scrape work is I/O-bound (HTTP + DynamoDB), so within a single cron invocation the coordinator scrapes active market cells **concurrently** on the event loop with bounded concurrency (an `asyncio.Semaphore` of ~10, or `asyncio.TaskGroup` + semaphore). This avoids the 15-minute Lambda timeout as cell count grows, without spawning child Lambdas.
+
+Async rules:
+
+- The concurrency primitive lives in `app/jobs/coordinator` (orchestration), not `core`. `core` exposes `async` single-cell functions with no shared mutable state.
+- CPU-bound scoring (numpy) is offloaded with `asyncio.to_thread(...)` so it never blocks the event loop.
+- `aioboto3` clients are async context managers. They are created once at cold start via an `AsyncExitStack` held in the container and reused across warm invocations — never re-created per request or per task.
+
+If cell count eventually exceeds single-invocation limits, `app/jobs/` can be split into separate Lambdas (replace the in-process `asyncio` fan-out with Lambda async invoke per cell) without changing `core` domain logic.
+
+## Observability
+
+- Structured JSON logs via AWS Lambda Powertools
+- Grafana for backend metrics and log aggregation
+- Sentry on the frontend PWA

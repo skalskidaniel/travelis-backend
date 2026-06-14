@@ -1,15 +1,15 @@
-# Tui — kontrakt integracji
+# TUI — Integration Contract
 
-## Metadane
+## Metadata
 
-- Źródło: reverse-engineering `www.tui.pl`
-- Ostatnio zweryfikowano: 2026-01-28
+- Source: reverse-engineering `www.tui.pl`
+- Last verified: 2026-01-28
 
-## Auth / identyfikacja klienta
+## Auth / Client Identification
 
-Brak klasycznego OAuth/BasicAuth. API działa jako „publiczne” API wykorzystywane przez frontend TUI.
+No classic OAuth/BasicAuth. The API functions as a "public" API used by the TUI frontend.
 
-Nagłówki:
+Headers:
 
 - `tui-api-key: www`
 - `x-market: pl`
@@ -18,30 +18,30 @@ Nagłówki:
 - `x-app-id: <uuid>`
 - `content-type: application/json;charset=UTF-8`
 
-## Endpointy
+## Endpoints
 
-### Lista ofert
+### Offer List
 
-- Metoda: `POST`
+- Method: `POST`
 - URL: `https://www.tui.pl/api/services/tui-search/api/search/offers`
 
-#### Nagłówki
+#### Headers
 
 ```http
 accept: application/json
 origin: https://www.tui.pl
-referer: <! Zakodowany url z zapytaniem -->
+referer: <! Encoded URL with query -->
 tui-api-key: www
 x-market: pl
 x-market-language: pl
 x-market-currency: PLN
 ```
 
-#### Request body
+#### Request Body
 
-Format dat: `DD.MM.YYYY`.
+Date format: `DD.MM.YYYY`.
 
-Filtry opisane w `filters.json`
+Filters are described in `filters.json`.
 
 ```json
 {
@@ -256,26 +256,43 @@ Filtry opisane w `filters.json`
 }
 ```
 
-Uwagi do mapowania pól:
+## Field Mapping & Query Construction Notes
 
-- `offerUrl` musi być prefixowane z `http://tui.pl/`
-- `boardCode` jest mapowane na typ wyżywienia po stronie aplikacji:
-  - `GT06-AI` / `GT06-XX` → `All inclusive`
-  - `GT06-FB` / `GT06-FBP` → `FB`
-  - `GT06-HB` / `GT06-HBP` → `HB`
-  - `GT06-BB` → `BB`
-  - `GT06-AO` → `None`
-- Lokalizacja w aplikacji pochodzi z `breadcrumbs[0].label` (kraj) i `breadcrumbs[1].label` (region).
+### Board Type
+- **App → TUI (Request)**: The `tui_filters.json` dictionary defines values like `"board": { "all-inclusive": "GT06-AI GT06-XX", ... }`. Values are space-separated. Before sending a request to TUI, split them (by space) into a list of strings and pass them in the `selectedValues` array for the filter with `filterId: "board"`.
+- **TUI → App (Response)**: The `boardCode` field from the TUI response is mapped to the canonical board type in the application:
+  - `GT06-AI` / `GT06-XX` → `all-inclusive`
+  - `GT06-FB` / `GT06-FBP` → `full-board`
+  - `GT06-HB` / `GT06-HBP` → `half-board`
+  - `GT06-BB` → `bed-and-breakfast`
+  - `GT06-AO` → `none`
 
-### Dostępność oferty
+### Departure Airport Codes
+TUI uses standard IATA codes directly in the `departuresCodes` array (e.g., `["POZ", "WAW", "KRK"]`). No lookup mapping is needed.
+
+### Occupancy & Children
+- Child birth date format expected by TUI: `DD.MM.YYYY`.
+- The request includes:
+  - `numberOfAdults`: number of adults from the search dimension.
+  - `childrenBirthdays`: list of children's birth dates (format `DD.MM.YYYY`). When scraping for dimensions with children, use a representative birth date of an 8-year-old child (e.g., `01.01.<current_year-8>`).
+  - `occupancies`: list of objects containing:
+    - `adultsCount`: number of adults.
+    - `childrenBirthDates`: list of children's birth dates (format `DD.MM.YYYY`).
+    - `participantsCount`: `adultsCount` + number of children.
+
+### Other Fields
+- `offerUrl` must be prefixed with `https://www.tui.pl` (e.g., `https://www.tui.pl/wypoczynek/...`).
+- Location in the application is derived from `breadcrumbs[0].label` (country) and `breadcrumbs[1].label` (region).
+
+### Offer Availability
 
 - `GET https://www.tui.pl/api/www/hotel-cards/offers?offerCode=<offerCode>`
 
-Przykładowa odpowiedź:
+Example response:
 
 ```json
 {
     "message": "Wybrana oferta nie jest już dostępna.",
-    "status": "UNAVAILABLE" // lub "OK" jeśli dostępna
+    "status": "UNAVAILABLE" // or "OK" if available
 }
 ```

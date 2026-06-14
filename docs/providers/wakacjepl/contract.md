@@ -1,22 +1,22 @@
-# wakacje.pl — kontrakt integracji
+# wakacje.pl — Integration Contract
 
-## Metadane
+## Metadata
 
-- Źródło: reverse-engineering `www.wakacje.pl`
-- Ostatnio zweryfikowano: 2026-01-28
+- Source: reverse-engineering `www.wakacje.pl`
+- Last verified: 2026-01-28
 
-## Auth / identyfikacja klienta
+## Auth / Client Identification
 
-Brak klasycznego OAuth/BasicAuth.
+No classic OAuth/BasicAuth.
 
-## Endpointy
+## Endpoints
 
-### Lista ofert
+### Offer List
 
-- Metoda: `POST`
+- Method: `POST`
 - URL: `https://www.wakacje.pl/v2/api/offers`
 
-#### Nagłówki
+#### Headers
 
 ```http
 accept: application/json
@@ -25,7 +25,7 @@ origin: https://www.wakacje.pl
 referer: https://www.wakacje.pl/wczasy/?src=fromSearch
 ```
 
-#### Request body
+#### Request Body
 
 ```json
 [
@@ -120,28 +120,30 @@ referer: https://www.wakacje.pl/wczasy/?src=fromSearch
 ]
 ```
 
-Uwagi do pól i formatów:
+#### Field Notes & Formats
 
-- Daty:
-  - `departureDate` / `arrivalDate` mają format `YYYY-MM-DD`.
-- Lotniska:
-  - `query.departure` bywa `null` dla „dowolnego wylotu”; po zawężeniu spodziewana jest lista ID lotnisk (liczby), ale w JSON wysyłane jako stringi.
-- Dzieci:
-  - `rooms[].ages[]` to lista dat w formacie `yyyyMMdd`.
+- **Dates**:
+  - `departureDate` / `arrivalDate` use format `YYYY-MM-DD`.
+- **Airports**:
+  - `query.departure` is `null` for "any departure"; when narrowed down, a list of airport IDs (numbers) is expected, but sent as strings in the JSON.
+- **Children**:
+  - `rooms[].ages[]` is a list of dates in format `yyyyMMdd`.
 
-#### Słowniki / ID kierunków
+#### Dictionaries / Destination IDs
 
-Wakacje.pl wystawia „słowniki” do pobrania aktualnych ID:
+wakacje.pl exposes "dictionaries" to fetch current IDs:
 
-- Kraje: `GET https://www.wakacje.pl/v2/api/geoCatalogCountries`
-  - przykład: `Grecja` ma `value: "29"`.
-- Regiony i miasta w kraju: `GET https://www.wakacje.pl/v2/api/geoCatalogRegionsAndCities/{countryId}`
-  - przykład: `Kreta` w `Grecja (29)` ma `value: "29004"`.
+- Countries: `GET https://www.wakacje.pl/v2/api/geoCatalogCountries`
+  - Example: `Grecja` has `value: "29"`.
+- Regions and cities within a country: `GET https://www.wakacje.pl/v2/api/geoCatalogRegionsAndCities/{countryId}`
+  - Example: `Kreta` in `Grecja (29)` has `value: "29004"`.
 
-Obserwacja z UI (wybór „Grecja → Kreta”):
+Observation from the UI (selecting "Grecja → Kreta"):
 
-- w `params.regionId` ląduje `"29004"`, natomiast `params.countryId` pozostaje puste,
-- kraj rodzica bywa przekazywany w `params.alternative.countryId` (tu: `"29"`).
+- `params.regionId` receives `"29004"`, while `params.countryId` remains empty.
+- The parent country is sometimes passed in `params.alternative.countryId` (here: `"29"`).
+
+> **Note:** For scraping purposes, only `countryId` is used (no `regionId` needed). Set `countryId` in `params.countryId` and leave `regionId` empty.
 
 #### Response
 
@@ -223,7 +225,37 @@ Obserwacja z UI (wybór „Grecja → Kreta”):
 }
 ```
 
-## Uwagi / pułapki
+## Notes & Gotchas
 
-- Wakacje.pl często zwraca oferty o tych samych parametrach różniące się ceną lub biurem podróży — w wymaganiach aplikacji traktujemy je jako „tę samą ofertę”. Obecny provider nie deduplikuje, więc deduplikacja powinna być w warstwie agregacji.
-- Klucz do identyfikacji oferty → klucz złożony, `offerHash + departureDate + returnDate + departurePlace + service + roomType`.
+### Hotel Stars (Category)
+- wakacje.pl represents hotel standard as numbers multiplied by 10 (e.g., 3 stars = 30, 4 stars = 40, 5 stars = 50).
+- In search parameters, pass `minCategory = min_stars * 10` and `maxCategory = 50`.
+
+### Rating Normalization
+- wakacje.pl returns `ratingValue` on a 0–10 scale. During ingest, divide by 2 to get the canonical 0–5 scale.
+- Example: `ratingValue: 7.5` → `rating: 3.75`.
+
+### Board Type Normalization
+- Use the numeric `service` field from the response for board type mapping (not `serviceDesc`).
+- Inverse mapping of `wakacjepl_filters.json`:
+  - `1` → `all-inclusive`
+  - `2` → `half-board`
+  - `3` → `bed-and-breakfast`
+  - `4` → `none`
+  - `6` → `full-board`
+
+### Occupancy & Children
+- Child birth date format in the `ages` array: `yyyyMMdd` (e.g., `20210227`).
+- The request passes an object in `query.rooms`:
+  - `adult`: number of adults.
+  - `kid`: number of children.
+  - `ages`: list of children's birth dates (format `yyyyMMdd`). When scraping for dimensions with children, use a representative birth date of an 8-year-old child (e.g., `(current_year-8)0101`).
+
+### Aggregation & Deduplication
+- wakacje.pl often returns offers with the same parameters differing only in price or tour operator — per application requirements, these are treated as "the same offer". Deduplication is performed in the integration service layer (`core/services/ingest.py`).
+- Deduplication involves:
+  - Grouping offers by the same fingerprint.
+  - Keeping the variant with the lowest `price`.
+  - Storing remaining variants in `metadata.sources[]` for debugging/history purposes.
+- Composite key for unique provider-level variant identification: `offerHash + departureDate + returnDate + departurePlace + serviceDesc + roomType`.
+- Semantic fingerprint for `offer_id` is computed as described in [data-model.md](../../architecture/data-model.md#semantic-fingerprint).
