@@ -1,30 +1,42 @@
 # Wymagania
 
-## Social media
+## Technologie
 
-- [Instagram](https://www.instagram.com/wakacje.travelis/)
-- [Facebook](https://www.facebook.com/profile.php?id=61583160197758)
-- [TikTok](https://www.tiktok.com/@wakacje.travelis)
+- AWS Lambda + Mangum
+- FastAPI + FastAPI Limiter
+- Terraform + Terraform Vault
+- DynamoDB z trybem provisioned aby ograniczyć koszty
+- SQLModel lub SQLAlchemy
+- Redis cache (pobieranie ofert użytkownika)
+- Scrapy oraz scrapy-playwright lub crawlee
+- Numpy lub pandas
+- AWS Powertools logging
+- Grafana (Sentry dla front endu)
+- AWS Boto3 dla dostępu do bazy danych
+- AWS Cognito
 
-## Konto użytkownika
+## TODO's
 
-### Przechowywane informacje:
+- CORS Middleware
+- Health Check
+- Wszystkie endpointy zaczynające się od /api/v2
+- Odpowiednie kody odpowiedzi RESTfulAPI
+- Debouncing zmian preferencji
 
-- Imię
-- adres email
-- preferencje
+```text
+Recommended pattern
+In your case, the best design is usually frontend debounce + backend coalescing. Debounce on the client reduces unnecessary API calls, and backend coalescing makes the system safe even if the client sends multiple requests anyway because of retries, multiple tabs, or race conditions.
+medium +1
+How it should work
+Use this flow:
+1. User changes trip preferences.
+2. Backend saves the latest preferences immediately.
+3. Instead of recomputing offers right away, schedule a refresh job for that user/trip with a debounce key like tripId or userId+tripId.
+4. If another change arrives before the delay expires, update the scheduled job time instead of creating a new one.
+5. Only when no more changes arrive for, say, 2 to 10 seconds, run filtering once using the latest saved preferences. inngest
+That is backend debouncing in practice: one delayed job per entity, continuously postponed until the input stabilizes.
+```
 
-### Metody logowania:
-
-- adres email (konieczne potwierdzenie maila)
-- konto google
-- konto facebook
-
-### Usuwanie konta
-
-Użytkownik może w dowolnej chwili usunąć wszystkie swoje dane.
-
-## Preferencje uzytkowników
 
 ### Użytkownik może wybrać:
 
@@ -125,70 +137,29 @@ Powiadomienie powinno zawierać informacje, ile nowych ofert od ostatniego uruch
 
 Oferty są pobierane poprzez API wakacje.pl oraz tui.pl
 
-Mechanizm musi być asynchroniczny, aby uniknąć długiego oczekiwania na otrzymanie odpowiedzi z API.
+Mechanizm szuka oferty dla aktywnych komórek marketu (gdy użytkownik zmienia preferencje, backend musi dodać do bazy danych aktywne komórki marketu)
 
-Mechanizm szuka oferty tylko dla aktywnych użytkowników (takich, którzy zalogowali się w ciągu ostatnich 7 dni).
+Backend dostaje sygnał 3 razy dziennie aby pobrać nowe oferty.
 
-Backend dostaje sygnał raz na 10 minut aby pobrać nowe oferty dla oczekujących użytkowników.
+Oferty są sprawdzane pod kątem dostępności/zmian cen raz dziennie.
 
-Oczekujący użytkownik - użytkownik, dla którego ostatnie sprawdzenie nowych ofert nastąpiło wcześniej niż 2 godziny temu.
-
-Wysyłane oferty nie mogą się powtarzać w panelu z ofertami.
-
-Świeżo wysłane oferty nie mogą być wyprzedane.
-
-Oferty starsze niż 14 dni są usuwane z konta użytkownika, chyba że są dodane do ulubionych.
+W bazie danych są zapisywane tylko atrakcyjne oferty, bez limitu ilości na jedną komórkę marketu.
 
 Oferty z wakacje.pl często mają te same parametry, ale inną cenę i inne biuro podróży. W tej aplikacji muszą być traktowane jako ta sama oferta.
 
 Pobrane oferty są analizowane statystycznie, aby zapewnić atrakcyjność oferty.
 
-Aby moc porownywac oferty, dla kazdej kombinacji (kraj, miesiac podrozy, standard hotelu, wyżywienie) są zbierane oferty. Zebrane oferty mają zapisane: id oferty (aby sie nie powtarzaly) cenę za osobę na dzień, standard hotelu, typ wyżywienia, ocena hotelu, ilosc recenzji, miesiąc w którym jest pobyt. Reszta danych jest niepotrzebna do analizy atrakcyjności, zatem oszczędzamy miejsce w bazie danych.
+Aby moc porownywac oferty, dla kazdej kombinacji (kraj, miesiac podrozy, standard hotelu, wyżywienie, ilosc doroslych, ilosc dzieci) są zbierane oferty.
 
-Atrakcyjnosc ceny jest obliczana na podstawie zapisanych wczesniej ofert.
+Atrakcyjność oferty jest obliczana na podstawie nowo pobranych ofert, tylko te które spełniają kryterium atrakcyjności są zapisywane na dysku.
 
 ### Definicja atrakcyjności oferty
 
-_Oferta musi w całości spełniać wymagania użytkownika_
-
-_Atrakcyjność ceny jest liczona na podstawie „ceny za osobę za dzień” oraz porównania do historycznych ofert w tej samej komórce rynku (poza dokładną datą — daty są zaokrąglane do miesięcy wg miesiąca początku podróży)._
-
-Definicje:
-
-- $p$ — cena za osobę za dzień, tj. $p = \frac{(\text{cena całkowita}/\text{liczba osób})}{\text{liczba dni}}$
-- Benchmark (zbiór porównawczy) — oferty z bazy dla kombinacji: $(kraj,\ miesiąc\ podróży,\ minimalny\ standard\ hotelu,\ wyżywienie)$
-- $m$ — mediana wartości $p$ w benchmarku
-- $MAD$ — median absolute deviation, tj. $MAD = median(|p_i - m|)$
-- $z_r$ — robust z-score: $z_r = \frac{p - m}{1.4826 \cdot MAD}$
-
-Oferta jest uznana za atrakcyjną cenowo, jeśli:
-
-- $z_r \le -2$
-
-Jeśli dana komórka rynku ma poniżej 200 ofert, powiększ tę komórkę o miesiąc poprzedni oraz następny. Jeśli to nie pomoże, miarą atrakcyjności oferty zamiast $z_r$ jest pozycja w top 10% ofertach
-
-**Przykład 1:**
-
-- Użytkownik chce wakacje w Grecji all-inclusive w 4 gwiazdkowym hotelu (lub lepszym) w dniach 14.06.2026-28.06.2026.
-- Oferty pobrane dla niego są porównywane z wszystkimi oferatami zapisanymi w bazie z Grecji, 4 lub 5 gwiazdkowe hotele, w miesiacu czerwcu
-
-**Przykład 2:**
-
-- Użytkownik chce wakacje w Grecji all-inclusive w 4 gwiazdkowym hotelu (lub lepszym) w dniach 20.06.2026-3.07.2026.
-- Oferty pobrane dla niego są porównywane z wszystkimi oferatami zapisanymi w bazie z Grecji, 4 lub 5 gwiazdkowe hotele, w miesiacu czerwcu
-
-### Czynniki dodatkowo podbijające atrakcyjność oferty
-
-1. Wysoka liczba wyświetleń oferty (popularność hotelu na podstawie offers_count)
-2. Wysokie opinie (tylko wtedy, jeśli jest ponad 100 opinii)
-3. Ilość wystawionych opinii
-
-## Zbieranie danych przez dewelopera
-
-1. Wysłane oferty do użytkowników (przechowywane 14 dni)
-2. Kliknięcia w ofertę
-3. Ilość odwiedzin strony
-4. Odinstalowanie aplikacji PWA, tak aby bez potrzeby serwer nie wyszukiwał ofert dla nieaktywnych użytkowników
-5. Logi do wykrywania błędów
-6. Logi podsumowujące call mechanizmu wyszukiwania ofert (ile użytkowników obsłużono, ile ofert wysłano)
-7. Oferty dodane do ulubionych przez użytkownika
+- Z-score
+- Cena/dzień/osoba mieszcząca się w 2QR (waga 0.4 lub ustawić za pomocą algorytmu AHP)
+- Ocena (waga 0.4 lub ustawić za pomocą algorytmu AHP)
+- Ilość recenzji (waga 0.2 lub ustawić za pomocą algorytmu AHP)
+- Godziny wylotu opcjonalnie
+- Odległość od morza opcjonalnie
+- Odległość od centrum opcjonalnie
+- Odległość od lotniska opcjonalnie

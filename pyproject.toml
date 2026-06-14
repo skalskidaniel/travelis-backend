@@ -4,4 +4,9 @@ version = "0.1.0"
 description = "Backend service for wakacje-travelis.pl"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "fastapi[standard]>=0.137.0",
+]
+
+[tool.fastapi]
+entrypoint = "app.main:app"
