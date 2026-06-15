@@ -5,7 +5,10 @@ description = "Backend service for wakacje-travelis.pl"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "bs4>=0.0.2",
+    "crawlee[all]>=1.7.2",
     "fastapi[standard]>=0.137.0",
+    "ipykernel>=7.3.0",
 ]
 
 [tool.fastapi]

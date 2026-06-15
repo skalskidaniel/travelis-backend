@@ -49,9 +49,10 @@ This same tuple is used for **scraping**, **statistical comparison**, and **scor
 Cells are global — not per-user. When any user's preferences require a cell, `activation_count` increments. Scraping runs once per active cell regardless of how many users share it.
 
 To keep cell scraping decoupled from user-specific details (and avoid expensive queries to find active users during scraping):
+
 1. **Departure Airports**: Scraper requests are always sent with "Any" departure airport. User-specific departure airport preferences are applied as filters on the backend during the user matching phase.
 2. **Duration / Stay Length**: Scraper requests query a wide default range of `2-28` nights. Exact min/max duration filters are applied during the user matching phase.
-3. **Representative Child Age**: Providers require birth dates to calculate prices. Because global cells only track the *number* of children, cells with `children > 0` are scraped using a representative child age of **8 years old** (birth date calculated as January 1st of `current_year - 8`). Exact matching filters on child ages are applied in Python during matching.
+3. **Representative Child Age**: Providers require birth dates to calculate prices. Because global cells only track the _number_ of children, cells with `children > 0` are scraped using a representative child age of **8 years old** (birth date calculated as January 1st of `current_year - 8`). Exact matching filters on child ages are applied in Python during matching.
 
 ### Coordinator (`jobs.coordinator`)
 
@@ -71,8 +72,9 @@ Per provider response:
 1. Map provider fields to canonical offer schema.
 2. Compute semantic fingerprint → `offer_id`.
 3. **wakacje.pl dedup:** collapse rows with same fingerprint; keep lowest price.
-4. Attach `cell_id` from the scrape context.
-5. Forward to scoring.
+4. **Provider metadata:** persist `metadata.wakacje` or `metadata.tui` (see [data-model.md](data-model.md#offer-metadata)) — required for later per-offer availability checks without re-scraping the offer page.
+5. Attach `cell_id` from the scrape context.
+6. Forward to scoring.
 
 ## Scoring (`jobs.score_offers`)
 
@@ -131,10 +133,14 @@ Triggered 1× daily.
 
 Baseline is **availability-by-absence**, which works for both providers without a per-offer endpoint: an offer no longer returned by the latest scrape of its cell is marked `available = false`, and the `departure_date` TTL eventually removes it.
 
-Optional refinement for fresher availability _between_ scrapes:
+Optional refinement for fresher availability _between_ scrapes (requires provider metadata persisted at ingest — see [data-model.md](data-model.md#offer-metadata)):
 
-- **tui.pl:** `GET /api/www/hotel-cards/offers?offerCode={provider_id}` (returns `OK` / `UNAVAILABLE`).
-- **wakacje.pl:** no clean per-offer endpoint — use scraper to mock the browser and check whether the site says available.
+- **tui.pl:** `GET /api/www/hotel-cards/offers?offerCode={metadata.tui.offer_code}` (returns `OK` / `UNAVAILABLE`).
+- **wakacje.pl:** two-step JSON API using stored `metadata.wakacje` + canonical offer fields (no offer-page HTML fetch):
+  1. `POST /v2/api/getCalculatorOfferVariants/{provider_id}` — empty `offers` ⇒ unavailable for this configuration.
+  2. `GET /v2/api/checkOfferAvailability` — `data.availability` + `data.status === "OK"`.
+
+Contract details: [providers/wakacjepl/contract.md](../providers/wakacjepl/contract.md#offer-availability). Prototype: `notebooks/wakacje_pl_availability.ipynb`.
 
 Update `Offers.available` and `price_total` when they change.
 

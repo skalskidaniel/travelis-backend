@@ -110,7 +110,7 @@ FastAPI's `Depends` only covers the HTTP path; the EventBridge path never touche
 
 A `Provider` Protocol (`async search(cell) -> list[RawOffer]`, `async check_availability(provider_id) -> bool`), one adapter per site, behind a registry. All contract messiness is contained in the adapter and never leaks past `RawOffer`:
 
-- wakacje.pl: `POST` search blob, `YYYY-MM-DD` dates, composite dedup key.
+- wakacje.pl: `POST` search blob, `YYYY-MM-DD` dates, composite dedup key; ingest persists `metadata.wakacje` for per-offer availability (`getCalculatorOfferVariants` + `checkOfferAvailability`).
 - tui.pl: `tui-api-key` / `x-market` headers, `DD.MM.YYYY` dates, `boardCode` → board-type map, `offerUrl` prefixing.
 
 Adding a third source later is one new adapter + one registry line. See [providers/](../providers/index.md) for the reverse-engineered contracts.

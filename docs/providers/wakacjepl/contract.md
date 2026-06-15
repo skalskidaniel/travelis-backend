@@ -3,7 +3,7 @@
 ## Metadata
 
 - Source: reverse-engineering `www.wakacje.pl`
-- Last verified: 2026-01-28
+- Last verified: 2026-06-15
 
 ## Auth / Client Identification
 
@@ -29,94 +29,94 @@ referer: https://www.wakacje.pl/wczasy/?src=fromSearch
 
 ```json
 [
-    {
-        "method": "search.tripsSearch",
-        "params": {
-            "brand": "WAK",
-            "limit": 500,
-            "priceHistory": 1,
-            "imageSizes": ["570,428"],
-            "flatArray": true,
-            "multiSearch": true,
-            "withHotelRate": 1,
-            "withPromoOffer": 0,
-            "recommendationVersion": "noTUI",
-            "imageLimit": 1,
-            "withPromotionsInfo": false,
-            "type": "tours",
-            "firstMinuteTui": false,
-            "countryId": [],
-            "regionId": [],
-            "cityId": [],
-            "hotelId": [],
-            "roundTripId": [],
-            "cruiseId": [],
-            "searchType": "wczasy",
-            "offersAttributes": [],
-            "alternative": {
-                "countryId": [],
-                "regionId": [],
-                "cityId": []
-            },
-            "qsVersion": "cx_v2_auction",
-            "query": {
-                "campTypes": [],
-                "qsVersion": "cx_v2_auction",
-                "qsVersionLast": 0,
-                "tab": false,
-                "candy": false,
-                "pok": null,
-                "flush": false,
-                "tourOpAndCode": null,
-                "obj_type": null,
-                "catalog": null,
-                "roomType": null,
-                "test": null,
-                "year": null,
-                "month": null,
-                "rangeDate": null,
-                "withoutLast": 0,
-                "category": false,
-                "not-attribute": false,
-                "pageNumber": 1,
-                "departureDate": "2026-01-30",
-                "arrivalDate": "2027-08-01",
-                "departure": null,
-                "type": [],
-                "duration": {
-                    "min": 5,
-                    "max": 28
-                },
-                "minPrice": null,
-                "maxPrice": null,
-                "service": [],
-                "firstminute": null,
-                "attribute": [],
-                "promotion": [],
-                "tourId": null,
-                "search": null,
-                "minCategory": null,
-                "maxCategory": 50,
-                "sort": 13,
-                "order": 1,
-                "totalPrice": true,
-                "rank": null, // to digit decimal from range [10-100] rounded to nearest 10 multiple
-                "withoutTours": [],
-                "withoutCountry": [],
-                "withoutTrips": [],
-                "rooms": [
-                    {
-                        "adult": 2,
-                        "kid": 0,
-                        "ages": [] // list of birthdays in format yyyyMMdd
-                    }
-                ],
-                "offerCode": null,
-                "dedicatedOffer": false
-            },
-            "durationMin": "5"
-        }
+  {
+    "method": "search.tripsSearch",
+    "params": {
+      "brand": "WAK",
+      "limit": 500,
+      "priceHistory": 1,
+      "imageSizes": ["570,428"],
+      "flatArray": true,
+      "multiSearch": true,
+      "withHotelRate": 1,
+      "withPromoOffer": 0,
+      "recommendationVersion": "noTUI",
+      "imageLimit": 1,
+      "withPromotionsInfo": false,
+      "type": "tours",
+      "firstMinuteTui": false,
+      "countryId": [],
+      "regionId": [],
+      "cityId": [],
+      "hotelId": [],
+      "roundTripId": [],
+      "cruiseId": [],
+      "searchType": "wczasy",
+      "offersAttributes": [],
+      "alternative": {
+        "countryId": [],
+        "regionId": [],
+        "cityId": []
+      },
+      "qsVersion": "cx_v2_auction",
+      "query": {
+        "campTypes": [],
+        "qsVersion": "cx_v2_auction",
+        "qsVersionLast": 0,
+        "tab": false,
+        "candy": false,
+        "pok": null,
+        "flush": false,
+        "tourOpAndCode": null,
+        "obj_type": null,
+        "catalog": null,
+        "roomType": null,
+        "test": null,
+        "year": null,
+        "month": null,
+        "rangeDate": null,
+        "withoutLast": 0,
+        "category": false,
+        "not-attribute": false,
+        "pageNumber": 1,
+        "departureDate": "2026-01-30",
+        "arrivalDate": "2027-08-01",
+        "departure": null,
+        "type": [],
+        "duration": {
+          "min": 5,
+          "max": 28
+        },
+        "minPrice": null,
+        "maxPrice": null,
+        "service": [],
+        "firstminute": null,
+        "attribute": [],
+        "promotion": [],
+        "tourId": null,
+        "search": null,
+        "minCategory": null,
+        "maxCategory": 50,
+        "sort": 13,
+        "order": 1,
+        "totalPrice": true,
+        "rank": null, // to digit decimal from range [10-100] rounded to nearest 10 multiple
+        "withoutTours": [],
+        "withoutCountry": [],
+        "withoutTrips": [],
+        "rooms": [
+          {
+            "adult": 2,
+            "kid": 0,
+            "ages": [] // list of birthdays in format yyyyMMdd
+          }
+        ],
+        "offerCode": null,
+        "dedicatedOffer": false
+      },
+      "durationMin": "5"
     }
+  }
 ]
 ```
 
@@ -163,7 +163,7 @@ Observation from the UI (selecting "Grecja → Kreta"):
         "placeName": "Grecja / Kreta / Ierapetra",
         "photos": {
           "570,428": [
-            "/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg",
+            "/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
           ]
         },
         "hotelId": 17001,
@@ -228,14 +228,17 @@ Observation from the UI (selecting "Grecja → Kreta"):
 ## Notes & Gotchas
 
 ### Hotel Stars (Category)
+
 - wakacje.pl represents hotel standard as numbers multiplied by 10 (e.g., 3 stars = 30, 4 stars = 40, 5 stars = 50).
 - In search parameters, pass `minCategory = min_stars * 10` and `maxCategory = 50`.
 
 ### Rating Normalization
+
 - wakacje.pl returns `ratingValue` on a 0–10 scale. During ingest, divide by 2 to get the canonical 0–5 scale.
 - Example: `ratingValue: 7.5` → `rating: 3.75`.
 
 ### Board Type Normalization
+
 - Use the numeric `service` field from the response for board type mapping (not `serviceDesc`).
 - Inverse mapping of `wakacjepl_filters.json`:
   - `1` → `all-inclusive`
@@ -245,6 +248,7 @@ Observation from the UI (selecting "Grecja → Kreta"):
   - `6` → `full-board`
 
 ### Occupancy & Children
+
 - Child birth date format in the `ages` array: `yyyyMMdd` (e.g., `20210227`).
 - The request passes an object in `query.rooms`:
   - `adult`: number of adults.
@@ -252,10 +256,151 @@ Observation from the UI (selecting "Grecja → Kreta"):
   - `ages`: list of children's birth dates (format `yyyyMMdd`). When scraping for dimensions with children, use a representative birth date of an 8-year-old child (e.g., `(current_year-8)0101`).
 
 ### Aggregation & Deduplication
+
 - wakacje.pl often returns offers with the same parameters differing only in price or tour operator — per application requirements, these are treated as "the same offer". Deduplication is performed in the integration service layer (`core/services/ingest.py`).
 - Deduplication involves:
   - Grouping offers by the same fingerprint.
   - Keeping the variant with the lowest `price`.
-  - Storing remaining variants in `metadata.sources[]` for debugging/history purposes.
+  - Storing remaining variants in `metadata.sources[]` for debugging/history purposes. Each source entry includes a full `metadata.wakacje` block (see below) so availability can be re-checked for any collapsed variant.
 - Composite key for unique provider-level variant identification: `offerHash + departureDate + returnDate + departurePlace + serviceDesc + roomType`.
 - Semantic fingerprint for `offer_id` is computed as described in [data-model.md](../../architecture/data-model.md#semantic-fingerprint).
+
+## Offer availability
+
+### Pipeline (no HTML scrape at check time)
+
+If ingest persisted [metadata.wakacje](../../architecture/data-model.md#metadatawakacje-required-for-availability-checks), the daily job can check availability using only HTTP JSON APIs:
+
+1. **Resolve room variant** — `POST /v2/api/getCalculatorOfferVariants/{offerId}`
+2. **Live check** — `GET /v2/api/checkOfferAvailability` (only when step 1 returns variants)
+
+Canonical offer columns supply `offerId` (`provider_id`), dates, duration, board, and occupancy. `metadata.wakacje` supplies geo/operator/airport IDs.
+
+### Step 1 — Calculator variants
+
+- Method: `POST`
+- URL: `https://www.wakacje.pl/v2/api/getCalculatorOfferVariants/{offerId}`
+
+#### Headers
+
+```http
+accept: application/json
+content-type: application/json
+origin: https://www.wakacje.pl
+referer: https://www.wakacje.pl/oferty/...  # metadata.wakacje.offer_page_path
+```
+
+#### Request body
+
+```json
+{
+  "adults": 2,
+  "kids": 0,
+  "infants": 0,
+  "kidsAges": [],
+  "serviceId": 1,
+  "duration": 7,
+  "departureDate": "2026-06-11",
+  "transportId": 1,
+  "departureCityId": 10119,
+  "departureCityCode": "WMI",
+  "hotelId": 2178,
+  "tourOp": "VITX",
+  "tourId": 17,
+  "cruiseId": 0,
+  "roundTripId": 0,
+  "isAlternativeRoom": false,
+  "isOffer77": false
+}
+```
+
+| Field                          | Source in TraveLis                                                                                              |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `offerId` (path)               | `Offers.provider_id`                                                                                            |
+| `adults` / `kids` / `kidsAges` | scrape cell (`adults`, `children`; representative child ages per [pipeline.md](../../architecture/pipeline.md)) |
+| `serviceId`                    | `metadata.wakacje.service_id`                                                                                   |
+| `duration`                     | `Offers.duration`                                                                                               |
+| `departureDate`                | `Offers.departure_date`                                                                                         |
+| `transportId`                  | `metadata.wakacje.transport_id`                                                                                 |
+| `departureCityId`              | `metadata.wakacje.departure_city_id`                                                                            |
+| `hotelId`                      | `metadata.wakacje.hotel_id`                                                                                     |
+| `tourId`                       | `metadata.wakacje.tour_operator_id`                                                                             |
+| `tourOp`                       | `metadata.wakacje.tour_op_code` (optional — omit if absent)                                                     |
+
+#### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "offers": [
+      {
+        "id": "paFObzVUbnhuFqjOwvxb-jAAog4KHuC94PJ1Q6a...",
+        "providerCode": "VITX",
+        "roomDesc": "Rm standard room",
+        "totalPrice": 4720,
+        "priceCurrency": "PLN",
+        "departStart": { "name": "Warszawa - Chopin", "date": "2026-06-18" }
+      }
+    ]
+  }
+}
+```
+
+- **`data.offers: []`** — exact configuration not sold (same as on-site _“Oferta w tej konfiguracji jest niedostępna”_). Treat as **unavailable**; do not call step 2.
+- Variant `id` is the long **`offerHash`** required by step 2. The short search `offerHash` (e.g. `GRCS:6935`) is not valid here.
+
+### Step 2 — Live availability
+
+- Method: `GET`
+- URL: `https://www.wakacje.pl/v2/api/checkOfferAvailability`
+
+#### Query parameters
+
+| Parameter                                        | Source                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| `providerCode`                                   | variant `providerCode`, else `metadata.wakacje.tour_op_code` |
+| `offerHash`                                      | variant `id` from step 1                                     |
+| `offerType`                                      | `tour`                                                       |
+| `includeTfgService`                              | `true`                                                       |
+| `isAlternativeRoom`                              | `false`                                                      |
+| `cityId` / `countryId` / `regionId`              | `metadata.wakacje`                                           |
+| `participantsObject[participants][n][birthDate]` | representative adult `1988-01-01`; children per scrape rules |
+| `participantsObject[participants][n][type]`      | `adult` / `child`                                            |
+
+#### Headers
+
+```http
+accept: application/json
+referer: https://www.wakacje.pl/oferty/...
+customHeaders: {"Page-Source":"PO","Tour-Operator-Code":"VITX","Tour-Operator-Id":"17","Object-Id":"2178"}
+```
+
+#### Response (available)
+
+```json
+{
+  "success": true,
+  "data": {
+    "availability": true,
+    "status": "OK",
+    "price": 4720,
+    "currency": "PLN",
+    "departureStringValue": "Kraków"
+  }
+}
+```
+
+Use `data.availability === true` and `data.status === "OK"`. Update `Offers.available` and `price_total` when changed.
+
+### Departure airport IDs
+
+URL slugs (`z-wroclawia`, `z-warszawy-chopin`) map to wakacje **city IDs**, not IATA codes. Airport-specific slugs must not be collapsed (Chopin `10119` ≠ generic Warszawa `278` ≠ Modlin `9758`). See `wakacjepl_filters.json` `departure` and ingest-time mapping from `departurePlace`.
+
+Optional catalog: `POST /v2/api/offerConfiguratorV2/filters` with `{ "offerId": … }` lists valid `departurePlaces` for an offer.
+
+### Ingest: fields to persist
+
+On every wakacje.pl row normalized into `Offers`, populate `metadata.wakacje` per [data-model.md](../../architecture/data-model.md#metadatawakacje-required-for-availability-checks). Minimum required keys:
+
+`hotel_id`, `tour_operator_id`, `country_id`, `region_id`, `city_id`, `departure_city_id`, `service_id`, `transport_id`, `departure_slug`, `offer_page_path`; `tour_op_code` when present in search results.

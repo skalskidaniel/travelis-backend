@@ -54,32 +54,32 @@ cell_id = sha256("{country}:{month}:{min_stars}:{board}:{adults}:{children}")[:1
 
 Canonical attractive offers (post-scoring, deduplicated).
 
-| Attribute                  | Type    | Description                                                                                      |
-| -------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| `cell_id` (PK)             | String  | Market cell this offer belongs to                                                                |
-| `offer_id` (SK)            | String  | Semantic fingerprint hash (globally unique)                                                      |
-| `provider`                 | String  | `wakacje` or `tui`                                                                               |
-| `provider_id`              | String  | Provider-native ID (e.g. wakacje `offerId`, tui `offerCode`)                                     |
-| `hotel_name`               | String  |                                                                                                  |
+| Attribute                  | Type    | Description                                                                                                                                                                                                                                                                                 |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cell_id` (PK)             | String  | Market cell this offer belongs to                                                                                                                                                                                                                                                           |
+| `offer_id` (SK)            | String  | Semantic fingerprint hash (globally unique)                                                                                                                                                                                                                                                 |
+| `provider`                 | String  | `wakacje` or `tui`                                                                                                                                                                                                                                                                          |
+| `provider_id`              | String  | Provider-native ID (e.g. wakacje `offerId`, tui `offerCode`)                                                                                                                                                                                                                                |
+| `hotel_name`               | String  |                                                                                                                                                                                                                                                                                             |
 | `location`                 | String  | Stored in format `Country/Region/City`. **Normalization:** wakacje.pl `placeName` is already in `Country / Region / City` format (normalize separators to `Country/Region/City`); TUI is constructed from `breadcrumbs[0].label` (country) + `breadcrumbs[1].label` (region) + `city` field |
-| `departure_airport`        | String  | IATA                                                                                             |
-| `departure_date`           | String  | ISO date                                                                                         |
-| `return_date`              | String  | ISO date                                                                                         |
-| `duration`                 | Number  | Nights                                                                                           |
-| `board`                    | String  | Normalized                                                                                       |
-| `stars`                    | Number  |                                                                                                  |
-| `rating`                   | Number  | Canonical 0–5 scale. wakacje.pl ratings (0–10) are divided by 2 during ingest normalization. TUI ratings (0–5, TripAdvisor) are used as-is |
-| `review_count`             | Number  |                                                                                                  |
-| `price_total`              | Number  | PLN                                                                                              |
-| `price_per_day_one_person` | Number  | PLN; `price_total / duration / (adults + children)`                                              |
-| `attractiveness_score`     | Number  | Stage 2 composite (used for sorting)                                                             |
-| `referral_url`             | String  | travellead / provider deep link                                                                  |
-| `share_url`                | String  | Constructed automatically on save: `f"{settings.FRONTEND_URL}/offer/{cell_id}/{offer_id}"`. Appears in **both** list and detail API responses |
-| `scraped_at`               | String  |                                                                                                  |
-| `updated_at`               | String  |                                                                                                  |
-| `available`                | Boolean | Updated by daily availability job                                                                |
-| `ttl`                      | Number  | Epoch seconds derived from `departure_date` (DynamoDB TTL)                                       |
-| `metadata`                 | Map     | Internal/debug fields not surfaced in the feed: `price_z_score`, `sources[]` (provider variants) |
+| `departure_airport`        | String  | IATA                                                                                                                                                                                                                                                                                        |
+| `departure_date`           | String  | ISO date                                                                                                                                                                                                                                                                                    |
+| `return_date`              | String  | ISO date                                                                                                                                                                                                                                                                                    |
+| `duration`                 | Number  | Nights                                                                                                                                                                                                                                                                                      |
+| `board`                    | String  | Normalized                                                                                                                                                                                                                                                                                  |
+| `stars`                    | Number  |                                                                                                                                                                                                                                                                                             |
+| `rating`                   | Number  | Canonical 0–5 scale. wakacje.pl ratings (0–10) are divided by 2 during ingest normalization. TUI ratings (0–5, TripAdvisor) are used as-is                                                                                                                                                  |
+| `review_count`             | Number  |                                                                                                                                                                                                                                                                                             |
+| `price_total`              | Number  | PLN                                                                                                                                                                                                                                                                                         |
+| `price_per_day_one_person` | Number  | PLN; `price_total / duration / (adults + children)`                                                                                                                                                                                                                                         |
+| `attractiveness_score`     | Number  | Stage 2 composite (used for sorting)                                                                                                                                                                                                                                                        |
+| `referral_url`             | String  | travellead / provider deep link                                                                                                                                                                                                                                                             |
+| `share_url`                | String  | Constructed automatically on save: `f"{settings.FRONTEND_URL}/offer/{cell_id}/{offer_id}"`. Appears in **both** list and detail API responses                                                                                                                                               |
+| `scraped_at`               | String  |                                                                                                                                                                                                                                                                                             |
+| `updated_at`               | String  |                                                                                                                                                                                                                                                                                             |
+| `available`                | Boolean | Updated by daily availability job                                                                                                                                                                                                                                                           |
+| `ttl`                      | Number  | Epoch seconds derived from `departure_date` (DynamoDB TTL)                                                                                                                                                                                                                                  |
+| `metadata`                 | Map     | Internal/debug fields not surfaced in the feed (see [Offer metadata](#offer-metadata))                                                                                                                                                                                                      |
 
 **Primary key (No GSIs):** `PK = cell_id`, `SK = offer_id`. The hot path (`jobs.match_users` reading all attractive offers for a set of cells) becomes a single `Query` per cell instead of a GSI lookup, and scrape upserts are `PutItem` on the composite key.
 
@@ -134,6 +134,57 @@ wakacje.pl often returns identical trips with different prices or tour operators
 
 Reference key fields from reverse-engineering: `offerHash`, `departureDate`, `returnDate`, `departurePlace`, `service`, `roomType`.
 
+## Offer metadata
+
+`metadata` holds fields needed for background jobs and provider-specific follow-up calls. None of it is returned in the user feed.
+
+### Common keys (all providers)
+
+| Key             | Type   | Description                                                                  |
+| --------------- | ------ | ---------------------------------------------------------------------------- |
+| `price_z_score` | Number | Stage-1 price z-score (debugging / attractiveness)                           |
+| `sources[]`     | List   | Collapsed provider variants after dedup (lowest price wins on the top level) |
+
+Each `sources[]` entry mirrors the provider-specific availability block below for that variant (same shape as `metadata.wakacje` or `metadata.tui`).
+
+### `metadata.wakacje` (required for availability checks)
+
+Persisted at **ingest** from the wakacje.pl search response (and airport catalog lookup). Together with the canonical offer columns (`provider_id`, `departure_date`, `return_date`, `duration`, `board`, `departure_airport`, plus cell `adults` / `children`), this must be sufficient to run the availability pipeline **without re-fetching the offer page HTML**.
+
+| Key                 | Type   | Source (search / ingest)                                                                          | Role                                                                                                       |
+| ------------------- | ------ | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `hotel_id`          | Number | `hotelId`                                                                                         | `getCalculatorOfferVariants` payload, `checkOfferAvailability` headers                                     |
+| `tour_operator_id`  | Number | `tourOperator`                                                                                    | `getCalculatorOfferVariants` payload (`tourId`)                                                            |
+| `tour_op_code`      | String | `tourOpCode` (optional — may be absent on SSR)                                                    | `getCalculatorOfferVariants` (`tourOp`), `checkOfferAvailability` (`providerCode`) fallback                |
+| `country_id`        | Number | `place.country.id`                                                                                | `checkOfferAvailability` query                                                                             |
+| `region_id`         | Number | `place.region.id`                                                                                 | `checkOfferAvailability` query                                                                             |
+| `city_id`           | Number | `place.city.id`                                                                                   | `checkOfferAvailability` query                                                                             |
+| `departure_city_id` | Number | mapped from `departurePlace` via airport catalog                                                  | `getCalculatorOfferVariants` (`departureCityId`) — **not** the IATA on `departure_airport`                 |
+| `service_id`        | Number | `service` (raw numeric board)                                                                     | `getCalculatorOfferVariants` (`serviceId`)                                                                 |
+| `transport_id`      | Number | `departureType` (default `1` = flight)                                                            | `getCalculatorOfferVariants` (`transportId`)                                                               |
+| `departure_slug`    | String | derived from `departurePlace` (e.g. `z-wroclawia`, `z-warszawy-chopin`)                           | Reconstructs the `od-...` URL selector; airport-specific slugs matter (Chopin ≠ Modlin ≠ generic Warszawa) |
+| `offer_page_path`   | String | geo slugs + `urlName` + `offerId` (e.g. `/oferty/egipt/hurghada/hurghada/hotel-name-745287.html`) | `Referer` on API calls                                                                                     |
+
+**Not stored** — resolved at check time:
+
+- `offer_hash` (long room variant id): returned by `POST /v2/api/getCalculatorOfferVariants/{offerId}` for the stored configuration. The short `offerHash` from search (e.g. `GRCS:6935`) is not usable for live checks.
+
+**Availability semantics** (see [pipeline.md](pipeline.md#availability-check-jobsavailability)):
+
+1. `getCalculatorOfferVariants` with stored params + canonical dates/occupancy.
+2. `offers: []` → configuration unavailable (`available = false`); skip step 3.
+3. Otherwise `checkOfferAvailability` with the chosen variant's `id` as `offerHash`.
+
+Canonical columns already cover: `provider_id` (= wakacje `offerId`), `departure_date`, `return_date`, `duration`, normalized `board`, `departure_airport` (IATA, feed-facing), and occupancy from the scrape cell (`adults`, `children`).
+
+### `metadata.tui` (required for availability checks)
+
+| Key          | Type   | Source      | Role                                         |
+| ------------ | ------ | ----------- | -------------------------------------------- |
+| `offer_code` | String | `offerCode` | `GET /api/www/hotel-cards/offers?offerCode=` |
+
+(`provider_id` on the offer row should match `offer_code`.)
+
 ### Cross-provider matching
 
 wakacje.pl and tui.pl offers are **not** merged across providers unless fingerprints collide (same hotel + dates + airport + board + room + occupancy). In practice they remain separate canonical offers.
@@ -161,6 +212,7 @@ user:{user_id}:sort:{field}:{order}:v{version}  →  ZSET
 Built lazily on first request for that sort. TTL: 24 hours.
 
 **Score Construction and Tie-Breaking**: Redis ZSET scores must be double-precision floats. Because multiple offers can have identical sort values (e.g. same price or same rating), the score is constructed deterministically to embed a lexicographical tie-breaker:
+
 - **Formula**: `score = primary_sort_value + (tie_breaker_fraction)`
 - **Price Sort (`price_total` or `price_per_day`)**: `score = price + (hash_fraction)`
 - **Attractiveness / Rating (`attractiveness_score`, `rating`)**: Since these are normalized values between `[0, 1]`, scale them: `score = (value * 1e8) + (hash_fraction)`.

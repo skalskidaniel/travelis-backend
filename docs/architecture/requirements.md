@@ -8,21 +8,21 @@ Users configure trip preferences and receive notifications when new matching dea
 
 ## Technology stack
 
-| Layer              | Choice                                                   |
-| ------------------ | -------------------------------------------------------- |
-| API runtime        | AWS Lambda + Mangum + FastAPI (`async def` handlers)     |
-| Concurrency        | Async end-to-end; `asyncio` semaphore for scrape fan-out |
-| Rate limiting      | FastAPI Limiter (async Redis)                            |
-| Infrastructure     | Terraform (+ Vault provider for secrets)                 |
-| Primary database   | DynamoDB (provisioned capacity for cost control)         |
-| Offer feed cache   | Redis Cloud                                              |
-| Scraping           | HTTP JSON APIs (no browser required for v1)              |
-| Statistics         | NumPy or pandas                                          |
-| Logging            | AWS Lambda Powertools                                    |
-| Monitoring         | Grafana (Sentry on frontend)                             |
-| AWS SDK            | aioboto3 (async; aiobotocore under the hood)             |
-| Authentication     | AWS Cognito                                              |
-| Availability check | TUI: direct API endpoint; wakacje.pl: availability-by-absence (offer no longer returned = unavailable). Better wakacje.pl method is a TODO |
+| Layer              | Choice                                                                                                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| API runtime        | AWS Lambda + Mangum + FastAPI (`async def` handlers)                                                                                                                                                                     |
+| Concurrency        | Async end-to-end; `asyncio` semaphore for scrape fan-out                                                                                                                                                                 |
+| Rate limiting      | FastAPI Limiter (async Redis)                                                                                                                                                                                            |
+| Infrastructure     | Terraform (+ Vault provider for secrets)                                                                                                                                                                                 |
+| Primary database   | DynamoDB (provisioned capacity for cost control)                                                                                                                                                                         |
+| Offer feed cache   | Redis Cloud                                                                                                                                                                                                              |
+| Scraping           | HTTP JSON APIs (no browser required for v1)                                                                                                                                                                              |
+| Statistics         | NumPy or pandas                                                                                                                                                                                                          |
+| Logging            | AWS Lambda Powertools                                                                                                                                                                                                    |
+| Monitoring         | Grafana (Sentry on frontend)                                                                                                                                                                                             |
+| AWS SDK            | aioboto3 (async; aiobotocore under the hood)                                                                                                                                                                             |
+| Authentication     | AWS Cognito                                                                                                                                                                                                              |
+| Availability check | Baseline: availability-by-absence (3× scrape). Optional 1× daily: TUI per-offer API; wakacje.pl two-step calculator API using `metadata.wakacje` (see [contract](../providers/wakacjepl/contract.md#offer-availability)) |
 
 CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the event loop.
 
@@ -31,42 +31,47 @@ CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the ev
 ## Implementation TODOs
 
 ### API & Infrastructure
+
 - [ ] Implement CORS middleware (frontend origin whitelist)
 - [ ] Implement health check endpoint (`/api/v2/health`)
 - [ ] Ensure all API endpoints are mounted under `/api/v2`
 - [ ] Validate proper use of RESTful HTTP status codes (`200`, `204`, `400`, `401`, `404`, `429`, `500`)
 
 ### Core Business Logic
+
 - [ ] Implement preference change debouncing using EventBridge Scheduler one-time schedules (see [pipeline.md](pipeline.md))
 
 ### Scraping & Integration
-- [ ] Find a way to check wakacje.pl offer availability. Create a test script to verify whether the tested approach works. (Do not implement into the main pipeline yet, just verify via script).
+
+- [x] Find a way to check wakacje.pl offer availability — verified in `notebooks/wakacje_pl_availability.ipynb` (`getCalculatorOfferVariants` + `checkOfferAvailability`). Pipeline integration pending; ingest must persist `metadata.wakacje` (see [data-model.md](data-model.md#metadatawakacje-required-for-availability-checks)).
+- [ ] Persist `metadata.wakacje` on ingest for every wakacje.pl offer.
+- [ ] Wire `jobs.availability` to the wakacje.pl JSON API (after metadata is populated).
 
 ## User preferences
 
 Users can configure:
 
-| #   | Field              | Constraints                                                                                |
-| --- | ------------------ | ------------------------------------------------------------------------------------------ |
-| 1   | Countries          | Unlimited selection                                                                        |
-| 2   | Departure airports | Unlimited selection (IATA codes; represented as an empty list `[]` for "Any")               |
-| 3   | Travel dates       | Date range (as ISO 8601 strings `YYYY-MM-DD`)                                               |
+| #   | Field              | Constraints                                                                                  |
+| --- | ------------------ | -------------------------------------------------------------------------------------------- |
+| 1   | Countries          | Unlimited selection                                                                          |
+| 2   | Departure airports | Unlimited selection (IATA codes; represented as an empty list `[]` for "Any")                |
+| 3   | Travel dates       | Date range (as ISO 8601 strings `YYYY-MM-DD`)                                                |
 | 4   | Occupancy          | Adults + children (children require birth dates formatted as `YYYY-MM-DD`). Single room only |
-| 5   | Board type         | `all-inclusive`, `full-board`, `half-board`, `bed-and-breakfast`, `none`                   |
-| 6   | Hotel standard     | Minimum stars (2–5) and minimum rating (0–5)                                               |
-| 7   | Stay length        | Minimum and maximum nights (the scraper queries `2–28` nights; matching filters user exact) |
+| 5   | Board type         | `all-inclusive`, `full-board`, `half-board`, `bed-and-breakfast`, `none`                     |
+| 6   | Hotel standard     | Minimum stars (2–5) and minimum rating (0–5)                                                 |
+| 7   | Stay length        | Minimum and maximum nights (the scraper queries `2–28` nights; matching filters user exact)  |
 
 ### Default preferences
 
-| Field              | Default                             | Behavior / Representation                           |
-| ------------------ | ----------------------------------- | --------------------------------------------------- |
-| Countries          | Greece, Italy, Spain, Turkey, Egypt | `["GR", "IT", "ES", "TR", "EG"]`                    |
-| Departure airports | Any                                 | Represented as empty list `[]`                      |
-| Travel dates       | Any                                 | Slid window: current month + next 8 months (9 total)|
-| Occupancy          | 2 adults, 0 children                | `adults = 2`, `children = []`                       |
-| Board type         | All-inclusive                       | `"all-inclusive"`                                   |
-| Hotel stars        | 2                                   | `min_stars = 2, min_rating = 0`                     |
-| Stay length        | Minimum 5 nights                    | `duration_min = 5, duration_max = null`             |
+| Field              | Default                             | Behavior / Representation                            |
+| ------------------ | ----------------------------------- | ---------------------------------------------------- |
+| Countries          | Greece, Italy, Spain, Turkey, Egypt | `["GR", "IT", "ES", "TR", "EG"]`                     |
+| Departure airports | Any                                 | Represented as empty list `[]`                       |
+| Travel dates       | Any                                 | Slid window: current month + next 8 months (9 total) |
+| Occupancy          | 2 adults, 0 children                | `adults = 2`, `children = []`                        |
+| Board type         | All-inclusive                       | `"all-inclusive"`                                    |
+| Hotel stars        | 2                                   | `min_stars = 2, min_rating = 0`                      |
+| Stay length        | Minimum 5 nights                    | `duration_min = 5, duration_max = null`              |
 
 ### Preference debouncing
 
@@ -158,10 +163,10 @@ Weights are fixed constants in v1. AHP-based calibration is a future improvement
 
 Providers use different rating scales:
 
-| Provider    | Native Scale | Source             |
-| ----------- | ------------ | ------------------ |
-| wakacje.pl  | 0–10         | Provider ratings   |
-| tui.pl      | 0–5          | TripAdvisor rating |
+| Provider   | Native Scale | Source             |
+| ---------- | ------------ | ------------------ |
+| wakacje.pl | 0–10         | Provider ratings   |
+| tui.pl     | 0–5          | TripAdvisor rating |
 
 Canonical `Offers.rating` is on a **0–5 scale**. During ingest normalization, wakacje.pl ratings are **divided by 2** to map to the canonical scale. TUI ratings are used as-is.
 
@@ -173,22 +178,22 @@ Canonical board types: `all-inclusive`, `full-board`, `half-board`, `bed-and-bre
 
 Uses a numeric `service` field (inverse mapping from `wakacjepl_filters.json`):
 
-| `service` value | Canonical board type  |
-| --------------- | --------------------- |
-| 1               | `all-inclusive`       |
-| 2               | `half-board`          |
-| 3               | `bed-and-breakfast`   |
-| 4               | `none`                |
-| 6               | `full-board`          |
+| `service` value | Canonical board type |
+| --------------- | -------------------- |
+| 1               | `all-inclusive`      |
+| 2               | `half-board`         |
+| 3               | `bed-and-breakfast`  |
+| 4               | `none`               |
+| 6               | `full-board`         |
 
 ### tui.pl
 
 Uses `boardCode` string values:
 
-| `boardCode`          | Canonical board type  |
-| -------------------- | --------------------- |
-| `GT06-AI`, `GT06-XX` | `all-inclusive`       |
-| `GT06-FB`, `GT06-FBP`| `full-board`          |
-| `GT06-HB`, `GT06-HBP`| `half-board`          |
-| `GT06-BB`            | `bed-and-breakfast`   |
-| `GT06-AO`            | `none`                |
+| `boardCode`           | Canonical board type |
+| --------------------- | -------------------- |
+| `GT06-AI`, `GT06-XX`  | `all-inclusive`      |
+| `GT06-FB`, `GT06-FBP` | `full-board`         |
+| `GT06-HB`, `GT06-HBP` | `half-board`         |
+| `GT06-BB`             | `bed-and-breakfast`  |
+| `GT06-AO`             | `none`               |
