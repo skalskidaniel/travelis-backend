@@ -67,11 +67,9 @@ The semaphore/fan-out lives in the orchestrator; per-cell work calls `async` `co
 
 ## Scrape → normalize
 
-Per provider response:
-
 1. Map provider fields to canonical offer schema.
 2. Compute semantic fingerprint → `offer_id`.
-3. **wakacje.pl dedup:** collapse rows with same fingerprint; keep lowest price.
+3. **Collapsing/Deduplication**: Collapse provider search results with the same semantic fingerprint (intra-scrape and cross-provider), keeping the lowest price variant and accumulating sources (see [data-model.md](data-model.md#deduplication-and-variant-collapsing)).
 4. **Provider metadata:** persist `metadata.wakacje` or `metadata.tui` (see [data-model.md](data-model.md#offer-metadata)) — required for later per-offer availability checks without re-scraping the offer page.
 5. Attach `cell_id` from the scrape context.
 6. Forward to scoring.
@@ -80,7 +78,7 @@ Per provider response:
 
 See [attractiveness.md](attractiveness.md).
 
-Only offers passing stage 2 are written to `Offers`. Existing offers for the same `offer_id` are upserted (price, availability, score may change).
+Only offers passing stage 2 are written to `Offers`. If an offer already exists in DynamoDB for the same `(cell_id, offer_id)`, the ingestion process retrieves the existing item, merges the new and old variant sources, updates the primary offer details with the lowest-priced variant, and saves it back (preventing overwrite of other provider data).
 
 ## User matching (`jobs.match_users`)
 

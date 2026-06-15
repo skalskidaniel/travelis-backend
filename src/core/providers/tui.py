@@ -20,8 +20,7 @@ from core.exceptions import (
     ProviderAPIException,
 )
 from core.models.cell import MarketCell
-from core.models.offer import BoardType, Offer, OfferMetadata, Provider, TuiMetadata
-from core.models.raw_offer import RawOffer
+from core.models.offer import BoardType, RawOffer, Offer, OfferMetadata, Provider, TuiMetadata
 
 SEARCH_URL = "https://www.tui.pl/api/services/tui-search/api/search/offers"
 AVAILABILITY_URL = "https://www.tui.pl/api/www/hotel-cards/offers"

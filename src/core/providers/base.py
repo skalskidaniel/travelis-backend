@@ -4,8 +4,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from core.models.cell import MarketCell
-    from core.models.offer import Offer, Provider
-    from core.models.raw_offer import RawOffer
+    from core.models.offer import RawOffer, Offer, Provider
 
 
 @runtime_checkable

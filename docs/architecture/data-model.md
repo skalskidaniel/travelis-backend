@@ -124,15 +124,30 @@ fingerprint = sha256(join([
 offer_id = fingerprint[:32]
 ```
 
-### wakacje.pl deduplication
+### Deduplication and variant collapsing
 
-wakacje.pl often returns identical trips with different prices or tour operators. During scrape normalization, collapse duplicates to one canonical offer:
+Deduplication occurs at multiple levels to ensure a clean, unified feed with the best prices:
 
-- Keep the **lowest `price_total`**.
-- Store all provider variants in `metadata.sources[]`.
-- Set `provider_id` to the winning variant's ID.
+1. **Intra-Scrape Deduplication (Same Provider)**:
+   - wakacje.pl often returns identical trips differing only in price or tour operator. During normalization, these are collapsed into one canonical offer.
+   - We keep the variant with the **lowest `price_total`**.
+   - All collapsed provider variants are stored in `metadata.sources[]`.
+   - The top-level `provider_id` is set to the winning variant's ID.
+   - Reference key fields for wakacje.pl variant matching: `offerHash`, `departureDate`, `returnDate`, `departurePlace`, `service`, `roomType`.
 
-Reference key fields from reverse-engineering: `offerHash`, `departureDate`, `returnDate`, `departurePlace`, `service`, `roomType`.
+2. **Cross-Provider Deduplication (Fingerprint Collision)**:
+   - When the same trip (same hotel, dates, airport, board, room, occupancy) is offered by both wakacje.pl and tui.pl, they compute to the same `offer_id`.
+   - If they are processed in the same scrape batch, they are collapsed into a single canonical offer based on the lowest price, with both providers' details stored as separate entries in `metadata.sources[]`.
+
+3. **Database-Level Deduplication (Cross-Scrape / Existing Offer in DB)**:
+   - When a scraped offer is being saved, the system checks if an offer with the same `(cell_id, offer_id)` already exists in the `Offers` table.
+   - If it exists, the system **merges** the existing and new items instead of performing a blind overwrite:
+     - The existing item is loaded from DynamoDB.
+     - The `sources` lists from both the existing and new offers are merged and deduplicated (using provider name and native ID).
+     - The variant with the **lowest `price_total`** across all combined sources is selected as the winner.
+     - The top-level offer fields (`price_total`, `price_per_day_one_person`, `provider`, `provider_id`, `referral_url`) are updated to reflect the winning variant.
+     - The provider-specific metadata blocks (`metadata.wakacje` and `metadata.tui`) are both preserved if variants from both providers exist in the merged sources list.
+     - The `updated_at` and `scraped_at` timestamps are refreshed, and the merged offer is saved back to DynamoDB.
 
 ## Offer metadata
 

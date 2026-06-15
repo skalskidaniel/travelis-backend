@@ -315,7 +315,7 @@ Use `destinationsCodes` / `departuresCodes` in search requests; there is no sepa
 ### Other Fields
 
 - `offerUrl` must be prefixed with `https://www.tui.pl` (e.g., `https://www.tui.pl/wypoczynek/...`).
-- Location in the application is derived from `breadcrumbs[0].label` (country) and `breadcrumbs[1].label` (region).
+- Location in the application is normalized to `Country/Region/City`. It is derived from `breadcrumbs[0].label` (country), `breadcrumbs[1].label` (region), and either `breadcrumbs[2].label` (city) if present or the fallback `city` field. All slashes (`/`) in labels are normalized to ` - `.
 
 ### Offer Availability
 

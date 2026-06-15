@@ -8,8 +8,7 @@ import numpy as np
 from unittest.mock import patch
 
 from core.models.cell import MarketCell
-from core.models.offer import BoardType, Offer, OfferMetadata, Provider, TuiMetadata
-from core.models.raw_offer import RawOffer
+from core.models.offer import BoardType, RawOffer, Offer, OfferMetadata, Provider, TuiMetadata
 from core.providers.tui import TuiProvider, SEARCH_URL, AVAILABILITY_URL
 from core.exceptions import (
     CountryNotFoundException,
