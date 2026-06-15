@@ -138,6 +138,39 @@ wakacje.pl exposes "dictionaries" to fetch current IDs:
 - Regions and cities within a country: `GET https://www.wakacje.pl/v2/api/geoCatalogRegionsAndCities/{countryId}`
   - Example: `Kreta` in `Grecja (29)` has `value: "29004"`.
 
+A minimal ID snapshot is checked in at [wakacjepl_geo_catalog.json](wakacjepl_geo_catalog.json) (~80 KB). Regenerate with:
+
+```bash
+uv run python scripts/fetch_wakacjepl_geo_catalog.py
+```
+
+Shape:
+
+```json
+{
+  "generated_at": "…",
+  "countries": { "99": { "iso": "MT", "name": "Malta" } },
+  "regions": { "312597": { "country_id": "99", "name": "Wyspa Malta" } },
+  "cities": {
+    "99004948": { "country_id": "99", "region_id": "312597", "name": "Bugibba" }
+  },
+  "departure_airports": {
+    "10119": {
+      "iata": "WAW",
+      "name": "Warszawa - Chopin",
+      "slug": "z-warszawy-chopin"
+    }
+  }
+}
+```
+
+- `countries` — `countryId` → ISO + display name
+- `regions` — `regionId` → `country_id` + **name**
+- `cities` — `cityId` → parent IDs + name (`checkOfferAvailability` / `metadata.wakacje`)
+- `departure_airports` — `departureCityId` → IATA, **name**, URL **slug** (`getCalculatorOfferVariants` / `metadata.wakacje.departure_slug`)
+
+Airport IDs are merged from [wakacjepl_filters.json](wakacjepl_filters.json) and `offerConfiguratorV2/filters` labels.
+
 Observation from the UI (selecting "Grecja → Kreta"):
 
 - `params.regionId` receives `"29004"`, while `params.countryId` remains empty.
