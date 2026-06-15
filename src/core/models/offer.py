@@ -167,21 +167,18 @@ class OfferMetadata(BaseModel):
     )
 
 
-class Offer(BaseModel):
+class RawOffer(BaseModel):
+    """Provider-mapped offer row returned by an adapter before ingest normalization."""
+
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    cell_id: CellId = Field(description="Market cell this offer belongs to.")
-    offer_id: OfferId = Field(description="Globally unique semantic fingerprint for the trip.")
-    provider: Provider = Field(description="Source provider adapter (wakacje or tui).")
-    provider_id: str = Field(
-        min_length=1,
-        description="Provider-native ID (wakacje offerId or TUI offerCode).",
-    )
+    provider: Provider = Field(description="Source provider adapter.")
+    provider_id: str = Field(min_length=1, description="Provider-native offer identifier.")
     hotel_name: str = Field(min_length=1, description="Display name of the hotel.")
     location: LocationPath = Field(description="Normalized Country/Region/City location path.")
     departure_airport: IataCode = Field(description="Departure airport IATA code.")
-    departure_date: date = Field(description="Trip departure date (ISO calendar date).")
-    return_date: date = Field(description="Trip return date (ISO calendar date).")
+    departure_date: date = Field(description="Trip departure date.")
+    return_date: date = Field(description="Trip return date.")
     duration: int = Field(ge=1, description="Trip length in nights.")
     board: BoardType = Field(description="Normalized board type.")
     stars: int = Field(ge=1, le=5, description="Hotel star rating.")
@@ -189,24 +186,28 @@ class Offer(BaseModel):
     review_count: int = Field(ge=0, description="Number of guest reviews backing the rating.")
     price_total: PricePLN = Field(description="Total trip price in PLN.")
     price_per_day_one_person: PricePLN = Field(
-        description="PLN per night per person: price_total / duration / (adults + children).",
+        description="PLN per night per person for the scrape occupancy.",
     )
+    referral_url: AnyHttpUrl = Field(description="Provider deep link.")
+    available: bool = Field(description="Whether the provider marks the offer as bookable.")
+    room_type: str = Field(min_length=1, description="Normalized room type used for fingerprinting.")
+    metadata: OfferMetadata = Field(description="Provider-specific metadata captured at ingest.")
+
+
+class Offer(RawOffer):
+    cell_id: CellId = Field(description="Market cell this offer belongs to.")
+    offer_id: OfferId = Field(description="Globally unique semantic fingerprint for the trip.")
     attractiveness_score: float = Field(
         ge=0,
         le=1,
         description="Stage-2 composite score used for feed sorting.",
     )
-    referral_url: AnyHttpUrl = Field(description="Provider or travellead deep link.")
     share_url: HttpUrl = Field(
         description=f"Public share URL; must start with {SHARE_URL_PREFIX}",
     )
     scraped_at: datetime = Field(description="UTC timestamp when the offer was last scraped.")
     updated_at: datetime = Field(description="UTC timestamp when the offer row was last updated.")
-    available: bool = Field(description="Whether the offer is currently bookable.")
     ttl: int = Field(ge=0, description="DynamoDB TTL as epoch seconds derived from departure_date.")
-    metadata: OfferMetadata = Field(
-        description="Internal/debug fields not surfaced in the user feed.",
-    )
 
     @field_validator("share_url")
     @classmethod
