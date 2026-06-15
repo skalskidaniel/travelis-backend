@@ -9,6 +9,7 @@ dependencies = [
     "crawlee[all]>=1.7.2",
     "fastapi[standard]>=0.137.0",
     "ipykernel>=7.3.0",
+    "pydantic>=2.13.4",
 ]
 
 [tool.fastapi]

@@ -2679,6 +2679,7 @@ dependencies = [
     { name = "crawlee", extra = ["all"] },
     { name = "fastapi", extra = ["standard"] },
     { name = "ipykernel" },
+    { name = "pydantic" },
 ]
 
 [package.metadata]
@@ -2687,6 +2688,7 @@ requires-dist = [
     { name = "crawlee", extras = ["all"], specifier = ">=1.7.2" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.137.0" },
     { name = "ipykernel", specifier = ">=7.3.0" },
+    { name = "pydantic", specifier = ">=2.13.4" },
 ]
 
 [[package]]
