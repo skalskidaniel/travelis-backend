@@ -97,9 +97,15 @@ Rating = Annotated[
 class OfferSource(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    provider: Provider = Field(description="Provider that supplied this collapsed variant.")
-    provider_id: str = Field(min_length=1, description="Provider-native offer identifier.")
-    price_total: PricePLN = Field(description="Total trip price for this variant in PLN.")
+    provider: Provider = Field(
+        description="Provider that supplied this collapsed variant."
+    )
+    provider_id: str = Field(
+        min_length=1, description="Provider-native offer identifier."
+    )
+    price_total: PricePLN = Field(
+        description="Total trip price for this variant in PLN."
+    )
     tour_operator: str | None = Field(
         default=None,
         description="Tour operator label when the provider exposes one (wakacje.pl dedup).",
@@ -109,8 +115,12 @@ class OfferSource(BaseModel):
 class WakacjeMetadata(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    hotel_id: int = Field(ge=1, description="wakacje.pl hotelId for calculator/availability APIs.")
-    tour_operator_id: int = Field(ge=1, description="wakacje.pl tourOperator (tourId in calculator payload).")
+    hotel_id: int = Field(
+        ge=1, description="wakacje.pl hotelId for calculator/availability APIs."
+    )
+    tour_operator_id: int = Field(
+        ge=1, description="wakacje.pl tourOperator (tourId in calculator payload)."
+    )
     tour_op_code: str | None = Field(
         default=None,
         min_length=1,
@@ -123,7 +133,9 @@ class WakacjeMetadata(BaseModel):
         ge=1,
         description="wakacje.pl departure city id mapped from departurePlace (not the IATA code).",
     )
-    service_id: int = Field(ge=1, description="Raw wakacje.pl service (board) numeric code.")
+    service_id: int = Field(
+        ge=1, description="Raw wakacje.pl service (board) numeric code."
+    )
     transport_id: int = Field(
         default=1,
         ge=1,
@@ -143,7 +155,9 @@ class WakacjeMetadata(BaseModel):
 class TuiMetadata(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    offer_code: str = Field(min_length=1, description="TUI offerCode for hotel-cards availability checks.")
+    offer_code: str = Field(
+        min_length=1, description="TUI offerCode for hotel-cards availability checks."
+    )
 
 
 class OfferMetadata(BaseModel):
@@ -173,9 +187,13 @@ class RawOffer(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     provider: Provider = Field(description="Source provider adapter.")
-    provider_id: str = Field(min_length=1, description="Provider-native offer identifier.")
+    provider_id: str = Field(
+        min_length=1, description="Provider-native offer identifier."
+    )
     hotel_name: str = Field(min_length=1, description="Display name of the hotel.")
-    location: LocationPath = Field(description="Normalized Country/Region/City location path.")
+    location: LocationPath = Field(
+        description="Normalized Country/Region/City location path."
+    )
     departure_airport: IataCode = Field(description="Departure airport IATA code.")
     departure_date: date = Field(description="Trip departure date.")
     return_date: date = Field(description="Trip return date.")
@@ -183,20 +201,30 @@ class RawOffer(BaseModel):
     board: BoardType = Field(description="Normalized board type.")
     stars: int = Field(ge=1, le=5, description="Hotel star rating.")
     rating: Rating = Field(description="Canonical guest rating on a 0–5 scale.")
-    review_count: int = Field(ge=0, description="Number of guest reviews backing the rating.")
+    review_count: int = Field(
+        ge=0, description="Number of guest reviews backing the rating."
+    )
     price_total: PricePLN = Field(description="Total trip price in PLN.")
     price_per_day_one_person: PricePLN = Field(
         description="PLN per night per person for the scrape occupancy.",
     )
     referral_url: AnyHttpUrl = Field(description="Provider deep link.")
-    available: bool = Field(description="Whether the provider marks the offer as bookable.")
-    room_type: str = Field(min_length=1, description="Normalized room type used for fingerprinting.")
-    metadata: OfferMetadata = Field(description="Provider-specific metadata captured at ingest.")
+    available: bool = Field(
+        description="Whether the provider marks the offer as bookable."
+    )
+    room_type: str = Field(
+        min_length=1, description="Normalized room type used for fingerprinting."
+    )
+    metadata: OfferMetadata = Field(
+        description="Provider-specific metadata captured at ingest."
+    )
 
 
 class Offer(RawOffer):
     cell_id: CellId = Field(description="Market cell this offer belongs to.")
-    offer_id: OfferId = Field(description="Globally unique semantic fingerprint for the trip.")
+    offer_id: OfferId = Field(
+        description="Globally unique semantic fingerprint for the trip."
+    )
     attractiveness_score: float = Field(
         ge=0,
         le=1,
@@ -205,9 +233,15 @@ class Offer(RawOffer):
     share_url: HttpUrl = Field(
         description=f"Public share URL; must start with {SHARE_URL_PREFIX}",
     )
-    scraped_at: datetime = Field(description="UTC timestamp when the offer was last scraped.")
-    updated_at: datetime = Field(description="UTC timestamp when the offer row was last updated.")
-    ttl: int = Field(ge=0, description="DynamoDB TTL as epoch seconds derived from departure_date.")
+    scraped_at: datetime = Field(
+        description="UTC timestamp when the offer was last scraped."
+    )
+    updated_at: datetime = Field(
+        description="UTC timestamp when the offer row was last updated."
+    )
+    ttl: int = Field(
+        ge=0, description="DynamoDB TTL as epoch seconds derived from departure_date."
+    )
 
     @field_validator("share_url")
     @classmethod

@@ -10,6 +10,15 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
+from core.exceptions import (
+    BoardTypeNotSupportedException,
+    CountryNotFoundException,
+    DateMismatchException,
+    InvalidOfferMetadataException,
+    MinStarsNotSupportedException,
+    PastDatesException,
+    ProviderAPIException,
+)
 from core.models.cell import MarketCell
 from core.models.offer import BoardType, Offer, OfferMetadata, Provider, TuiMetadata
 from core.models.raw_offer import RawOffer
@@ -36,7 +45,9 @@ BOARD_CODE_TO_TYPE: dict[str, BoardType] = {
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_FILTERS_PATH = Path(__file__).resolve().parent / "resources/tui_filters.json"
-DEFAULT_GEO_CATALOG_PATH = _PROJECT_ROOT / "docs/providers/tui/tui_geo_catalog.json"  # TODO: load from S3 in prod
+DEFAULT_GEO_CATALOG_PATH = (
+    _PROJECT_ROOT / "docs/providers/tui/tui_geo_catalog.json"
+)  # TODO: load from S3 in prod
 
 
 def _format_tui_date(value: date) -> str:
@@ -72,7 +83,10 @@ def _default_search_filters(
         {"filterId": "amountRange", "selectedValues": []},
         {"filterId": "minHotelCategory", "selectedValues": [min_hotel_category]},
         {"filterId": "flight_category", "selectedValues": []},
-        {"filterId": "tripAdvisorRating", "selectedValues": ["defaultTripAdvisorRating"]},
+        {
+            "filterId": "tripAdvisorRating",
+            "selectedValues": ["defaultTripAdvisorRating"],
+        },
         {"filterId": "beach_distance", "selectedValues": ["defaultBeachDistance"]},
         {"filterId": "facilities", "selectedValues": []},
         {"filterId": "WIFI", "selectedValues": []},
@@ -107,17 +121,34 @@ class TuiProvider:
         return Provider.TUI
 
     async def search(self, cell: MarketCell) -> list[RawOffer]:
+        departure_from, departure_to = _month_date_bounds(cell.month)
+        today = date.today()
+        if departure_from > departure_to:
+            raise DateMismatchException(
+                f"Departure date {departure_from} is after return/end date {departure_to}"
+            )
+        if departure_from < today and departure_to < today:
+            raise PastDatesException(
+                f"Both search dates are in the past: {departure_from} to {departure_to} (today is {today})"
+            )
+
         destination_codes = self._destination_codes.get(cell.country)
         if not destination_codes:
-            return []
+            raise CountryNotFoundException(
+                f"Country code '{cell.country}' is not supported by TUI provider."
+            )
 
         board_codes = self._board_codes_for_cell(cell)
         if board_codes is None:
-            return []
+            raise BoardTypeNotSupportedException(
+                f"Board type '{cell.board}' is not supported by TUI provider."
+            )
 
         min_hotel_category = self._min_hotel_category_values.get(str(cell.min_stars))
         if min_hotel_category is None:
-            return []
+            raise MinStarsNotSupportedException(
+                f"Min stars '{cell.min_stars}' is not supported by TUI provider."
+            )
 
         raw_offers: list[RawOffer] = []
         page = 0
@@ -131,12 +162,16 @@ class TuiProvider:
                 board_codes=board_codes,
                 min_hotel_category=min_hotel_category,
             )
-            response = await self._client.post(
-                SEARCH_URL,
-                json=payload,
-                headers=self._search_headers(),
-            )
-            response.raise_for_status()
+            try:
+                response = await self._client.post(
+                    SEARCH_URL,
+                    json=payload,
+                    headers=self._search_headers(),
+                )
+                response.raise_for_status()
+            except httpx.HTTPError as e:
+                raise ProviderAPIException(f"TUI search API request failed: {e}") from e
+
             data = response.json()
             pagination = data.get("pagination") or {}
             pages_count = int(pagination.get("pagesCount") or 0)
@@ -233,21 +268,29 @@ class TuiProvider:
     async def _fetch_offer_details(self, offer: Offer) -> dict[str, Any]:
         if offer.metadata.tui is None:
             msg = "metadata.tui is required for TUI availability checks"
-            raise ValueError(msg)
+            raise InvalidOfferMetadataException(msg)
 
-        response = await self._client.get(
-            AVAILABILITY_URL,
-            params={"offerCode": offer.metadata.tui.offer_code},
-            headers=self._availability_headers(),
-        )
-        response.raise_for_status()
+        try:
+            response = await self._client.get(
+                AVAILABILITY_URL,
+                params={"offerCode": offer.metadata.tui.offer_code},
+                headers=self._availability_headers(),
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as e:
+            raise ProviderAPIException(
+                f"TUI availability API request failed: {e}"
+            ) from e
+
         payload = response.json()
         if not isinstance(payload, dict):
-            msg = "unexpected TUI availability response shape"
-            raise TypeError(msg)
+            msg = f"unexpected TUI availability response shape: expected dict, got {type(payload).__name__}"
+            raise ProviderAPIException(msg)
         return payload
 
-    def _map_search_offer(self, item: dict[str, Any], *, cell: MarketCell) -> RawOffer | None:
+    def _map_search_offer(
+        self, item: dict[str, Any], *, cell: MarketCell
+    ) -> RawOffer | None:
         if item.get("soldOut"):
             return None
 
@@ -303,9 +346,9 @@ class TuiProvider:
         participants = cell.adults + cell.children
         price_total = Decimal(str(price_total_raw))
         if price_per_person_raw is not None:
-            price_per_day_one_person = (Decimal(str(price_per_person_raw)) / duration).quantize(
-                Decimal("0.01")
-            )
+            price_per_day_one_person = (
+                Decimal(str(price_per_person_raw)) / duration
+            ).quantize(Decimal("0.01"))
         else:
             price_per_day_one_person = (price_total / duration / participants).quantize(
                 Decimal("0.01")

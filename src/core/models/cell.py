@@ -21,11 +21,17 @@ class MarketCell(BaseModel):
         pattern=MONTH_PATTERN,
         description="Travel month bucket as YYYY-MM.",
     )
-    min_stars: int = Field(ge=2, le=5, description="Minimum hotel star rating for this cell.")
+    min_stars: int = Field(
+        ge=2, le=5, description="Minimum hotel star rating for this cell."
+    )
     board: BoardType = Field(description="Normalized board type scraped for this cell.")
     adults: int = Field(ge=1, description="Number of adults in the scrape occupancy.")
-    children: int = Field(ge=0, description="Number of children in the scrape occupancy.")
-    activation_count: int = Field(ge=1, description="Number of users requiring this cell.")
+    children: int = Field(
+        ge=0, description="Number of children in the scrape occupancy."
+    )
+    activation_count: int = Field(
+        ge=1, description="Number of users requiring this cell."
+    )
     last_scraped_at: datetime | None = Field(
         default=None,
         description="UTC timestamp of the last successful scrape for this cell.",

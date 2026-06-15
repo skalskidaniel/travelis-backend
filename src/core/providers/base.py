@@ -38,7 +38,7 @@ class OfferProvider(Protocol):
         ``metadata.tui``) together with canonical offer fields.
         """
         ...
-        
+
     async def check_price(self, offer: Offer) -> Decimal:
         """Return an updated offer price."""
         ...

@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI
 from app.auth.controller import router as auth_router
 from app.offers.controller import router as offers_router
 from app.user.controller import router as user_router

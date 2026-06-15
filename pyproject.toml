@@ -9,8 +9,20 @@ dependencies = [
     "crawlee[all]>=1.7.2",
     "fastapi[standard]>=0.137.0",
     "ipykernel>=7.3.0",
+    "pandas>=3.0.3",
     "pydantic>=2.13.4",
 ]
 
 [tool.fastapi]
 entrypoint = "app.main:app"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.0",
+    "pytest-asyncio>=1.4.0",
+    "respx>=0.23.1",
+    "ruff>=0.15.17",
+]
