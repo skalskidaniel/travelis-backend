@@ -1,5 +1,11 @@
 {
-  "generated_at": "2026-06-15T16:45:26.930204+00:00",
+  "provider": "wakacje.pl",
+  "generated_at": "2026-06-15T16:52:05.509008+00:00",
+  "sources": {
+    "countries": "https://www.wakacje.pl/v2/api/geoCatalogCountries",
+    "regions_and_cities": "https://www.wakacje.pl/v2/api/geoCatalogRegionsAndCities/{countryId}",
+    "departure_airports": "https://www.wakacje.pl/v2/api/offerConfiguratorV2/filters"
+  },
   "countries": {
     "436": {
       "iso": "AL",
@@ -11235,5 +11241,11 @@
       "name": "Warszawa",
       "slug": "z-warszawy"
     }
+  },
+  "stats": {
+    "country_count": 133,
+    "region_count": 399,
+    "city_count": 1801,
+    "departure_airport_count": 19
   }
 }

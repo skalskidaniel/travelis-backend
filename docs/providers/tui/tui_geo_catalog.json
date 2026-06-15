@@ -1,0 +1,718 @@
+{
+  "provider": "tui.pl",
+  "generated_at": "2026-06-15T16:52:18.411752+00:00",
+  "sources": {
+    "destinations_and_departures": "https://www.tui.pl/api/services/tui-search/api/gs/initial"
+  },
+  "countries": {
+    "TIA": {
+      "iso": "AL",
+      "name": "Albania"
+    },
+    "AUA": {
+      "iso": "AUA",
+      "name": "Aruba"
+    },
+    "AT": {
+      "iso": "AT",
+      "name": "Austria"
+    },
+    "PDL": {
+      "iso": "PT-20",
+      "name": "Azory"
+    },
+    "BG": {
+      "iso": "BG",
+      "name": "Bułgaria"
+    },
+    "HR": {
+      "iso": "HR",
+      "name": "Chorwacja"
+    },
+    "CUR": {
+      "iso": "CW",
+      "name": "Curaçao"
+    },
+    "CY": {
+      "iso": "CY",
+      "name": "Cypr"
+    },
+    "TGD": {
+      "iso": "ME",
+      "name": "Czarnogóra"
+    },
+    "CZ": {
+      "iso": "CZ",
+      "name": "Czechy"
+    },
+    "DK": {
+      "iso": "DK",
+      "name": "Dania"
+    },
+    "DJE": {
+      "iso": "TN",
+      "name": "Djerba"
+    },
+    "DO": {
+      "iso": "DO",
+      "name": "Dominikana"
+    },
+    "EG": {
+      "iso": "EG",
+      "name": "Egipt"
+    },
+    "FR": {
+      "iso": "FR",
+      "name": "Francja"
+    },
+    "BJL": {
+      "iso": "BJL",
+      "name": "Gambia"
+    },
+    "GR": {
+      "iso": "GR",
+      "name": "Grecja"
+    },
+    "ES": {
+      "iso": "ES",
+      "name": "Hiszpania"
+    },
+    "ID": {
+      "iso": "ID",
+      "name": "Indonezja - Bali"
+    },
+    "MBJ": {
+      "iso": "JM",
+      "name": "Jamajka"
+    },
+    "MBA": {
+      "iso": "KE",
+      "name": "Kenia"
+    },
+    "SJO": {
+      "iso": "SJO",
+      "name": "Kostaryka"
+    },
+    "FNC": {
+      "iso": "PT-30",
+      "name": "Madera"
+    },
+    "MLE": {
+      "iso": "MV",
+      "name": "Malediwy"
+    },
+    "MLA": {
+      "iso": "MT",
+      "name": "Malta"
+    },
+    "MA": {
+      "iso": "MA",
+      "name": "Maroko"
+    },
+    "MRU": {
+      "iso": "MU",
+      "name": "Mauritius"
+    },
+    "ME": {
+      "iso": "ME",
+      "name": "Meksyk"
+    },
+    "DE": {
+      "iso": "DE",
+      "name": "Niemcy"
+    },
+    "OM": {
+      "iso": "OM",
+      "name": "Oman"
+    },
+    "PT": {
+      "iso": "PT",
+      "name": "Portugalia"
+    },
+    "DSS": {
+      "iso": "SN",
+      "name": "Senegal"
+    },
+    "SC": {
+      "iso": "SC",
+      "name": "Seszele"
+    },
+    "SIN": {
+      "iso": "SG",
+      "name": "Singapur"
+    },
+    "CMB": {
+      "iso": "LK",
+      "name": "Sri Lanka"
+    },
+    "US": {
+      "iso": "US",
+      "name": "Stany Zjednoczone"
+    },
+    "TH": {
+      "iso": "TH",
+      "name": "Tajlandia"
+    },
+    "TN": {
+      "iso": "TN",
+      "name": "Tunezja"
+    },
+    "TR": {
+      "iso": "TR",
+      "name": "Turcja"
+    },
+    "BUD": {
+      "iso": "BUD",
+      "name": "Węgry"
+    },
+    "UK": {
+      "iso": "UK",
+      "name": "Wielka Brytania"
+    },
+    "VN": {
+      "iso": "VN",
+      "name": "Wietnam"
+    },
+    "IT": {
+      "iso": "IT",
+      "name": "Włochy"
+    },
+    "IC": {
+      "iso": "IC",
+      "name": "Wyspy Kanaryjskie"
+    },
+    "CV": {
+      "iso": "CV",
+      "name": "Wyspy Zielonego Przylądka"
+    },
+    "ZNZ": {
+      "iso": "ZNZ",
+      "name": "Zanzibar"
+    },
+    "AE": {
+      "iso": "AE",
+      "name": "Zjednoczone Emiraty Arabskie"
+    }
+  },
+  "regions": {
+    "TIA": {
+      "country_code": "TIA",
+      "name": "Albania"
+    },
+    "AUA": {
+      "country_code": "AUA",
+      "name": "Aruba"
+    },
+    "INN": {
+      "country_code": "AT",
+      "name": "Tyrol"
+    },
+    "VIE": {
+      "country_code": "AT",
+      "name": "Wiedeń"
+    },
+    "PDL": {
+      "country_code": "PT",
+      "name": "Azory"
+    },
+    "BOJ": {
+      "country_code": "BG",
+      "name": "Riwiera Bułgarska"
+    },
+    "ZAD": {
+      "country_code": "HR",
+      "name": "Dalmacja Północna"
+    },
+    "DBV": {
+      "country_code": "HR",
+      "name": "Dalmacja Południowa"
+    },
+    "SPU": {
+      "country_code": "HR",
+      "name": "Dalmacja Środkowa"
+    },
+    "PUY": {
+      "country_code": "HR",
+      "name": "Istria"
+    },
+    "RJK": {
+      "country_code": "HR",
+      "name": "Zatoka Kvarner"
+    },
+    "CUR": {
+      "country_code": "CUR",
+      "name": "Curaçao"
+    },
+    "LCA": {
+      "country_code": "CY",
+      "name": "Larnaka"
+    },
+    "PFO": {
+      "country_code": "CY",
+      "name": "Pafos"
+    },
+    "TGD": {
+      "country_code": "TGD",
+      "name": "Czarnogóra"
+    },
+    "PRG10": {
+      "country_code": "CZ",
+      "name": "Praga"
+    },
+    "AAR": {
+      "country_code": "DK",
+      "name": "Billund-LEGOLAND"
+    },
+    "DJE": {
+      "country_code": "TN",
+      "name": "Djerba"
+    },
+    "PUJ": {
+      "country_code": "DO",
+      "name": "Punta Cana"
+    },
+    "HRG": {
+      "country_code": "EG",
+      "name": "Hurghada"
+    },
+    "RMF": {
+      "country_code": "EG",
+      "name": "Marsa Alam"
+    },
+    "MUH": {
+      "country_code": "EG",
+      "name": "Marsa Matruh"
+    },
+    "SSH": {
+      "country_code": "EG",
+      "name": "Sharm el Sheikh"
+    },
+    "NCE": {
+      "country_code": "FR",
+      "name": "Lazurowe Wybrzeże"
+    },
+    "PAR": {
+      "country_code": "FR",
+      "name": "Paryż"
+    },
+    "BJL": {
+      "country_code": "BJL",
+      "name": "Gambia"
+    },
+    "ATH": {
+      "country_code": "GR",
+      "name": "Attyka i Evia"
+    },
+    "SKG": {
+      "country_code": "GR",
+      "name": "Chalkidiki"
+    },
+    "EFL": {
+      "country_code": "GR",
+      "name": "Kefalonia"
+    },
+    "CFU": {
+      "country_code": "GR",
+      "name": "Korfu"
+    },
+    "KGS": {
+      "country_code": "GR",
+      "name": "Kos"
+    },
+    "CHQ": {
+      "country_code": "GR",
+      "name": "Kreta"
+    },
+    "GPA": {
+      "country_code": "GR",
+      "name": "Peloponez"
+    },
+    "RHO": {
+      "country_code": "GR",
+      "name": "Rodos"
+    },
+    "SMI": {
+      "country_code": "GR",
+      "name": "Samos"
+    },
+    "JTR": {
+      "country_code": "GR",
+      "name": "Santorini"
+    },
+    "ZTH": {
+      "country_code": "GR",
+      "name": "Zakynthos"
+    },
+    "SVQ": {
+      "country_code": "ES",
+      "name": "Andaluzja"
+    },
+    "LEI": {
+      "country_code": "ES",
+      "name": "Costa Almeria"
+    },
+    "BCN": {
+      "country_code": "ES",
+      "name": "Costa Barcelona"
+    },
+    "ALC": {
+      "country_code": "ES",
+      "name": "Costa Blanca"
+    },
+    "GRO": {
+      "country_code": "ES",
+      "name": "Costa Brava"
+    },
+    "HEV": {
+      "country_code": "ES",
+      "name": "Costa de la Luz - Huelva"
+    },
+    "XRY": {
+      "country_code": "ES",
+      "name": "Costa de la Luz - Jerez"
+    },
+    "AGP": {
+      "country_code": "ES",
+      "name": "Costa del Sol"
+    },
+    "REU": {
+      "country_code": "ES",
+      "name": "Costa Dorada"
+    },
+    "FXX": {
+      "country_code": "ES",
+      "name": "Formentera"
+    },
+    "IBZ": {
+      "country_code": "ES",
+      "name": "Ibiza"
+    },
+    "PMI": {
+      "country_code": "ES",
+      "name": "Majorka"
+    },
+    "MAH": {
+      "country_code": "ES",
+      "name": "Minorka"
+    },
+    "MAD": {
+      "country_code": "ES",
+      "name": "Prowincja Madryt"
+    },
+    "DPS": {
+      "country_code": "ID",
+      "name": "Bali"
+    },
+    "MBJ": {
+      "country_code": "MBJ",
+      "name": "Jamajka"
+    },
+    "MBA": {
+      "country_code": "MBA",
+      "name": "Kenia"
+    },
+    "SJO": {
+      "country_code": "SJO",
+      "name": "Kostaryka"
+    },
+    "FNC": {
+      "country_code": "PT",
+      "name": "Madera"
+    },
+    "MLE": {
+      "country_code": "MLE",
+      "name": "Malediwy"
+    },
+    "MLA": {
+      "country_code": "MLA",
+      "name": "Malta"
+    },
+    "AGA": {
+      "country_code": "MA",
+      "name": "Agadir"
+    },
+    "RAK": {
+      "country_code": "MA",
+      "name": "Marrakesz"
+    },
+    "MRU": {
+      "country_code": "MRU",
+      "name": "Mauritius"
+    },
+    "SJD": {
+      "country_code": "ME",
+      "name": "Cabo San Lucas"
+    },
+    "CUN": {
+      "country_code": "ME",
+      "name": "Półwysep Jukatan"
+    },
+    "BER": {
+      "country_code": "DE",
+      "name": "Berlin"
+    },
+    "SLL": {
+      "country_code": "OM",
+      "name": "Salalah"
+    },
+    "FAO": {
+      "country_code": "PT",
+      "name": "Algarve"
+    },
+    "OPO": {
+      "country_code": "PT",
+      "name": "Porto"
+    },
+    "LIS": {
+      "country_code": "PT",
+      "name": "Wybrzeże Lizbońskie"
+    },
+    "DSS": {
+      "country_code": "DSS",
+      "name": "Senegal"
+    },
+    "PRI": {
+      "country_code": "SC",
+      "name": "Praslin – La Digue"
+    },
+    "SEZ": {
+      "country_code": "SC",
+      "name": "Wyspa Mahe"
+    },
+    "SIN": {
+      "country_code": "SIN",
+      "name": "Singapur"
+    },
+    "CMB": {
+      "country_code": "CMB",
+      "name": "Sri Lanka"
+    },
+    "LAX": {
+      "country_code": "US",
+      "name": "Los Angeles"
+    },
+    "MIA": {
+      "country_code": "US",
+      "name": "Miami"
+    },
+    "NYC": {
+      "country_code": "US",
+      "name": "Nowy Jork"
+    },
+    "SFO": {
+      "country_code": "US",
+      "name": "San Francisco"
+    },
+    "BKK": {
+      "country_code": "TH",
+      "name": "Bangkok"
+    },
+    "KBV": {
+      "country_code": "TH",
+      "name": "Krabi"
+    },
+    "HKT": {
+      "country_code": "TH",
+      "name": "Wyspa Phuket"
+    },
+    "NBE": {
+      "country_code": "TN",
+      "name": "Tunezja kontynentalna"
+    },
+    "AYT": {
+      "country_code": "TR",
+      "name": "Riwiera Turecka"
+    },
+    "IST": {
+      "country_code": "TR",
+      "name": "Stambuł"
+    },
+    "ADB": {
+      "country_code": "TR",
+      "name": "Turcja Egejska"
+    },
+    "BUD21": {
+      "country_code": "BUD",
+      "name": "Budapeszt"
+    },
+    "LON": {
+      "country_code": "UK",
+      "name": "Londyn"
+    },
+    "DAD": {
+      "country_code": "VN",
+      "name": "Da Nang"
+    },
+    "SGN": {
+      "country_code": "VN",
+      "name": "Ho Chi Minh"
+    },
+    "PQC": {
+      "country_code": "VN",
+      "name": "Phu Quoc"
+    },
+    "BRI": {
+      "country_code": "IT",
+      "name": "Apulia-Basilikata"
+    },
+    "RMI": {
+      "country_code": "IT",
+      "name": "Dolny Adriatyk"
+    },
+    "VCE5": {
+      "country_code": "IT",
+      "name": "Górny Adriatyk"
+    },
+    "JGA": {
+      "country_code": "IT",
+      "name": "Jezioro Garda"
+    },
+    "SUF": {
+      "country_code": "IT",
+      "name": "Kalabria"
+    },
+    "NAP": {
+      "country_code": "IT",
+      "name": "Kampania"
+    },
+    "ROM": {
+      "country_code": "IT",
+      "name": "Lacjum - Rzym"
+    },
+    "MXP": {
+      "country_code": "IT",
+      "name": "Lombardia"
+    },
+    "MIL": {
+      "country_code": "IT",
+      "name": "Mediolan"
+    },
+    "MXPS": {
+      "country_code": "IT",
+      "name": "Piemont"
+    },
+    "OLB": {
+      "country_code": "IT",
+      "name": "Sardynia"
+    },
+    "CTA": {
+      "country_code": "IT",
+      "name": "Sycylia"
+    },
+    "PSA": {
+      "country_code": "IT",
+      "name": "Toskania"
+    },
+    "BZO00": {
+      "country_code": "IT",
+      "name": "Trentino"
+    },
+    "VCE12": {
+      "country_code": "IT",
+      "name": "Wenecja"
+    },
+    "FUE": {
+      "country_code": "IC",
+      "name": "Fuerteventura"
+    },
+    "LPA": {
+      "country_code": "IC",
+      "name": "Gran Canaria"
+    },
+    "GMZ": {
+      "country_code": "IC",
+      "name": "La Gomera"
+    },
+    "ACE": {
+      "country_code": "IC",
+      "name": "Lanzarote"
+    },
+    "TFS": {
+      "country_code": "IC",
+      "name": "Teneryfa"
+    },
+    "BVC": {
+      "country_code": "CV",
+      "name": "Boa Vista"
+    },
+    "SID": {
+      "country_code": "CV",
+      "name": "Wyspa Sal"
+    },
+    "ZNZ": {
+      "country_code": "ZNZ",
+      "name": "Zanzibar"
+    },
+    "AUH": {
+      "country_code": "AE",
+      "name": "Abu Zabi"
+    },
+    "DXB": {
+      "country_code": "AE",
+      "name": "Dubaj"
+    },
+    "RKT": {
+      "country_code": "AE",
+      "name": "Ras Al Khaimah / Fujairah"
+    }
+  },
+  "departure_airports": {
+    "BZG": {
+      "code": "BZG",
+      "name": "Bydgoszcz"
+    },
+    "GDN": {
+      "code": "GDN",
+      "name": "Gdańsk"
+    },
+    "KTW": {
+      "code": "KTW",
+      "name": "Katowice"
+    },
+    "KRK": {
+      "code": "KRK",
+      "name": "Kraków"
+    },
+    "LCJ": {
+      "code": "LCJ",
+      "name": "Łódź"
+    },
+    "LUZ": {
+      "code": "LUZ",
+      "name": "Lublin"
+    },
+    "POZ": {
+      "code": "POZ",
+      "name": "Poznań"
+    },
+    "RZE": {
+      "code": "RZE",
+      "name": "Rzeszów"
+    },
+    "SZZ": {
+      "code": "SZZ",
+      "name": "Szczecin"
+    },
+    "WAW": {
+      "code": "WAW",
+      "name": "Warszawa-Chopina"
+    },
+    "WMI": {
+      "code": "WMI",
+      "name": "Warszawa-Modlin"
+    },
+    "RDO": {
+      "code": "RDO",
+      "name": "Warszawa-Radom"
+    },
+    "WRO": {
+      "code": "WRO",
+      "name": "Wrocław"
+    }
+  },
+  "stats": {
+    "country_count": 47,
+    "region_count": 115,
+    "departure_airport_count": 13
+  }
+}

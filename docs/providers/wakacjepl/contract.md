@@ -141,7 +141,7 @@ wakacje.pl exposes "dictionaries" to fetch current IDs:
 A minimal ID snapshot is checked in at [wakacjepl_geo_catalog.json](wakacjepl_geo_catalog.json) (~80 KB). Regenerate with:
 
 ```bash
-uv run python scripts/fetch_wakacjepl_geo_catalog.py
+uv run python scripts/fetch_geo_catalog.py
 ```
 
 Shape:

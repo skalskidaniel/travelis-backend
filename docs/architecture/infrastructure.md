@@ -7,6 +7,7 @@ Terraform-managed AWS resources with modular layout. Secrets via Terraform Vault
 ```
 infra/
 ├── modules/
+│   ├── geo_catalog/      # S3 bucket for provider geo catalogs
 │   ├── lambda/           # Lambdalith function + IAM role
 │   ├── api_gateway/      # HTTP API → Lambda
 │   ├── dynamodb/         # 4 tables (provisioned)
@@ -47,6 +48,26 @@ The deployment artifact zips the **contents** of `src/`, so `app` and `core` are
 
 No VPC attachment required (Redis Cloud is external, providers are public HTTPS).
 
+### S3 (provider geo catalogs)
+
+Private bucket for refreshed destination/departure catalogs used at scrape time:
+
+| Setting  | Value                                                                                         |
+| -------- | --------------------------------------------------------------------------------------------- |
+| Module   | `modules/geo_catalog`                                                                         |
+| Objects  | `providers/tui/tui_geo_catalog.json`, `providers/wakacjepl/wakacjepl_geo_catalog.json`        |
+| Access   | Lambda read (IAM added with `lambda` module); writes via `scripts/fetch_geo_catalog.py` or CI |
+| Security | SSE-S3, public access blocked, versioning enabled                                             |
+
+Populate after `terraform apply`:
+
+```bash
+aws s3 cp docs/providers/tui/tui_geo_catalog.json \
+  s3://<bucket>/providers/tui/tui_geo_catalog.json
+aws s3 cp docs/providers/wakacjepl/wakacjepl_geo_catalog.json \
+  s3://<bucket>/providers/wakacjepl/wakacjepl_geo_catalog.json
+```
+
 ### API Gateway
 
 HTTP API (v2) proxying all routes to the Lambda. Routes:
@@ -57,12 +78,12 @@ HTTP API (v2) proxying all routes to the Lambda. Routes:
 
 Four tables with **provisioned capacity** (cost control):
 
-| Table         | PK        | SK         | GSI            | TTL                                                     |
-| ------------- | --------- | ---------- | -------------- | ------------------------------------------------------- |
-| `Users`       | `user_id` | —          | —              |                                                         |
-| `MarketCells` | `cell_id` | —          | —              |                                                         |
-| `Offers`      | `cell_id` | `offer_id` | —              | `ttl` (epoch of `departure_date`)                       |
-| `UserOffers`  | `user_id` | `offer_id` | —              | Pruned cascadingly by eventual consistency in match job |
+| Table         | PK        | SK         | GSI | TTL                                                     |
+| ------------- | --------- | ---------- | --- | ------------------------------------------------------- |
+| `Users`       | `user_id` | —          | —   |                                                         |
+| `MarketCells` | `cell_id` | —          | —   |                                                         |
+| `Offers`      | `cell_id` | `offer_id` | —   | `ttl` (epoch of `departure_date`)                       |
+| `UserOffers`  | `user_id` | `offer_id` | —   | Pruned cascadingly by eventual consistency in match job |
 
 Start with low provisioned RCU/WCU; auto-scaling or manual tuning as load grows.
 
@@ -121,18 +142,18 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 
 ## Environment variables (Lambda)
 
-| Variable                     | Source           | Description                   |
-| ---------------------------- | ---------------- | ----------------------------- |
-| `REDIS_URL`                  | SSM / Vault      | Redis Cloud connection string |
-| `COGNITO_USER_POOL_ID`       | Terraform output |                               |
-| `COGNITO_APP_CLIENT_ID`      | Terraform output |                               |
-| `DYNAMODB_USERS_TABLE`       | Terraform output |                               |
-| `DYNAMODB_CELLS_TABLE`       | Terraform output |                               |
-| `DYNAMODB_OFFERS_TABLE`      | Terraform output |                               |
-| `DYNAMODB_USER_OFFERS_TABLE` | Terraform output |                               |
-| `ATTRACTIVENESS_Z_THRESHOLD` | SSM              | Default `-1.0`                |
-| `VAPID_PRIVATE_KEY`          | Vault            | Web Push signing              |
-| `VAPID_PUBLIC_KEY`           | SSM              | Web Push public key           |
+| Variable                     | Source           | Description                                               |
+| ---------------------------- | ---------------- | --------------------------------------------------------- |
+| `REDIS_URL`                  | SSM / Vault      | Redis Cloud connection string                             |
+| `COGNITO_USER_POOL_ID`       | Terraform output |                                                           |
+| `COGNITO_APP_CLIENT_ID`      | Terraform output |                                                           |
+| `DYNAMODB_USERS_TABLE`       | Terraform output |                                                           |
+| `DYNAMODB_CELLS_TABLE`       | Terraform output |                                                           |
+| `DYNAMODB_OFFERS_TABLE`      | Terraform output |                                                           |
+| `DYNAMODB_USER_OFFERS_TABLE` | Terraform output |                                                           |
+| `ATTRACTIVENESS_Z_THRESHOLD` | SSM              | Default `-1.0`                                            |
+| `VAPID_PRIVATE_KEY`          | Vault            | Web Push signing                                          |
+| `VAPID_PUBLIC_KEY`           | SSM              | Web Push public key                                       |
 | `FRONTEND_URL`               | SSM / env        | e.g. `https://wakacje-travelis.pl` (used for `share_url`) |
 
 Never commit secrets. Use `.env.example` with placeholders for local dev.
@@ -157,6 +178,30 @@ DynamoDB Local or dev AWS account for integration testing. Redis Cloud free data
 | Sentry                | Frontend PWA only           |
 
 ## Deployment flow
+
+### AWS credentials (`aws login`)
+
+The AWS CLI `aws login` flow stores credentials in a format Terraform does not read yet. Add a bridge profile to `~/.aws/config` (once):
+
+```ini
+[profile travelis-terraform]
+credential_process = aws configure export-credentials --profile default --format process
+region = eu-central-1
+```
+
+Then authenticate as usual:
+
+```bash
+aws login
+```
+
+`infra/environments/dev/terraform.tfvars` sets `aws_profile = "travelis-terraform"`. Quick alternative without the bridge profile:
+
+```bash
+eval "$(aws configure export-credentials --format env)"
+```
+
+### Apply
 
 ```bash
 cd infra/environments/dev

@@ -52,20 +52,18 @@ Filters are described in `filters.json`.
   "destinationsCodes": ["GR"],
   "durationFrom": 7,
   "durationTo": 10,
-    "occupancies": [
-        {
-            "adultsCount": 2,
-            "childrenBirthDates": [],
-            "participantsCount": 2
-        },
-        {
-            "adultsCount": 1,
-            "childrenBirthDates": [
-                "27.02.2021"
-            ],
-            "participantsCount": 2
-        }
-    ],
+  "occupancies": [
+    {
+      "adultsCount": 2,
+      "childrenBirthDates": [],
+      "participantsCount": 2
+    },
+    {
+      "adultsCount": 1,
+      "childrenBirthDates": ["27.02.2021"],
+      "participantsCount": 2
+    }
+  ],
   "numberOfAdults": 3,
   "offerType": "BY_PLANE",
   "filters": [
@@ -259,6 +257,7 @@ Filters are described in `filters.json`.
 ## Field Mapping & Query Construction Notes
 
 ### Board Type
+
 - **App → TUI (Request)**: The `tui_filters.json` dictionary defines values like `"board": { "all-inclusive": "GT06-AI GT06-XX", ... }`. Values are space-separated. Before sending a request to TUI, split them (by space) into a list of strings and pass them in the `selectedValues` array for the filter with `filterId: "board"`.
 - **TUI → App (Response)**: The `boardCode` field from the TUI response is mapped to the canonical board type in the application:
   - `GT06-AI` / `GT06-XX` → `all-inclusive`
@@ -268,9 +267,42 @@ Filters are described in `filters.json`.
   - `GT06-AO` → `none`
 
 ### Departure Airport Codes
+
 TUI uses standard IATA codes directly in the `departuresCodes` array (e.g., `["POZ", "WAW", "KRK"]`). No lookup mapping is needed.
 
+### Destination Codes / Geo Catalog
+
+TUI exposes the destination tree and departure airports via the search bootstrap endpoint:
+
+- `POST https://www.tui.pl/api/services/tui-search/api/gs/initial`
+  - `filters` entry with `filterType: "REGION"` — countries and nested regions (or leaf single-destination countries such as `MLA` for Malta)
+  - `filters` entry with `filterType: "AIRPORT"` — Polish departure airports
+
+A minimal ID snapshot is checked in at [tui_geo_catalog.json](tui_geo_catalog.json) (~13 KB). Regenerate with:
+
+```bash
+uv run python scripts/fetch_geo_catalog.py --provider tui
+```
+
+Shape:
+
+```json
+{
+  "generated_at": "…",
+  "countries": { "GR": { "iso": "GR", "name": "Grecja" } },
+  "regions": { "CHQ": { "country_code": "GR", "name": "Kreta" } },
+  "departure_airports": { "KRK": { "code": "KRK", "name": "Kraków" } }
+}
+```
+
+- `countries` — TUI destination code → ISO + display name (ISO enriched from `tui_filters.json` `destinationsCodes`)
+- `regions` — TUI destination/region code → `country_code` + name (single-destination countries also appear here with `country_code` equal to their own code)
+- `departure_airports` — IATA code → code + name
+
+Use `destinationsCodes` / `departuresCodes` in search requests; there is no separate city level.
+
 ### Occupancy & Children
+
 - Child birth date format expected by TUI: `DD.MM.YYYY`.
 - The request includes:
   - `numberOfAdults`: number of adults from the search dimension.
@@ -281,6 +313,7 @@ TUI uses standard IATA codes directly in the `departuresCodes` array (e.g., `["P
     - `participantsCount`: `adultsCount` + number of children.
 
 ### Other Fields
+
 - `offerUrl` must be prefixed with `https://www.tui.pl` (e.g., `https://www.tui.pl/wypoczynek/...`).
 - Location in the application is derived from `breadcrumbs[0].label` (country) and `breadcrumbs[1].label` (region).
 
@@ -292,7 +325,7 @@ Example response:
 
 ```json
 {
-    "message": "Wybrana oferta nie jest już dostępna.",
-    "status": "UNAVAILABLE" // or "OK" if available
+  "message": "Wybrana oferta nie jest już dostępna.",
+  "status": "UNAVAILABLE" // or "OK" if available
 }
 ```
