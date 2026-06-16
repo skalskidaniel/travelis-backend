@@ -1,11 +1,9 @@
 import pytest
 import respx
 import httpx
-import json
 from decimal import Decimal
 from datetime import date, datetime, timezone
 from unittest.mock import patch
-from pathlib import Path
 
 from core.models.cell import MarketCell
 from core.models.offer import (
@@ -19,8 +17,8 @@ from core.providers.tui.main import (
     TuiProvider,
     SEARCH_URL,
     AVAILABILITY_URL,
-    DEFAULT_FILTERS_PATH,
 )
+from core.providers.resources import country_registry, tui_filters
 from core.exceptions.provider import (
     CountryNotFoundException,
     BoardTypeNotSupportedException,
@@ -30,9 +28,6 @@ from core.exceptions.provider import (
     InvalidOfferMetadataException,
     ProviderAPIException,
 )
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-COUNTRY_REGISTRY_PATH = PROJECT_ROOT / "src/core/providers/resources/country_registry.json"
 
 
 @pytest.fixture
@@ -50,10 +45,8 @@ def test_tui_provider_identity(tui_provider):
 
 
 def test_tui_destination_codes_are_registered():
-    filters = json.loads(DEFAULT_FILTERS_PATH.read_text(encoding="utf-8"))
-    registry = json.loads(COUNTRY_REGISTRY_PATH.read_text(encoding="utf-8"))
-    registry_codes = set(registry["codes"].keys())
-    destination_codes = set(filters["destinationsCodes"].keys()) - {"any"}
+    registry_codes = set(country_registry["codes"].keys())
+    destination_codes = set(tui_filters["destinationsCodes"].keys()) - {"any"}
     assert destination_codes <= registry_codes
 
 

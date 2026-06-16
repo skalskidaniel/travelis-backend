@@ -6,13 +6,18 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from core.providers.resources import COUNTRY_REGISTRY_PATH, TUI_FILTERS_PATH  # noqa: E402
+
 DEFAULT_CATALOG_PATH = ROOT / "docs/providers/tui/tui_geo_catalog.json"
-DEFAULT_OUTPUT_PATH = ROOT / "src/core/providers/resources/tui_filters.json"
-DEFAULT_COUNTRY_REGISTRY_PATH = ROOT / "src/core/providers/resources/country_registry.json"
+DEFAULT_OUTPUT_PATH = TUI_FILTERS_PATH
+DEFAULT_COUNTRY_REGISTRY_PATH = COUNTRY_REGISTRY_PATH
 STRICT_ISO_PATTERN = re.compile(r"^[A-Z]{2}$")
 
 BOARD_FILTERS: dict[str, str] = {
@@ -94,6 +99,7 @@ def build_filters(catalog: dict[str, Any]) -> dict[str, Any]:
         "board": BOARD_FILTERS,
         "minHotelCategory": MIN_HOTEL_CATEGORY_FILTERS,
         "tripAdvisorRating": TRIP_ADVISOR_RATING_FILTERS,
+        "departureAirports": catalog.get("departure_airports", {}),
     }
 
 

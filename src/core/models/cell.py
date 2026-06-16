@@ -1,22 +1,19 @@
 import re
-import json
 from functools import lru_cache
 from datetime import datetime
-from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from core.models.offer import BoardType
 from core.models.common import CellId
+from core.providers.resources import country_registry
 
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 COUNTRY_PATTERN = re.compile(r"^[A-Z]{2}$")
-COUNTRY_REGISTRY_PATH = Path(__file__).resolve().parents[1] / "providers/resources/country_registry.json"
 
 
 @lru_cache(maxsize=1)
 def _allowed_country_codes() -> frozenset[str]:
-    payload = json.loads(COUNTRY_REGISTRY_PATH.read_text(encoding="utf-8"))
-    raw_codes = payload.get("codes")
+    raw_codes = country_registry.get("codes")
     if not isinstance(raw_codes, dict):
         msg = "country registry must contain object field 'codes'"
         raise RuntimeError(msg)

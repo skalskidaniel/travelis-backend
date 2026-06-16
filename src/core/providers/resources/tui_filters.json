@@ -210,5 +210,59 @@
     "3.5": "3.5t",
     "3": "3t",
     "any": "defaultTripAdvisorRating"
+  },
+  "departureAirports": {
+    "BZG": {
+      "code": "BZG",
+      "name": "Bydgoszcz"
+    },
+    "GDN": {
+      "code": "GDN",
+      "name": "Gdańsk"
+    },
+    "KTW": {
+      "code": "KTW",
+      "name": "Katowice"
+    },
+    "KRK": {
+      "code": "KRK",
+      "name": "Kraków"
+    },
+    "LCJ": {
+      "code": "LCJ",
+      "name": "Łódź"
+    },
+    "LUZ": {
+      "code": "LUZ",
+      "name": "Lublin"
+    },
+    "POZ": {
+      "code": "POZ",
+      "name": "Poznań"
+    },
+    "RZE": {
+      "code": "RZE",
+      "name": "Rzeszów"
+    },
+    "SZZ": {
+      "code": "SZZ",
+      "name": "Szczecin"
+    },
+    "WAW": {
+      "code": "WAW",
+      "name": "Warszawa-Chopina"
+    },
+    "WMI": {
+      "code": "WMI",
+      "name": "Warszawa-Modlin"
+    },
+    "RDO": {
+      "code": "RDO",
+      "name": "Warszawa-Radom"
+    },
+    "WRO": {
+      "code": "WRO",
+      "name": "Wrocław"
+    }
   }
 }

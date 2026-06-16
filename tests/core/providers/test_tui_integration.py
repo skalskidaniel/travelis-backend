@@ -3,7 +3,6 @@ import pytest_asyncio
 import httpx
 from datetime import date
 import os
-import json
 import re
 import asyncio
 
@@ -15,11 +14,11 @@ from core.models.offer import (
 )
 from core.providers.tui.main import (
     TuiProvider,
-    DEFAULT_FILTERS_PATH,
 )
+from core.providers.resources import tui_filters
 
 
-_TUI_FILTERS = json.loads(DEFAULT_FILTERS_PATH.read_text(encoding="utf-8"))
+_TUI_FILTERS = tui_filters
 SUPPORTED_COUNTRY_CODES = tuple(
     sorted(
         code

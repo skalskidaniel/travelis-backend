@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
 from datetime import date
 from decimal import Decimal
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -20,6 +18,7 @@ from core.exceptions.provider import (
 )
 from core.models.cell import MarketCell
 from core.models.offer import RawOffer, Offer, OfferMetadata, ProviderName, TuiMetadata
+from core.providers.resources import tui_filters
 from core.providers.tui.utils import (
     BOARD_CODE_TO_TYPE,
     _month_date_bounds,
@@ -36,32 +35,20 @@ PAGE_SIZE = 500
 MIN_DURATION_NIGHTS = 2
 MAX_DURATION_NIGHTS = 28
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[4]
-DEFAULT_FILTERS_PATH = (
-    Path(__file__).resolve().parents[1] / "resources/tui_filters.json"
-)
-DEFAULT_GEO_CATALOG_PATH = (
-    _PROJECT_ROOT / "docs/providers/tui/tui_geo_catalog.json"
-)  # TODO: load from S3 in prod
-
 
 class TuiProvider:
     def __init__(
         self,
         client: httpx.AsyncClient,
         *,
-        filters_path: Path = DEFAULT_FILTERS_PATH,
-        geo_catalog_path: Path = DEFAULT_GEO_CATALOG_PATH,
         app_id: str = DEFAULT_APP_ID,
     ) -> None:
         self._client = client
         self._app_id = app_id
-        filters = json.loads(filters_path.read_text(encoding="utf-8"))
-        geo_catalog = json.loads(geo_catalog_path.read_text(encoding="utf-8"))
-        self._destination_codes = filters["destinationsCodes"]
-        self._board_filter_values = filters["board"]
-        self._min_hotel_category_values = filters["minHotelCategory"]
-        self._departure_airport_codes = list(geo_catalog["departure_airports"])
+        self._destination_codes = tui_filters["destinationsCodes"]
+        self._board_filter_values = tui_filters["board"]
+        self._min_hotel_category_values = tui_filters["minHotelCategory"]
+        self._departure_airport_codes = list(tui_filters["departureAirports"])
 
     @property
     def provider(self) -> ProviderName:
@@ -118,7 +105,9 @@ class TuiProvider:
                 response.raise_for_status()
             except httpx.HTTPError as e:
                 error_msg = str(e) or e.__class__.__name__
-                raise ProviderAPIException(f"TUI search API request failed: {error_msg}") from e
+                raise ProviderAPIException(
+                    f"TUI search API request failed: {error_msg}"
+                ) from e
 
             data = response.json()
             pagination = data.get("pagination") or {}
