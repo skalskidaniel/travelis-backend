@@ -48,6 +48,7 @@ class DateMismatchException(ProviderException):
 
     pass
 
+
 class DurationMismatchException(ProviderException):
     """Raised when the duration does not match return_date - departure_date"""
 

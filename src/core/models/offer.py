@@ -12,7 +12,16 @@ from pydantic import (
     model_validator,
 )
 
-from core.models.common import CellId, IataCode, LocationPath, OfferId, PricePLN, Rating, ProviderName, BoardType
+from core.models.common import (
+    CellId,
+    IataCode,
+    LocationPath,
+    OfferId,
+    PricePLN,
+    Rating,
+    ProviderName,
+    BoardType,
+)
 from core.exceptions.provider import DateMismatchException, DurationMismatchException
 
 SHARE_URL_PREFIX = "https://wakacje-travelis.pl/"
@@ -23,6 +32,7 @@ REFERRAL_PARAMS = {
     "a_cid": "11111111",
     "a_aid": "2933",
 }
+
 
 class OfferSource(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -186,7 +196,10 @@ class Offer(RawOffer):
             msg = "duration must equal the number of nights between departure_date and return_date"
             raise DurationMismatchException(msg)
 
-        if self.provider is ProviderName.WAKACJE_PL and self.metadata.wakacje_pl is None:
+        if (
+            self.provider is ProviderName.WAKACJE_PL
+            and self.metadata.wakacje_pl is None
+        ):
             msg = "metadata.wakacje is required for wakacje offers"
             raise ValueError(msg)
 

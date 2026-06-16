@@ -25,7 +25,8 @@ from core.providers.tui.utils import (
     _month_date_bounds,
     _representative_child_birthday,
     _format_tui_date,
-    _parse_tui_date)
+    _parse_tui_date,
+)
 
 SEARCH_URL = "https://www.tui.pl/api/services/tui-search/api/search/offers"
 AVAILABILITY_URL = "https://www.tui.pl/api/www/hotel-cards/offers"
@@ -36,7 +37,9 @@ MIN_DURATION_NIGHTS = 2
 MAX_DURATION_NIGHTS = 28
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[4]
-DEFAULT_FILTERS_PATH = Path(__file__).resolve().parents[1] / "resources/tui_filters.json"
+DEFAULT_FILTERS_PATH = (
+    Path(__file__).resolve().parents[1] / "resources/tui_filters.json"
+)
 DEFAULT_GEO_CATALOG_PATH = (
     _PROJECT_ROOT / "docs/providers/tui/tui_geo_catalog.json"
 )  # TODO: load from S3 in prod
@@ -260,9 +263,7 @@ class TuiProvider:
         return payload
 
     @staticmethod
-    def _map_search_offer(
-        item: dict[str, Any], *, cell: MarketCell
-    ) -> RawOffer | None:
+    def _map_search_offer(item: dict[str, Any], *, cell: MarketCell) -> RawOffer | None:
         if item.get("soldOut"):
             return None
 

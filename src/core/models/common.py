@@ -69,6 +69,7 @@ Rating = Annotated[
     ),
 ]
 
+
 class ProviderName(StrEnum):
     WAKACJE_PL = "wakacje_pl"
     TUI = "tui"

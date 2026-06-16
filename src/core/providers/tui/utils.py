@@ -16,6 +16,7 @@ BOARD_CODE_TO_TYPE: dict[str, BoardType] = {
     "GT06-AO": BoardType.NONE,
 }
 
+
 def _format_tui_date(value: date) -> str:
     return value.strftime("%d.%m.%Y")
 
