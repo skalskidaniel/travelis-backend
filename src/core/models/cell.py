@@ -1,13 +1,12 @@
 import re
 from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, Field
 
-from core.models.offer import BoardType, CellId
+from core.models.offer import BoardType
+from core.models.common import CellId
 
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 COUNTRY_PATTERN = re.compile(r"^[A-Z]{2}$")
-
 
 class MarketCell(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")

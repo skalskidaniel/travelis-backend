@@ -1,7 +1,6 @@
 from datetime import date, datetime
-from decimal import Decimal
-from enum import StrEnum
-from typing import Annotated, Self
+from typing import Self
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import (
     AnyHttpUrl,
@@ -9,98 +8,29 @@ from pydantic import (
     ConfigDict,
     Field,
     HttpUrl,
-    PlainValidator,
     field_validator,
     model_validator,
 )
 
-HEX_CELL_ID = r"^[a-f0-9]{16}$"
-HEX_OFFER_ID = r"^[a-f0-9]{32}$"
-IATA_CODE = r"^[A-Z]{3}$"
-LOCATION_PATH = r"^[^/]+/[^/]+/[^/]+$"
+from core.models.common import CellId, IataCode, LocationPath, OfferId, PricePLN, Rating, ProviderName, BoardType
+from core.exceptions.provider import DateMismatchException, DurationMismatchException
+
 SHARE_URL_PREFIX = "https://wakacje-travelis.pl/"
-
-
-def _to_decimal(value: object) -> Decimal:
-    if isinstance(value, Decimal):
-        return value
-    return Decimal(str(value))
-
-
-class Provider(StrEnum):
-    WAKACJE = "wakacje"
-    TUI = "tui"
-
-
-class BoardType(StrEnum):
-    ALL_INCLUSIVE = "all-inclusive"
-    FULL_BOARD = "full-board"
-    HALF_BOARD = "half-board"
-    BED_AND_BREAKFAST = "bed-and-breakfast"
-    NONE = "none"
-
-
-CellId = Annotated[
-    str,
-    Field(
-        pattern=HEX_CELL_ID,
-        description="Deterministic hash of market-cell dimensions (first 16 hex chars of SHA-256).",
-    ),
-]
-
-OfferId = Annotated[
-    str,
-    Field(
-        pattern=HEX_OFFER_ID,
-        description="Semantic fingerprint hash of trip semantics (first 32 hex chars of SHA-256).",
-    ),
-]
-
-IataCode = Annotated[
-    str,
-    Field(
-        pattern=IATA_CODE,
-        description="Departure airport IATA code (uppercase).",
-    ),
-]
-
-LocationPath = Annotated[
-    str,
-    Field(
-        pattern=LOCATION_PATH,
-        description="Normalized location as Country/Region/City.",
-    ),
-]
-
-PricePLN = Annotated[
-    Decimal,
-    PlainValidator(_to_decimal),
-    Field(
-        ge=Decimal(0),
-        decimal_places=2,
-        description="Monetary amount in PLN (up to two decimal places).",
-    ),
-]
-
-Rating = Annotated[
-    Decimal,
-    PlainValidator(_to_decimal),
-    Field(
-        ge=Decimal(0),
-        le=Decimal(5),
-        decimal_places=1,
-        description="Canonical hotel rating on a 0–5 scale (one decimal place).",
-    ),
-]
-
+REFERRAL_PARAMS = {
+    "utm_source": "travellead",
+    "utm_medium": "cps",
+    "utm_campaign": "2933-t-HolidayPicker",
+    "a_cid": "11111111",
+    "a_aid": "2933",
+}
 
 class OfferSource(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    provider: Provider = Field(
+    provider: ProviderName = Field(
         description="Provider that supplied this collapsed variant."
     )
-    provider_id: str = Field(
+    external_offer_id: str = Field(
         min_length=1, description="Provider-native offer identifier."
     )
     price_total: PricePLN = Field(
@@ -112,7 +42,7 @@ class OfferSource(BaseModel):
     )
 
 
-class WakacjeMetadata(BaseModel):
+class WakacjePlMetadata(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     hotel_id: int = Field(
@@ -171,7 +101,7 @@ class OfferMetadata(BaseModel):
         default_factory=list,
         description="Collapsed provider variants after deduplication (lowest price wins at offer level).",
     )
-    wakacje: WakacjeMetadata | None = Field(
+    wakacje_pl: WakacjePlMetadata | None = Field(
         default=None,
         description="Provider-specific ingest payload required for wakacje.pl availability checks.",
     )
@@ -186,28 +116,24 @@ class RawOffer(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    provider: Provider = Field(description="Source provider adapter.")
-    provider_id: str = Field(
+    provider: ProviderName
+    external_offer_id: str = Field(
         min_length=1, description="Provider-native offer identifier."
     )
     hotel_name: str = Field(min_length=1, description="Display name of the hotel.")
-    location: LocationPath = Field(
-        description="Normalized Country/Region/City location path."
-    )
-    departure_airport: IataCode = Field(description="Departure airport IATA code.")
+    location: LocationPath
+    departure_airport: IataCode
     departure_date: date = Field(description="Trip departure date.")
     return_date: date = Field(description="Trip return date.")
     duration: int = Field(ge=1, description="Trip length in nights.")
-    board: BoardType = Field(description="Normalized board type.")
+    board: BoardType
     stars: int = Field(ge=1, le=5, description="Hotel star rating.")
-    rating: Rating = Field(description="Canonical guest rating on a 0–5 scale.")
+    rating: Rating
     review_count: int = Field(
         ge=0, description="Number of guest reviews backing the rating."
     )
-    price_total: PricePLN = Field(description="Total trip price in PLN.")
-    price_per_day_one_person: PricePLN = Field(
-        description="PLN per night per person for the scrape occupancy.",
-    )
+    price_total: PricePLN
+    price_per_day_one_person: PricePLN
     referral_url: AnyHttpUrl = Field(description="Provider deep link.")
     available: bool = Field(
         description="Whether the provider marks the offer as bookable."
@@ -222,9 +148,7 @@ class RawOffer(BaseModel):
 
 class Offer(RawOffer):
     cell_id: CellId = Field(description="Market cell this offer belongs to.")
-    offer_id: OfferId = Field(
-        description="Globally unique semantic fingerprint for the trip."
-    )
+    offer_id: OfferId
     attractiveness_score: float = Field(
         ge=0,
         le=1,
@@ -255,23 +179,53 @@ class Offer(RawOffer):
     def validate_trip_dates_and_provider_metadata(self) -> Self:
         if self.return_date < self.departure_date:
             msg = "return_date must be on or after departure_date"
-            raise ValueError(msg)
+            raise DateMismatchException(msg)
 
         night_span = (self.return_date - self.departure_date).days
         if self.duration != night_span:
             msg = "duration must equal the number of nights between departure_date and return_date"
-            raise ValueError(msg)
+            raise DurationMismatchException(msg)
 
-        if self.provider is Provider.WAKACJE and self.metadata.wakacje is None:
+        if self.provider is ProviderName.WAKACJE_PL and self.metadata.wakacje_pl is None:
             msg = "metadata.wakacje is required for wakacje offers"
             raise ValueError(msg)
 
-        if self.provider is Provider.TUI:
+        if self.provider is ProviderName.TUI:
             if self.metadata.tui is None:
                 msg = "metadata.tui is required for tui offers"
                 raise ValueError(msg)
-            if self.provider_id != self.metadata.tui.offer_code:
+            if self.external_offer_id != self.metadata.tui.offer_code:
                 msg = "provider_id must match metadata.tui.offer_code"
                 raise ValueError(msg)
 
         return self
+
+    @field_validator("referral_url")
+    @classmethod
+    def append_referral_url(cls, value: HttpUrl) -> HttpUrl:
+        url_str = str(value)
+        parts = urlsplit(url_str)
+
+        params = dict(parse_qsl(parts.query, keep_blank_values=True))
+
+        changed = False
+        for key, val in REFERRAL_PARAMS.items():
+            if params.get(key) != val:
+                params[key] = val
+                changed = True
+
+        if not changed:
+            return value
+
+        new_query = urlencode(params, doseq=True)
+        new_url = urlunsplit(
+            (
+                parts.scheme,
+                parts.netloc,
+                parts.path,
+                new_query,
+                parts.fragment,
+            )
+        )
+
+        return type(value)(new_url)

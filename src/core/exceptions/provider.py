@@ -1,10 +1,7 @@
-class TravelisException(Exception):
-    """Base exception for all Travelis application errors."""
-
-    pass
+from core.exceptions.common import CoreException
 
 
-class ProviderException(TravelisException):
+class ProviderException(CoreException):
     """Base exception for all provider/adapter-related errors."""
 
     pass
@@ -47,6 +44,11 @@ class PastDatesException(ProviderException):
 
 
 class DateMismatchException(ProviderException):
-    """Raised when departure/start date is after return/end date."""
+    """Raised when the departure / start date is after the return / end date."""
+
+    pass
+
+class DurationMismatchException(ProviderException):
+    """Raised when the duration does not match return_date - departure_date"""
 
     pass

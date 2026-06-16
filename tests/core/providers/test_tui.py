@@ -8,9 +8,9 @@ import numpy as np
 from unittest.mock import patch
 
 from core.models.cell import MarketCell
-from core.models.offer import BoardType, RawOffer, Offer, OfferMetadata, Provider, TuiMetadata
-from core.providers.tui import TuiProvider, SEARCH_URL, AVAILABILITY_URL
-from core.exceptions import (
+from core.models.offer import BoardType, RawOffer, Offer, OfferMetadata, ProviderName, TuiMetadata
+from core.providers.tui.main import TuiProvider, SEARCH_URL, AVAILABILITY_URL
+from core.exceptions.provider import (
     CountryNotFoundException,
     BoardTypeNotSupportedException,
     MinStarsNotSupportedException,
@@ -32,7 +32,7 @@ def tui_provider(async_client):
 
 
 def test_tui_provider_identity(tui_provider):
-    assert tui_provider.provider == Provider.TUI
+    assert tui_provider.provider == ProviderName.TUI
 
 
 @pytest.mark.asyncio
@@ -119,7 +119,7 @@ async def test_search_date_mismatch(tui_provider):
         children=1,
         activation_count=1,
     )
-    with patch("core.providers.tui._month_date_bounds") as mock_bounds:
+    with patch("core.providers.tui.main._month_date_bounds") as mock_bounds:
         mock_bounds.return_value = (date(2026, 7, 31), date(2026, 7, 1))
         with pytest.raises(
             DateMismatchException, match="Departure date .* is after return/end date"
@@ -266,7 +266,7 @@ async def test_search_filters_and_validation(tui_provider):
 
     df["departure_month"] = pd.to_datetime(df["departure_date"]).dt.strftime("%Y-%m")
 
-    assert np.all(df["provider"] == Provider.TUI)
+    assert np.all(df["provider"] == ProviderName.TUI)
     assert np.all(df["location"].str.startswith("Egipt/"))
     assert np.all(df["departure_month"] == "2026-07")
     assert np.all(df["stars"] >= 4)
@@ -294,8 +294,8 @@ async def test_search_api_failure(tui_provider):
 @pytest.fixture
 def sample_offer():
     return Offer(
-        provider=Provider.TUI,
-        provider_id="TUI-OFFER-1",
+        provider=ProviderName.TUI,
+        external_offer_id="TUI-OFFER-1",
         hotel_name="Test Hotel",
         location="Egipt/Hurghada/Hurghada City",
         departure_airport="WAW",
@@ -387,8 +387,8 @@ async def test_check_price(tui_provider, sample_offer):
 @pytest.mark.asyncio
 async def test_check_availability_live_unavailable(tui_provider):
     offer = Offer(
-        provider=Provider.TUI,
-        provider_id="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
+        provider=ProviderName.TUI,
+        external_offer_id="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
         hotel_name="Hotel Kent",
         location="Włochy/Dolny Adriatyk/Rimini",
         departure_airport="KRK",

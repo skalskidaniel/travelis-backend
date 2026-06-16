@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import json
-from calendar import monthrange
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -10,7 +9,7 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from core.exceptions import (
+from core.exceptions.provider import (
     BoardTypeNotSupportedException,
     CountryNotFoundException,
     DateMismatchException,
@@ -20,7 +19,13 @@ from core.exceptions import (
     ProviderAPIException,
 )
 from core.models.cell import MarketCell
-from core.models.offer import BoardType, RawOffer, Offer, OfferMetadata, Provider, TuiMetadata
+from core.models.offer import RawOffer, Offer, OfferMetadata, ProviderName, TuiMetadata
+from core.providers.tui.utils import (
+    BOARD_CODE_TO_TYPE,
+    _month_date_bounds,
+    _representative_child_birthday,
+    _format_tui_date,
+    _parse_tui_date)
 
 SEARCH_URL = "https://www.tui.pl/api/services/tui-search/api/search/offers"
 AVAILABILITY_URL = "https://www.tui.pl/api/www/hotel-cards/offers"
@@ -29,72 +34,12 @@ DEFAULT_APP_ID = "6f8e9a2b-1c3d-4e5f-9a0b-1c2d3e4f5a6b"
 PAGE_SIZE = 500
 MIN_DURATION_NIGHTS = 2
 MAX_DURATION_NIGHTS = 28
-REPRESENTATIVE_CHILD_AGE_YEARS = 8
 
-BOARD_CODE_TO_TYPE: dict[str, BoardType] = {
-    "GT06-AI": BoardType.ALL_INCLUSIVE,
-    "GT06-XX": BoardType.ALL_INCLUSIVE,
-    "GT06-FB": BoardType.FULL_BOARD,
-    "GT06-FBP": BoardType.FULL_BOARD,
-    "GT06-HB": BoardType.HALF_BOARD,
-    "GT06-HBP": BoardType.HALF_BOARD,
-    "GT06-BB": BoardType.BED_AND_BREAKFAST,
-    "GT06-AO": BoardType.NONE,
-}
-
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_FILTERS_PATH = Path(__file__).resolve().parent / "resources/tui_filters.json"
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_FILTERS_PATH = Path(__file__).resolve().parents[1] / "resources/tui_filters.json"
 DEFAULT_GEO_CATALOG_PATH = (
     _PROJECT_ROOT / "docs/providers/tui/tui_geo_catalog.json"
 )  # TODO: load from S3 in prod
-
-
-def _format_tui_date(value: date) -> str:
-    return value.strftime("%d.%m.%Y")
-
-
-def _parse_tui_date(value: str) -> date:
-    return datetime.strptime(value, "%d.%m.%Y").date()
-
-
-def _representative_child_birthday(today: date | None = None) -> str:
-    today = today or date.today()
-    birth_year = today.year - REPRESENTATIVE_CHILD_AGE_YEARS
-    return _format_tui_date(date(birth_year, 1, 1))
-
-
-def _month_date_bounds(month: str) -> tuple[date, date]:
-    year_str, month_str = month.split("-", maxsplit=1)
-    year = int(year_str)
-    month_number = int(month_str)
-    last_day = monthrange(year, month_number)[1]
-    return date(year, month_number, 1), date(year, month_number, last_day)
-
-
-def _default_search_filters(
-    *,
-    board_codes: list[str],
-    min_hotel_category: str,
-) -> list[dict[str, Any]]:
-    return [
-        {"filterId": "priceSelector", "selectedValues": []},
-        {"filterId": "board", "selectedValues": board_codes},
-        {"filterId": "amountRange", "selectedValues": []},
-        {"filterId": "minHotelCategory", "selectedValues": [min_hotel_category]},
-        {"filterId": "flight_category", "selectedValues": []},
-        {
-            "filterId": "tripAdvisorRating",
-            "selectedValues": ["defaultTripAdvisorRating"],
-        },
-        {"filterId": "beach_distance", "selectedValues": ["defaultBeachDistance"]},
-        {"filterId": "facilities", "selectedValues": []},
-        {"filterId": "WIFI", "selectedValues": []},
-        {"filterId": "sport_and_wellness", "selectedValues": []},
-        {"filterId": "room_type", "selectedValues": []},
-        {"filterId": "room_attributes", "selectedValues": []},
-        {"filterId": "hotel_chain", "selectedValues": []},
-        {"filterId": "airport_distance", "selectedValues": []},
-    ]
 
 
 class TuiProvider:
@@ -116,8 +61,8 @@ class TuiProvider:
         self._departure_airport_codes = list(geo_catalog["departure_airports"])
 
     @property
-    def provider(self) -> Provider:
-        return Provider.TUI
+    def provider(self) -> ProviderName:
+        return ProviderName.TUI
 
     async def search(self, cell: MarketCell) -> list[RawOffer]:
         departure_from, departure_to = _month_date_bounds(cell.month)
@@ -235,12 +180,38 @@ class TuiProvider:
             ],
             "numberOfAdults": cell.adults,
             "offerType": "BY_PLANE",
-            "filters": _default_search_filters(
+            "filters": self._default_search_filters(
                 board_codes=board_codes,
                 min_hotel_category=min_hotel_category,
             ),
             "metaData": {"page": page, "pageSize": PAGE_SIZE, "sorting": "price"},
         }
+
+    @staticmethod
+    def _default_search_filters(
+        *,
+        board_codes: list[str],
+        min_hotel_category: str,
+    ) -> list[dict[str, Any]]:
+        return [
+            {"filterId": "priceSelector", "selectedValues": []},
+            {"filterId": "board", "selectedValues": board_codes},
+            {"filterId": "amountRange", "selectedValues": []},
+            {"filterId": "minHotelCategory", "selectedValues": [min_hotel_category]},
+            {"filterId": "flight_category", "selectedValues": []},
+            {
+                "filterId": "tripAdvisorRating",
+                "selectedValues": ["defaultTripAdvisorRating"],
+            },
+            {"filterId": "beach_distance", "selectedValues": ["defaultBeachDistance"]},
+            {"filterId": "facilities", "selectedValues": []},
+            {"filterId": "WIFI", "selectedValues": []},
+            {"filterId": "sport_and_wellness", "selectedValues": []},
+            {"filterId": "room_type", "selectedValues": []},
+            {"filterId": "room_attributes", "selectedValues": []},
+            {"filterId": "hotel_chain", "selectedValues": []},
+            {"filterId": "airport_distance", "selectedValues": []},
+        ]
 
     def _search_headers(self) -> dict[str, str]:
         return {
@@ -255,7 +226,8 @@ class TuiProvider:
             "x-app-id": self._app_id,
         }
 
-    def _availability_headers(self) -> dict[str, str]:
+    @staticmethod
+    def _availability_headers() -> dict[str, str]:
         return {
             "accept": "application/json",
             "tui-api-key": "www",
@@ -287,8 +259,9 @@ class TuiProvider:
             raise ProviderAPIException(msg)
         return payload
 
+    @staticmethod
     def _map_search_offer(
-        self, item: dict[str, Any], *, cell: MarketCell
+        item: dict[str, Any], *, cell: MarketCell
     ) -> RawOffer | None:
         if item.get("soldOut"):
             return None
@@ -366,8 +339,8 @@ class TuiProvider:
             return None
 
         return RawOffer(
-            provider=Provider.TUI,
-            provider_id=offer_code,
+            provider=ProviderName.TUI,
+            external_offer_id=offer_code,
             hotel_name=hotel_name.strip(),
             location=location,
             departure_airport=departure_airport,

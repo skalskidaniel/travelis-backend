@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from core.models.cell import MarketCell
-    from core.models.offer import RawOffer, Offer, Provider
+    from core.models.offer import RawOffer, Offer, ProviderName
 
 
 @runtime_checkable
@@ -17,7 +17,7 @@ class OfferProvider(Protocol):
     """
 
     @property
-    def provider(self) -> Provider:
+    def provider(self) -> ProviderName:
         """Which provider this adapter implements."""
         ...
 
