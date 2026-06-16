@@ -337,6 +337,10 @@ Use `destinationsCodes` / `departuresCodes` in search requests; there is no sepa
 
 - `offerUrl` must be prefixed with `https://www.tui.pl` (e.g., `https://www.tui.pl/wypoczynek/...`).
 - Location in the application is normalized to `Country/Region/City`. It is derived from `breadcrumbs[0].label` (country), `breadcrumbs[1].label` (region), and either `breadcrumbs[2].label` (city) if present or the fallback `city` field. All slashes (`/`) in labels are normalized to `-`.
+- Country label consistency caveat: for some destination codes, TUI can return mixed top-level country labels in one result set when the destination/departure combination maps to cross-border inventory. Observed and accepted mixed pairs:
+  - `Portugalia` + `Hiszpania`
+  - `Hiszpania` + `Wyspy Kanaryjskie`
+    Any other mixed top-level country-label combination should be treated as unexpected and investigated.
 
 ### Offer Availability
 

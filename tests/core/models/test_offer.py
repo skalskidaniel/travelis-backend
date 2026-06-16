@@ -58,7 +58,6 @@ def test_referral_url_appending_with_existing_query_params(valid_offer_kwargs):
     )
     offer = Offer(**valid_offer_kwargs)
 
-    # Existing params should be preserved, and referral params appended
     url_str = str(offer.referral_url)
     assert "foo=bar" in url_str
     assert "baz=123" in url_str
@@ -102,7 +101,6 @@ def test_share_url_prefix_validation(valid_offer_kwargs):
 
 
 def test_date_mismatch_validation(valid_offer_kwargs):
-    # Departure date after return date
     valid_offer_kwargs["departure_date"] = date(2026, 7, 19)
     valid_offer_kwargs["return_date"] = date(2026, 7, 12)
     valid_offer_kwargs["duration"] = 7
@@ -114,7 +112,6 @@ def test_date_mismatch_validation(valid_offer_kwargs):
 
 
 def test_duration_mismatch_validation(valid_offer_kwargs):
-    # Dates span 7 nights, but duration is set to 5
     valid_offer_kwargs["departure_date"] = date(2026, 7, 12)
     valid_offer_kwargs["return_date"] = date(2026, 7, 19)
     valid_offer_kwargs["duration"] = 5
