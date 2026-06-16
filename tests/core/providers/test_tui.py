@@ -40,11 +40,11 @@ def tui_provider(async_client):
     return TuiProvider(client=async_client)
 
 
-def test_tui_provider_identity(tui_provider):
+def test_provider_identity(tui_provider):
     assert tui_provider.provider == ProviderName.TUI
 
 
-def test_tui_destination_codes_are_registered():
+def test_destination_codes_are_registered():
     registry_codes = set(country_registry["codes"].keys())
     destination_codes = set(tui_filters["destinationsCodes"].keys()) - {"any"}
     assert destination_codes <= registry_codes
@@ -229,33 +229,7 @@ async def test_check_availability(tui_provider, sample_offer):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_check_price(tui_provider, sample_offer):
-    mock_payload = {"priceInformationData": {"priceData": {"amount": 5432.10}}}
-    respx.get(url=AVAILABILITY_URL).mock(
-        return_value=httpx.Response(200, json=mock_payload)
-    )
-    price = await tui_provider.check_price(sample_offer)
-    assert price == Decimal("5432.10")
-
-    respx.get(url=AVAILABILITY_URL).mock(return_value=httpx.Response(200, json={}))
-    price = await tui_provider.check_price(sample_offer)
-    assert price == Decimal("5000.00")
-
-    offer_no_tui = sample_offer.model_copy(deep=True)
-    offer_no_tui.metadata.tui = None
-    with pytest.raises(InvalidOfferMetadataException, match="metadata.tui is required"):
-        await tui_provider.check_price(offer_no_tui)
-
-    respx.get(url=AVAILABILITY_URL).mock(return_value=httpx.Response(500))
-    with pytest.raises(
-        ProviderAPIException, match="TUI availability API request failed"
-    ):
-        await tui_provider.check_price(sample_offer)
-
-
-@pytest.mark.asyncio
-async def test_check_availability_live_unavailable(tui_provider):
+async def test_check_availability_returns_unavailable(tui_provider):
     offer = Offer(
         provider=ProviderName.TUI,
         external_offer_id="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
@@ -289,3 +263,28 @@ async def test_check_availability_live_unavailable(tui_provider):
     )
     available = await tui_provider.check_availability(offer)
     assert available is False
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_check_price(tui_provider, sample_offer):
+    mock_payload = {"priceInformationData": {"priceData": {"amount": 5432.10}}}
+    respx.get(url=AVAILABILITY_URL).mock(
+        return_value=httpx.Response(200, json=mock_payload)
+    )
+    price = await tui_provider.check_price(sample_offer)
+    assert price == Decimal("5432.10")
+
+    respx.get(url=AVAILABILITY_URL).mock(return_value=httpx.Response(200, json={}))
+    price = await tui_provider.check_price(sample_offer)
+    assert price == Decimal("5000.00")
+
+    offer_no_tui = sample_offer.model_copy(deep=True)
+    offer_no_tui.metadata.tui = None
+    with pytest.raises(InvalidOfferMetadataException, match="metadata.tui is required"):
+        await tui_provider.check_price(offer_no_tui)
+
+    respx.get(url=AVAILABILITY_URL).mock(return_value=httpx.Response(500))
+    with pytest.raises(
+        ProviderAPIException, match="TUI availability API request failed"
+    ):
+        await tui_provider.check_price(sample_offer)

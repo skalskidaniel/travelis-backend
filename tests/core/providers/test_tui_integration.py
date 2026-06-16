@@ -29,6 +29,13 @@ SUPPORTED_COUNTRY_CODES = tuple(
 SUPPORTED_BOARD_TYPES = tuple(
     BoardType(board_value) for board_value in _TUI_FILTERS["board"].keys()
 )
+SUPPORTED_MIN_STARS = tuple(
+    sorted(
+        int(stars_value)
+        for stars_value in _TUI_FILTERS["minHotelCategory"].keys()
+        if stars_value.isdigit()
+    )
+)
 
 
 def _max_concurrent_live_requests() -> int:
@@ -73,7 +80,7 @@ async def live_provider() -> TuiProvider:
     os.environ.get("RUN_INTEGRATION_TESTS") != "1",
     reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
 )
-async def test_search_filters_and_validation_next_month():
+async def test_search_filters_consistency():
     cell = MarketCell(
         cell_id="1234567890abcdef",
         country="EG",
@@ -107,7 +114,7 @@ async def test_search_filters_and_validation_next_month():
     os.environ.get("RUN_INTEGRATION_TESTS") != "1",
     reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
 )
-async def test_search_country_consistency_for_all_supported_countries(
+async def test_search_country_consistency(
     live_provider: TuiProvider,
 ):
     month_bucket = _next_month_bucket()
@@ -164,7 +171,7 @@ async def test_search_country_consistency_for_all_supported_countries(
     os.environ.get("RUN_INTEGRATION_TESTS") != "1",
     reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
 )
-async def test_search_board_filter_consistency_for_all_board_types(
+async def test_search_board_filter_consistency(
     live_provider: TuiProvider,
 ):
     month_bucket = _next_month_bucket()
@@ -195,6 +202,45 @@ async def test_search_board_filter_consistency_for_all_board_types(
 
     await asyncio.gather(
         *(_check_board(board_type) for board_type in SUPPORTED_BOARD_TYPES)
+    )
+    if failures:
+        pytest.fail("\n".join(failures))
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+)
+async def test_hotel_standard_consistency(live_provider: TuiProvider):
+    month_bucket = _next_month_bucket()
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_LIVE_REQUESTS)
+    failures: list[str] = []
+
+    async def _check_min_stars(min_stars: int) -> None:
+        async with semaphore:
+            cell = MarketCell(
+                cell_id="1234567890abcdef",
+                country="GR",
+                month=month_bucket,
+                min_stars=min_stars,
+                board=BoardType.HALF_BOARD,
+                adults=2,
+                children=0,
+                activation_count=1,
+            )
+            offers = await live_provider.search(cell)
+
+        if not offers:
+            return
+
+        if not all(offer.stars >= min_stars for offer in offers):
+            failures.append(
+                f"min_stars={min_stars}: found offers below requested hotel standard"
+            )
+
+    await asyncio.gather(
+        *(_check_min_stars(min_stars) for min_stars in SUPPORTED_MIN_STARS)
     )
     if failures:
         pytest.fail("\n".join(failures))
