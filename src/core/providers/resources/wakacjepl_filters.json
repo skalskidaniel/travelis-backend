@@ -74,5 +74,97 @@
     "bed-and-breakfast": "3",
     "none": "4",
     "full-board": "6"
+  },
+  "departurePlaces": {
+    "WAW": {
+      "name": "Warszawa",
+      "id": 278,
+      "slug": "z-warszawy"
+    },
+    "DRS": {
+      "name": "Drezno",
+      "id": 10305,
+      "slug": "z-drezno"
+    },
+    "RDO": {
+      "name": "Warszawa - Radom",
+      "id": 11688,
+      "slug": "z-radomia"
+    },
+    "RZE": {
+      "name": "Rzeszów",
+      "id": 1909,
+      "slug": "z-rzeszowa"
+    },
+    "WRO": {
+      "name": "Wrocław",
+      "id": 256,
+      "slug": "z-wroclawia"
+    },
+    "KTW": {
+      "name": "Katowice",
+      "id": 2622,
+      "slug": "z-katowic"
+    },
+    "POZ": {
+      "name": "Poznań",
+      "id": 2632,
+      "slug": "z-poznania"
+    },
+    "LCJ": {
+      "name": "Łódź",
+      "id": 2654,
+      "slug": "z-lodzi"
+    },
+    "BZG": {
+      "name": "Bydgoszcz",
+      "id": 269,
+      "slug": "z-bydgoszczy"
+    },
+    "KRK": {
+      "name": "Kraków",
+      "id": 2696,
+      "slug": "z-krakowa"
+    },
+    "LUZ": {
+      "name": "Lublin",
+      "id": 272,
+      "slug": "z-lublina"
+    },
+    "GDN": {
+      "name": "Gdańsk",
+      "id": 2880,
+      "slug": "z-gdanska"
+    },
+    "SZY": {
+      "name": "Szczytno",
+      "id": 2891,
+      "slug": "z-szczytno"
+    },
+    "SZZ": {
+      "name": "Szczecin",
+      "id": 2904,
+      "slug": "z-szczecina"
+    },
+    "IEG": {
+      "name": "Zielona Góra",
+      "id": 306,
+      "slug": "z-zielonej-gory"
+    },
+    "BER": {
+      "name": "Berlin",
+      "id": 3301,
+      "slug": "z-berlina"
+    },
+    "OSR": {
+      "name": "Ostrawa",
+      "id": 4837,
+      "slug": "z-ostrawa"
+    },
+    "WMI": {
+      "name": "Warszawa - Modlin",
+      "id": 9758,
+      "slug": "z-warszawy-modlin"
+    }
   }
 }

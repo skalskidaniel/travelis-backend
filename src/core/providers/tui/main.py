@@ -21,11 +21,11 @@ from core.models.offer import RawOffer, Offer, OfferMetadata, ProviderName, TuiM
 from core.providers.resources import tui_filters
 from core.providers.tui.utils import (
     BOARD_CODE_TO_TYPE,
-    _month_date_bounds,
     _representative_child_birthday,
     _format_tui_date,
     _parse_tui_date,
 )
+from core.providers.utils import _month_date_bounds
 
 SEARCH_URL = "https://www.tui.pl/api/services/tui-search/api/search/offers"
 AVAILABILITY_URL = "https://www.tui.pl/api/www/hotel-cards/offers"
