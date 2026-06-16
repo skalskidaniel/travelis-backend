@@ -90,13 +90,8 @@ class WakacjePlMetadata(BaseModel):
         pattern=r"^/.+",
         description="Relative offer page path used as Referer on wakacje.pl API calls.",
     )
-    adults: int = Field(
-        ge=1, description="Number of adults from the search cell."
-    )
-    children: int = Field(
-        ge=0, description="Number of children from the search cell."
-    )
-
+    adults: int = Field(ge=1, description="Number of adults from the search cell.")
+    children: int = Field(ge=0, description="Number of children from the search cell.")
 
 
 class TuiMetadata(BaseModel):

@@ -264,6 +264,7 @@ async def test_check_availability_returns_unavailable(tui_provider):
     available = await tui_provider.check_availability(offer)
     assert available is False
 
+
 @pytest.mark.asyncio
 @respx.mock
 async def test_check_price(tui_provider, sample_offer):

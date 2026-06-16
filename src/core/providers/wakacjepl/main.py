@@ -132,15 +132,15 @@ class WakacjePlProvider:
     async def check_availability(self, offer: Offer) -> bool:
         """Return whether a persisted offer is still bookable on Wakacje.pl.
 
-        Uses a two-step process: first, calling the calculator variants API to 
-        retrieve a fresh offerHash, and then hitting the hotel-cards availability 
+        Uses a two-step process: first, calling the calculator variants API to
+        retrieve a fresh offerHash, and then hitting the hotel-cards availability
         API to confirm whether it is bookable.
         """
         variants = await self._fetch_calculator_variants(offer)
         if not variants:
             return False
 
-        # We pick the first variant because it typically matches the base 
+        # We pick the first variant because it typically matches the base
         # configuration from the original search result (cheapest/default room).
         variant = variants[0]
         offer_hash = variant.get("id")
@@ -165,7 +165,7 @@ class WakacjePlProvider:
     async def check_price(self, offer: Offer) -> Decimal:
         """Fetch the current live price for the given offer on Wakacje.pl.
 
-        Similar to `check_availability`, this executes the full two-step booking 
+        Similar to `check_availability`, this executes the full two-step booking
         flow check to retrieve the most up-to-date total price for the offer.
         """
         variants = await self._fetch_calculator_variants(offer)
@@ -232,11 +232,7 @@ class WakacjePlProvider:
                     "cruiseId": [],
                     "searchType": "wczasy",
                     "offersAttributes": [],
-                    "alternative": {
-                        "countryId": [],
-                        "regionId": [],
-                        "cityId": []
-                    },
+                    "alternative": {"countryId": [], "regionId": [], "cityId": []},
                     "qsVersion": "cx_v2_auction",
                     "query": {
                         "campTypes": [],
@@ -300,7 +296,7 @@ class WakacjePlProvider:
 
     async def _fetch_calculator_variants(self, offer: Offer) -> list[dict[str, Any]]:
         """Fetch variant details for a specific offer from the calculator API.
-        
+
         This step is necessary because the search response doesn't provide the full
         `offerHash` needed for the final availability check.
         """
@@ -363,8 +359,8 @@ class WakacjePlProvider:
     ) -> dict[str, Any]:
         """Check live booking availability using the final offerHash.
 
-        This calls the `checkOfferAvailability` endpoint with a complex 
-        customHeaders structure and detailed participant mapping to simulate 
+        This calls the `checkOfferAvailability` endpoint with a complex
+        customHeaders structure and detailed participant mapping to simulate
         a booking verification.
         """
         meta = offer.metadata.wakacje_pl
