@@ -151,7 +151,7 @@ Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB
 
 ### `GET /api/v2/offers/{offer_id}`
 
-Single offer detail for an offer in the user's feed. 
+Single offer detail for an offer in the user's feed.
 
 **Behavior**: The backend looks up the `cell_id` associated with this `offer_id` in the `UserOffers` table for the authenticated user. If a match exists, it retrieves the offer from the `Offers` table using `(cell_id, offer_id)`.
 
@@ -160,8 +160,8 @@ Single offer detail for an offer in the user's feed.
 ```json
 {
   "offer_id": "a1b2c3...",
-  "provider": "wakacje",
-  "provider_id": "916232",
+  "provider": "wakacje_pl",
+  "external_offer_id": "916232",
   "hotel_name": "Kakkos Terra Blue",
   "country": "GR",
   "region": "Crete",
@@ -181,8 +181,18 @@ Single offer detail for an offer in the user's feed.
   "referral_url": "https://...",
   "share_url": "https://wakacje-travelis.pl/offer/cell123/a1b2c3...",
   "sources": [
-    { "provider": "wakacje", "provider_id": "916232", "price_total": 6148, "tour_operator": "Grecos" },
-    { "provider": "wakacje", "provider_id": "916240", "price_total": 6350, "tour_operator": "Itaka" }
+    {
+      "provider": "wakacje_pl",
+      "external_offer_id": "916232",
+      "price_total": 6148,
+      "tour_operator": "Grecos"
+    },
+    {
+      "provider": "wakacje_pl",
+      "external_offer_id": "916240",
+      "price_total": 6350,
+      "tour_operator": "Itaka"
+    }
   ],
   "scraped_at": "2026-04-20T06:00:00Z",
   "updated_at": "2026-04-20T06:00:00Z"

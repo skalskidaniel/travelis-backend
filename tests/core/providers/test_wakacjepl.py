@@ -26,6 +26,7 @@ from core.exceptions.provider import (
     PastDatesException,
     DateMismatchException,
     InvalidOfferMetadataException,
+    MinStarsNotSupportedException,
     ProviderAPIException,
 )
 
@@ -82,6 +83,29 @@ async def test_search_unsupported_board(wakacjepl_provider):
                 match="Board type 'none' is not supported",
             ):
                 await wakacjepl_provider.search(cell)
+
+
+@pytest.mark.asyncio
+async def test_search_unsupported_stars(wakacjepl_provider):
+    cell = MarketCell(
+        cell_id="1234567890abcdef",
+        country="EG",
+        month="2026-07",
+        min_stars=4,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=1,
+        activation_count=1,
+    )
+    with (
+        patch.dict(wakacjepl_provider._country_ids, {"EG": "37"}),
+        patch.dict(wakacjepl_provider._service_values, {"all-inclusive": "1"}),
+        patch("core.providers.wakacjepl.main.SUPPORTED_MIN_STARS", frozenset({3, 5})),
+    ):
+        with pytest.raises(
+            MinStarsNotSupportedException, match="Min stars '4' is not supported"
+        ):
+            await wakacjepl_provider.search(cell)
 
 
 @pytest.mark.asyncio
@@ -267,6 +291,76 @@ async def test_search_happy_path(wakacjepl_provider):
             assert offer.location == "Grecja/Kreta/Ierapetra"
             assert offer.price_total == Decimal("6148.00")
             assert offer.metadata.wakacje_pl.tour_op_code == "GRCS"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_search_skips_rows_with_invalid_provider_metadata(wakacjepl_provider):
+    cell = MarketCell(
+        cell_id="1234567890abcdef",
+        country="GR",
+        month="2026-08",
+        min_stars=5,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    mock_response = {
+        "success": True,
+        "data": {
+            "count": 1,
+            "offers": [
+                {
+                    "offerId": 916232,
+                    "name": "Kakkos Terra Blue",
+                    "place": {
+                        "country": {"id": 29, "name": "Grecja", "slug": "grecja"},
+                        "region": {"id": 29004, "name": "Kreta", "slug": "kreta"},
+                        "city": {
+                            "id": 29011912,
+                            "name": "Ierapetra",
+                            "slug": "ierapetra",
+                        },
+                    },
+                    "departureDate": "2026-08-26",
+                    "returnDate": "2026-09-02",
+                    "durationNights": 7,
+                    "departurePlace": "Rzeszów",
+                    "departurePlaceCode": "RZE",
+                    "service": 1,
+                    "category": 50,
+                    "ratingValue": 7.5,
+                    "ratingReservationCount": 40,
+                    "price": 6148,
+                    "roomType": "Pokój standard",
+                    "urlName": "kakkos-terra-blue",
+                    "hotelId": 0,
+                    "tourOperator": 1588,
+                    "tourOpCode": "GRCS",
+                    "departureType": 1,
+                }
+            ],
+        },
+    }
+
+    with patch("core.providers.wakacjepl.main._month_date_bounds") as mock_bounds:
+        mock_bounds.return_value = (date(2026, 8, 1), date(2026, 8, 31))
+
+        with (
+            patch.dict(wakacjepl_provider._country_ids, {"GR": "29"}),
+            patch.dict(wakacjepl_provider._service_values, {"all-inclusive": "1"}),
+            patch.dict(
+                wakacjepl_provider._departure_places_map,
+                {"RZE": {"name": "Rzeszów", "id": 1909, "slug": "z-rzeszowa"}},
+            ),
+        ):
+            respx.post(SEARCH_URL).mock(
+                return_value=httpx.Response(200, json=mock_response)
+            )
+            offers = await wakacjepl_provider.search(cell)
+
+            assert offers == []
 
 
 @pytest.mark.asyncio

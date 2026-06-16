@@ -75,7 +75,7 @@ async def live_provider() -> WakacjePlProvider:
 async def test_search_filters_consistency(live_provider):
     cell = MarketCell(
         cell_id="1234567890abcdef",
-        country="TR",
+        country="EG",
         month=_next_month_bucket(),
         min_stars=4,
         board=BoardType.ALL_INCLUSIVE,

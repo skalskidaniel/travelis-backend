@@ -70,7 +70,7 @@ The semaphore/fan-out lives in the orchestrator; per-cell work calls `async` `co
 1. Map provider fields to canonical offer schema.
 2. Compute semantic fingerprint → `offer_id`.
 3. **Collapsing/Deduplication**: Collapse provider search results with the same semantic fingerprint (intra-scrape and cross-provider), keeping the lowest price variant and accumulating sources (see [data-model.md](data-model.md#deduplication-and-variant-collapsing)).
-4. **Provider metadata:** persist `metadata.wakacje` or `metadata.tui` (see [data-model.md](data-model.md#offer-metadata)) — required for later per-offer availability checks without re-scraping the offer page.
+4. **Provider metadata:** persist `metadata.wakacje_pl` or `metadata.tui` (see [data-model.md](data-model.md#offer-metadata)) — required for later per-offer availability checks without re-scraping the offer page.
 5. Attach `cell_id` from the scrape context.
 6. Forward to scoring.
 
@@ -134,8 +134,8 @@ Baseline is **availability-by-absence**, which works for both providers without 
 Optional refinement for fresher availability _between_ scrapes (requires provider metadata persisted at ingest — see [data-model.md](data-model.md#offer-metadata)):
 
 - **tui.pl:** `GET /api/www/hotel-cards/offers?offerCode={metadata.tui.offer_code}` (returns `OK` / `UNAVAILABLE`).
-- **wakacje.pl:** two-step JSON API using stored `metadata.wakacje` + canonical offer fields (no offer-page HTML fetch):
-  1. `POST /v2/api/getCalculatorOfferVariants/{provider_id}` — empty `offers` ⇒ unavailable for this configuration.
+- **wakacje.pl:** two-step JSON API using stored `metadata.wakacje_pl` + canonical offer fields (no offer-page HTML fetch):
+  1. `POST /v2/api/getCalculatorOfferVariants/{external_offer_id}` — empty `offers` ⇒ unavailable for this configuration.
   2. `GET /v2/api/checkOfferAvailability` — `data.availability` + `data.status === "OK"`.
 
 Contract details: [providers/wakacjepl/contract.md](../providers/wakacjepl/contract.md#offer-availability). Prototype: `notebooks/wakacje_pl_availability.ipynb`.

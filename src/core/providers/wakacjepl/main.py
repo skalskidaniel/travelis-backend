@@ -6,12 +6,14 @@ from decimal import Decimal
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
 from core.exceptions.provider import (
     BoardTypeNotSupportedException,
     CountryNotFoundException,
     DateMismatchException,
     InvalidOfferMetadataException,
+    MinStarsNotSupportedException,
     PastDatesException,
     ProviderAPIException,
 )
@@ -38,6 +40,7 @@ WAKACJE_ORIGIN = "https://www.wakacje.pl"
 PAGE_SIZE = 500
 MIN_DURATION_NIGHTS = 2
 MAX_DURATION_NIGHTS = 28
+SUPPORTED_MIN_STARS = frozenset(range(2, 6))
 
 
 class WakacjePlProvider:
@@ -83,6 +86,11 @@ class WakacjePlProvider:
             )
         service_id = int(service_str)
 
+        if cell.min_stars not in SUPPORTED_MIN_STARS:
+            raise MinStarsNotSupportedException(
+                f"Min stars '{cell.min_stars}' is not supported by Wakacje.pl provider."
+            )
+
         raw_offers: list[RawOffer] = []
         page = 1
         has_more = True
@@ -118,7 +126,10 @@ class WakacjePlProvider:
             offers_list = data.get("offers") or []
 
             for item in offers_list:
-                mapped = self._map_search_offer(item, cell=cell)
+                try:
+                    mapped = self._map_search_offer(item, cell=cell)
+                except ValidationError:
+                    continue
                 if mapped is not None:
                     raw_offers.append(mapped)
 
@@ -136,23 +147,11 @@ class WakacjePlProvider:
         retrieve a fresh offerHash, and then hitting the hotel-cards availability
         API to confirm whether it is bookable.
         """
-        variants = await self._fetch_calculator_variants(offer)
-        if not variants:
+        live_variant = await self._resolve_live_variant(offer)
+        if live_variant is None:
             return False
 
-        # We pick the first variant because it typically matches the base
-        # configuration from the original search result (cheapest/default room).
-        variant = variants[0]
-        offer_hash = variant.get("id")
-        if not offer_hash:
-            return False
-
-        provider_code = (
-            variant.get("providerCode") or offer.metadata.wakacje_pl.tour_op_code
-        )
-        if not provider_code:
-            provider_code = "WAK"
-
+        offer_hash, provider_code = live_variant
         status_data = await self._fetch_live_availability(
             offer, offer_hash, provider_code
         )
@@ -168,22 +167,11 @@ class WakacjePlProvider:
         Similar to `check_availability`, this executes the full two-step booking
         flow check to retrieve the most up-to-date total price for the offer.
         """
-        variants = await self._fetch_calculator_variants(offer)
-        if not variants:
+        live_variant = await self._resolve_live_variant(offer)
+        if live_variant is None:
             return offer.price_total
 
-        # The 0th variant represents the base configuration selected during search.
-        variant = variants[0]
-        offer_hash = variant.get("id")
-        if not offer_hash:
-            return offer.price_total
-
-        provider_code = (
-            variant.get("providerCode") or offer.metadata.wakacje_pl.tour_op_code
-        )
-        if not provider_code:
-            provider_code = "WAK"
-
+        offer_hash, provider_code = live_variant
         status_data = await self._fetch_live_availability(
             offer, offer_hash, provider_code
         )
@@ -294,16 +282,35 @@ class WakacjePlProvider:
             "referer": f"{WAKACJE_ORIGIN}/wczasy/?src=fromSearch",
         }
 
+    @staticmethod
+    def _metadata_for_offer(offer: Offer) -> WakacjePlMetadata:
+        meta = offer.metadata.wakacje_pl
+        if meta is None:
+            msg = "metadata.wakacje_pl is required for Wakacje.pl availability checks"
+            raise InvalidOfferMetadataException(msg)
+        return meta
+
+    async def _resolve_live_variant(self, offer: Offer) -> tuple[str, str] | None:
+        variants = await self._fetch_calculator_variants(offer)
+        if not variants:
+            return None
+
+        variant = variants[0]
+        offer_hash = variant.get("id")
+        if not offer_hash:
+            return None
+
+        meta = self._metadata_for_offer(offer)
+        provider_code = variant.get("providerCode") or meta.tour_op_code or "WAK"
+        return str(offer_hash), str(provider_code)
+
     async def _fetch_calculator_variants(self, offer: Offer) -> list[dict[str, Any]]:
         """Fetch variant details for a specific offer from the calculator API.
 
         This step is necessary because the search response doesn't provide the full
         `offerHash` needed for the final availability check.
         """
-        meta = offer.metadata.wakacje_pl
-        if meta is None:
-            msg = "metadata.wakacje_pl is required for Wakacje.pl availability checks"
-            raise InvalidOfferMetadataException(msg)
+        meta = self._metadata_for_offer(offer)
 
         child_birthday = _representative_child_birthday()
         children_birthdays = [child_birthday] * meta.children
@@ -363,7 +370,7 @@ class WakacjePlProvider:
         customHeaders structure and detailed participant mapping to simulate
         a booking verification.
         """
-        meta = offer.metadata.wakacje_pl
+        meta = self._metadata_for_offer(offer)
 
         custom_headers = json.dumps(
             {
@@ -445,6 +452,9 @@ class WakacjePlProvider:
         price = item.get("price")
         room_type = item.get("roomType")
         url_name = item.get("urlName")
+        hotel_id = item.get("hotelId")
+        tour_operator_id = item.get("tourOperator")
+        transport_id = item.get("departureType", 1)
 
         if not all(
             [
@@ -462,6 +472,8 @@ class WakacjePlProvider:
                 price is not None,
                 room_type,
                 url_name,
+                hotel_id is not None,
+                tour_operator_id is not None,
             ]
         ):
             return None
@@ -477,6 +489,9 @@ class WakacjePlProvider:
         country_slug = country.get("slug")
         region_slug = region.get("slug")
         city_slug = city.get("slug")
+        country_id = country.get("id")
+        region_id = region.get("id")
+        city_id = city.get("id")
 
         if not all(
             [
@@ -486,12 +501,11 @@ class WakacjePlProvider:
                 country_slug,
                 region_slug,
                 city_slug,
+                country_id is not None,
+                region_id is not None,
+                city_id is not None,
             ]
         ):
-            return None
-
-        board = SERVICE_TO_BOARD.get(int(service))
-        if board is None:
             return None
 
         departure_iata = item.get("departurePlaceCode")
@@ -499,20 +513,31 @@ class WakacjePlProvider:
             return None
 
         dep_meta = self._departure_places_map.get(departure_iata)
-        if not dep_meta:
+        if not dep_meta or dep_meta.get("id") is None or not dep_meta.get("slug"):
             return None
 
         try:
+            service_id = int(service)
+            hotel_id_int = int(hotel_id)
+            tour_operator_id_int = int(tour_operator_id)
+            country_id_int = int(country_id)
+            region_id_int = int(region_id)
+            city_id_int = int(city_id)
+            departure_city_id = int(dep_meta["id"])
+            transport_id_int = int(transport_id)
             departure_date = datetime.strptime(departure_date_raw, "%Y-%m-%d").date()
             return_date = datetime.strptime(return_date_raw, "%Y-%m-%d").date()
-        except ValueError:
+            duration = int(duration_nights)
+            stars = int(category) // 10
+        except (TypeError, ValueError):
             return None
 
-        duration = int(duration_nights)
         if duration < 1:
             return None
 
-        stars = int(category) // 10
+        board = SERVICE_TO_BOARD.get(service_id)
+        if board is None:
+            return None
 
         rating = (Decimal(str(rating_value)) / Decimal("2")).quantize(Decimal("0.1"))
 
@@ -531,15 +556,15 @@ class WakacjePlProvider:
         referral_url = f"{WAKACJE_ORIGIN}{offer_page_path}"
 
         wakacje_metadata = WakacjePlMetadata(
-            hotel_id=item.get("hotelId", 0),
-            tour_operator_id=item.get("tourOperator", 0),
+            hotel_id=hotel_id_int,
+            tour_operator_id=tour_operator_id_int,
             tour_op_code=item.get("tourOpCode"),
-            country_id=country.get("id", 0),
-            region_id=region.get("id", 0),
-            city_id=city.get("id", 0),
-            departure_city_id=dep_meta["id"],
-            service_id=int(service),
-            transport_id=item.get("departureType", 1),
+            country_id=country_id_int,
+            region_id=region_id_int,
+            city_id=city_id_int,
+            departure_city_id=departure_city_id,
+            service_id=service_id,
+            transport_id=transport_id_int,
             departure_slug=dep_meta["slug"],
             offer_page_path=offer_page_path,
             adults=cell.adults,

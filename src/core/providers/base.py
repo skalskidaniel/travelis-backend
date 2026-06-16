@@ -33,7 +33,7 @@ class OfferProvider(Protocol):
     async def check_availability(self, offer: Offer) -> bool:
         """Return whether a persisted offer is still bookable.
 
-        Uses provider metadata captured at ingest (``metadata.wakacje`` or
+        Uses provider metadata captured at ingest (``metadata.wakacje_pl`` or
         ``metadata.tui``) together with canonical offer fields.
         """
         ...

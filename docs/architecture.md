@@ -6,17 +6,17 @@ This document is the entry point for architecture documentation. Each linked fil
 
 ## Documentation map
 
-| Document                                              | Contents                                                        |
-| ----------------------------------------------------- | --------------------------------------------------------------- |
-| [agent-guidelines.md](architecture/agent-guidelines.md)| **Mandatory rules for AI agents and engineers**                 |
-| [requirements.md](architecture/requirements.md)       | Product requirements, preferences, supported countries/airports |
-| [system-overview.md](architecture/system-overview.md) | Lambdalith layout, modules, runtime model                       |
-| [code-structure.md](architecture/code-structure.md)   | Hexagonal layering, models, repositories, container, providers  |
-| [data-model.md](architecture/data-model.md)           | DynamoDB tables, Redis keys, offer identity                     |
-| [pipeline.md](architecture/pipeline.md)               | Scraping, scoring, matching, debouncing, schedules              |
-| [attractiveness.md](architecture/attractiveness.md)   | Two-stage scoring algorithm                                     |
-| [api.md](architecture/api.md)                         | REST API (`/api/v2/*`) contracts                                |
-| [infrastructure.md](architecture/infrastructure.md)   | Terraform modules, AWS resources, Redis Cloud                   |
+| Document                                                | Contents                                                        |
+| ------------------------------------------------------- | --------------------------------------------------------------- |
+| [agent-guidelines.md](architecture/agent-guidelines.md) | **Mandatory rules for AI agents and engineers**                 |
+| [requirements.md](architecture/requirements.md)         | Product requirements, preferences, supported countries/airports |
+| [system-overview.md](architecture/system-overview.md)   | Lambdalith layout, modules, runtime model                       |
+| [code-structure.md](architecture/code-structure.md)     | Hexagonal layering, models, repositories, container, providers  |
+| [data-model.md](architecture/data-model.md)             | DynamoDB tables, Redis keys, offer identity                     |
+| [pipeline.md](architecture/pipeline.md)                 | Scraping, scoring, matching, debouncing, schedules              |
+| [attractiveness.md](architecture/attractiveness.md)     | Two-stage scoring algorithm                                     |
+| [api.md](architecture/api.md)                           | REST API (`/api/v2/*`) contracts                                |
+| [infrastructure.md](architecture/infrastructure.md)     | Terraform modules, AWS resources, Redis Cloud                   |
 
 ## Provider integrations
 
@@ -35,7 +35,7 @@ External API contracts live separately (reverse-engineered, versioned in git):
 | Cell scraping        | `asyncio` semaphore fan-out inside one invocation (bounded)          |
 | Persistence          | DynamoDB (4 tables) + Redis Cloud (user offer feed)                  |
 | Market cells         | Global cells with activation tracking                                |
-| Offer identity       | Semantic fingerprint hash; `provider_id` stored separately           |
+| Offer identity       | Semantic fingerprint hash; `external_offer_id` stored separately     |
 | Auth                 | Cognito in PWA; backend validates JWT; delete account via API        |
 | Account provisioning | Cognito post-confirmation trigger creates `Users` + default cells    |
 | Preference updates   | EventBridge Scheduler one-time `at(now+30s)`, debounced by overwrite |

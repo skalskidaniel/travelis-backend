@@ -202,7 +202,7 @@ class Offer(RawOffer):
             self.provider is ProviderName.WAKACJE_PL
             and self.metadata.wakacje_pl is None
         ):
-            msg = "metadata.wakacje is required for wakacje offers"
+            msg = "metadata.wakacje_pl is required for wakacje.pl offers"
             raise ValueError(msg)
 
         if self.provider is ProviderName.TUI:
@@ -210,7 +210,7 @@ class Offer(RawOffer):
                 msg = "metadata.tui is required for tui offers"
                 raise ValueError(msg)
             if self.external_offer_id != self.metadata.tui.offer_code:
-                msg = "provider_id must match metadata.tui.offer_code"
+                msg = "external_offer_id must match metadata.tui.offer_code"
                 raise ValueError(msg)
 
         return self

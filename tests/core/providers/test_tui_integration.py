@@ -85,7 +85,7 @@ async def test_search_filters_consistency():
         cell_id="1234567890abcdef",
         country="EG",
         month=_next_month_bucket(),
-        min_stars=4,
+        min_stars=3,
         board=BoardType.ALL_INCLUSIVE,
         adults=2,
         children=1,
@@ -105,7 +105,7 @@ async def test_search_filters_consistency():
         assert o.provider == ProviderName.TUI
         assert o.location.startswith("Egipt/")
         assert o.departure_date.strftime("%Y-%m") == cell.month
-        assert o.stars >= 4
+        assert o.stars >= 3
         assert o.board == BoardType.ALL_INCLUSIVE
 
 

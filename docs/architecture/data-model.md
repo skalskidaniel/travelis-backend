@@ -58,8 +58,8 @@ Canonical attractive offers (post-scoring, deduplicated).
 | -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cell_id` (PK)             | String  | Market cell this offer belongs to                                                                                                                                                                                                                                                           |
 | `offer_id` (SK)            | String  | Semantic fingerprint hash (globally unique)                                                                                                                                                                                                                                                 |
-| `provider`                 | String  | `wakacje` or `tui`                                                                                                                                                                                                                                                                          |
-| `provider_id`              | String  | Provider-native ID (e.g. wakacje `offerId`, tui `offerCode`)                                                                                                                                                                                                                                |
+| `provider`                 | String  | `wakacje_pl` or `tui`                                                                                                                                                                                                                                                                       |
+| `external_offer_id`        | String  | Provider-native ID (e.g. wakacje `offerId`, tui `offerCode`)                                                                                                                                                                                                                                |
 | `hotel_name`               | String  |                                                                                                                                                                                                                                                                                             |
 | `location`                 | String  | Stored in format `Country/Region/City`. **Normalization:** wakacje.pl `placeName` is already in `Country / Region / City` format (normalize separators to `Country/Region/City`); TUI is constructed from `breadcrumbs[0].label` (country) + `breadcrumbs[1].label` (region) + `city` field |
 | `departure_airport`        | String  | IATA                                                                                                                                                                                                                                                                                        |
@@ -132,7 +132,7 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
    - wakacje.pl often returns identical trips differing only in price or tour operator. During normalization, these are collapsed into one canonical offer.
    - We keep the variant with the **lowest `price_total`**.
    - All collapsed provider variants are stored in `metadata.sources[]`.
-   - The top-level `provider_id` is set to the winning variant's ID.
+   - The top-level `external_offer_id` is set to the winning variant's ID.
    - Reference key fields for wakacje.pl variant matching: `offerHash`, `departureDate`, `returnDate`, `departurePlace`, `service`, `roomType`.
 
 2. **Cross-Provider Deduplication (Fingerprint Collision)**:
@@ -145,8 +145,8 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
      - The existing item is loaded from DynamoDB.
      - The `sources` lists from both the existing and new offers are merged and deduplicated (using provider name and native ID).
      - The variant with the **lowest `price_total`** across all combined sources is selected as the winner.
-     - The top-level offer fields (`price_total`, `price_per_day_one_person`, `provider`, `provider_id`, `referral_url`) are updated to reflect the winning variant.
-     - The provider-specific metadata blocks (`metadata.wakacje` and `metadata.tui`) are both preserved if variants from both providers exist in the merged sources list.
+     - The top-level offer fields (`price_total`, `price_per_day_one_person`, `provider`, `external_offer_id`, `referral_url`) are updated to reflect the winning variant.
+     - The provider-specific metadata blocks (`metadata.wakacje_pl` and `metadata.tui`) are both preserved if variants from both providers exist in the merged sources list.
      - The `updated_at` and `scraped_at` timestamps are refreshed, and the merged offer is saved back to DynamoDB.
 
 ## Offer metadata
@@ -160,11 +160,11 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
 | `price_z_score` | Number | Stage-1 price z-score (debugging / attractiveness)                           |
 | `sources[]`     | List   | Collapsed provider variants after dedup (lowest price wins on the top level) |
 
-Each `sources[]` entry mirrors the provider-specific availability block below for that variant (same shape as `metadata.wakacje` or `metadata.tui`).
+Each `sources[]` entry mirrors the provider-specific availability block below for that variant (same shape as `metadata.wakacje_pl` or `metadata.tui`).
 
-### `metadata.wakacje` (required for availability checks)
+### `metadata.wakacje_pl` (required for availability checks)
 
-Persisted at **ingest** from the wakacje.pl search response (and airport catalog lookup). Together with the canonical offer columns (`provider_id`, `departure_date`, `return_date`, `duration`, `board`, `departure_airport`, plus cell `adults` / `children`), this must be sufficient to run the availability pipeline **without re-fetching the offer page HTML**.
+Persisted at **ingest** from the wakacje.pl search response (and airport catalog lookup). Together with the canonical offer columns (`external_offer_id`, `departure_date`, `return_date`, `duration`, `board`, `departure_airport`, plus cell `adults` / `children`), this must be sufficient to run the availability pipeline **without re-fetching the offer page HTML**.
 
 | Key                 | Type   | Source (search / ingest)                                                                          | Role                                                                                                       |
 | ------------------- | ------ | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -190,7 +190,7 @@ Persisted at **ingest** from the wakacje.pl search response (and airport catalog
 2. `offers: []` → configuration unavailable (`available = false`); skip step 3.
 3. Otherwise `checkOfferAvailability` with the chosen variant's `id` as `offerHash`.
 
-Canonical columns already cover: `provider_id` (= wakacje `offerId`), `departure_date`, `return_date`, `duration`, normalized `board`, `departure_airport` (IATA, feed-facing), and occupancy from the scrape cell (`adults`, `children`).
+Canonical columns already cover: `external_offer_id` (= wakacje `offerId`), `departure_date`, `return_date`, `duration`, normalized `board`, `departure_airport` (IATA, feed-facing), and occupancy from the scrape cell (`adults`, `children`).
 
 ### `metadata.tui` (required for availability checks)
 
@@ -198,7 +198,7 @@ Canonical columns already cover: `provider_id` (= wakacje `offerId`), `departure
 | ------------ | ------ | ----------- | -------------------------------------------- |
 | `offer_code` | String | `offerCode` | `GET /api/www/hotel-cards/offers?offerCode=` |
 
-(`provider_id` on the offer row should match `offer_code`.)
+(`external_offer_id` on the offer row should match `offer_code`.)
 
 ### Cross-provider matching
 

@@ -8,21 +8,21 @@ Users configure trip preferences and receive notifications when new matching dea
 
 ## Technology stack
 
-| Layer              | Choice                                                                                                                                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| API runtime        | AWS Lambda + Mangum + FastAPI (`async def` handlers)                                                                                                                                                                     |
-| Concurrency        | Async end-to-end; `asyncio` semaphore for scrape fan-out                                                                                                                                                                 |
-| Rate limiting      | FastAPI Limiter (async Redis)                                                                                                                                                                                            |
-| Infrastructure     | Terraform (+ Vault provider for secrets)                                                                                                                                                                                 |
-| Primary database   | DynamoDB (provisioned capacity for cost control)                                                                                                                                                                         |
-| Offer feed cache   | Redis Cloud                                                                                                                                                                                                              |
-| Scraping           | HTTP JSON APIs (no browser required for v1)                                                                                                                                                                              |
-| Statistics         | NumPy or pandas                                                                                                                                                                                                          |
-| Logging            | AWS Lambda Powertools                                                                                                                                                                                                    |
-| Monitoring         | Grafana (Sentry on frontend)                                                                                                                                                                                             |
-| AWS SDK            | aioboto3 (async; aiobotocore under the hood)                                                                                                                                                                             |
-| Authentication     | AWS Cognito                                                                                                                                                                                                              |
-| Availability check | Baseline: availability-by-absence (3× scrape). Optional 1× daily: TUI per-offer API; wakacje.pl two-step calculator API using `metadata.wakacje` (see [contract](../providers/wakacjepl/contract.md#offer-availability)) |
+| Layer              | Choice                                                                                                                                                                                                                      |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API runtime        | AWS Lambda + Mangum + FastAPI (`async def` handlers)                                                                                                                                                                        |
+| Concurrency        | Async end-to-end; `asyncio` semaphore for scrape fan-out                                                                                                                                                                    |
+| Rate limiting      | FastAPI Limiter (async Redis)                                                                                                                                                                                               |
+| Infrastructure     | Terraform (+ Vault provider for secrets)                                                                                                                                                                                    |
+| Primary database   | DynamoDB (provisioned capacity for cost control)                                                                                                                                                                            |
+| Offer feed cache   | Redis Cloud                                                                                                                                                                                                                 |
+| Scraping           | HTTP JSON APIs (no browser required for v1)                                                                                                                                                                                 |
+| Statistics         | NumPy or pandas                                                                                                                                                                                                             |
+| Logging            | AWS Lambda Powertools                                                                                                                                                                                                       |
+| Monitoring         | Grafana (Sentry on frontend)                                                                                                                                                                                                |
+| AWS SDK            | aioboto3 (async; aiobotocore under the hood)                                                                                                                                                                                |
+| Authentication     | AWS Cognito                                                                                                                                                                                                                 |
+| Availability check | Baseline: availability-by-absence (3× scrape). Optional 1× daily: TUI per-offer API; wakacje.pl two-step calculator API using `metadata.wakacje_pl` (see [contract](../providers/wakacjepl/contract.md#offer-availability)) |
 
 CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the event loop.
 
@@ -43,8 +43,8 @@ CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the ev
 
 ### Scraping & Integration
 
-- [x] Find a way to check wakacje.pl offer availability — verified in `notebooks/wakacje_pl_availability.ipynb` (`getCalculatorOfferVariants` + `checkOfferAvailability`). Pipeline integration pending; ingest must persist `metadata.wakacje` (see [data-model.md](data-model.md#metadatawakacje-required-for-availability-checks)).
-- [ ] Persist `metadata.wakacje` on ingest for every wakacje.pl offer.
+- [x] Find a way to check wakacje.pl offer availability — verified in `notebooks/wakacje_pl_availability.ipynb` (`getCalculatorOfferVariants` + `checkOfferAvailability`). Pipeline integration pending; ingest must persist `metadata.wakacje_pl` (see [data-model.md](data-model.md#metadatawakacje_pl-required-for-availability-checks)).
+- [ ] Persist `metadata.wakacje_pl` on ingest for every wakacje.pl offer.
 - [ ] Wire `jobs.availability` to the wakacje.pl JSON API (after metadata is populated).
 
 ## User preferences

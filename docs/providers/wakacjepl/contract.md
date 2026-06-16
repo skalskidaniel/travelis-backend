@@ -166,8 +166,8 @@ Shape:
 
 - `countries` — `countryId` → ISO + display name
 - `regions` — `regionId` → `country_id` + **name**
-- `cities` — `cityId` → parent IDs + name (`checkOfferAvailability` / `metadata.wakacje`)
-- `departure_airports` — `departureCityId` → IATA, **name**, URL **slug** (`getCalculatorOfferVariants` / `metadata.wakacje.departure_slug`)
+- `cities` — `cityId` → parent IDs + name (`checkOfferAvailability` / `metadata.wakacje_pl`)
+- `departure_airports` — `departureCityId` → IATA, **name**, URL **slug** (`getCalculatorOfferVariants` / `metadata.wakacje_pl.departure_slug`)
 
 Airport IDs are merged from [wakacjepl_filters.json](wakacjepl_filters.json) and `offerConfiguratorV2/filters` labels.
 
@@ -267,8 +267,8 @@ Observation from the UI (selecting "Grecja → Kreta"):
 
 ### Rating Normalization
 
-- wakacje.pl returns `ratingValue` on a 0–10 scale. During ingest, divide by 2 to get the canonical 0–5 scale.
-- Example: `ratingValue: 7.5` → `rating: 3.75`.
+- wakacje.pl returns `ratingValue` on a 0–10 scale. During ingest, divide by 2 and store the canonical one-decimal 0–5 `Rating`.
+- Example: `ratingValue: 7.5` → `rating: 3.8`.
 
 ### Board Type Normalization
 
@@ -294,7 +294,7 @@ Observation from the UI (selecting "Grecja → Kreta"):
 - Deduplication involves:
   - Grouping offers by the same fingerprint.
   - Keeping the variant with the lowest `price`.
-  - Storing remaining variants in `metadata.sources[]` for debugging/history purposes. Each source entry includes a full `metadata.wakacje` block (see below) so availability can be re-checked for any collapsed variant.
+- Storing remaining variants in `metadata.sources[]` for debugging/history purposes. Each source entry includes a full `metadata.wakacje_pl` block (see below) so availability can be re-checked for any collapsed variant.
 - Composite key for unique provider-level variant identification: `offerHash + departureDate + returnDate + departurePlace + serviceDesc + roomType`.
 - Semantic fingerprint for `offer_id` is computed as described in [data-model.md](../../architecture/data-model.md#semantic-fingerprint).
 
@@ -302,12 +302,12 @@ Observation from the UI (selecting "Grecja → Kreta"):
 
 ### Pipeline (no HTML scrape at check time)
 
-If ingest persisted [metadata.wakacje](../../architecture/data-model.md#metadatawakacje-required-for-availability-checks), the daily job can check availability using only HTTP JSON APIs:
+If ingest persisted [metadata.wakacje_pl](../../architecture/data-model.md#metadatawakacje_pl-required-for-availability-checks), the daily job can check availability using only HTTP JSON APIs:
 
 1. **Resolve room variant** — `POST /v2/api/getCalculatorOfferVariants/{offerId}`
 2. **Live check** — `GET /v2/api/checkOfferAvailability` (only when step 1 returns variants)
 
-Canonical offer columns supply `offerId` (`provider_id`), dates, duration, board, and occupancy. `metadata.wakacje` supplies geo/operator/airport IDs.
+Canonical offer columns supply `offerId` (`external_offer_id`), dates, duration, board, and occupancy. `metadata.wakacje_pl` supplies geo/operator/airport IDs.
 
 ### Step 1 — Calculator variants
 
@@ -320,7 +320,7 @@ Canonical offer columns supply `offerId` (`provider_id`), dates, duration, board
 accept: application/json
 content-type: application/json
 origin: https://www.wakacje.pl
-referer: https://www.wakacje.pl/oferty/...  # metadata.wakacje.offer_page_path
+referer: https://www.wakacje.pl/oferty/...  # metadata.wakacje_pl.offer_page_path
 ```
 
 #### Request body
@@ -349,16 +349,16 @@ referer: https://www.wakacje.pl/oferty/...  # metadata.wakacje.offer_page_path
 
 | Field                          | Source in TraveLis                                                                                              |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `offerId` (path)               | `Offers.provider_id`                                                                                            |
+| `offerId` (path)               | `Offers.external_offer_id`                                                                                      |
 | `adults` / `kids` / `kidsAges` | scrape cell (`adults`, `children`; representative child ages per [pipeline.md](../../architecture/pipeline.md)) |
-| `serviceId`                    | `metadata.wakacje.service_id`                                                                                   |
+| `serviceId`                    | `metadata.wakacje_pl.service_id`                                                                                |
 | `duration`                     | `Offers.duration`                                                                                               |
 | `departureDate`                | `Offers.departure_date`                                                                                         |
-| `transportId`                  | `metadata.wakacje.transport_id`                                                                                 |
-| `departureCityId`              | `metadata.wakacje.departure_city_id`                                                                            |
-| `hotelId`                      | `metadata.wakacje.hotel_id`                                                                                     |
-| `tourId`                       | `metadata.wakacje.tour_operator_id`                                                                             |
-| `tourOp`                       | `metadata.wakacje.tour_op_code` (optional — omit if absent)                                                     |
+| `transportId`                  | `metadata.wakacje_pl.transport_id`                                                                              |
+| `departureCityId`              | `metadata.wakacje_pl.departure_city_id`                                                                         |
+| `hotelId`                      | `metadata.wakacje_pl.hotel_id`                                                                                  |
+| `tourId`                       | `metadata.wakacje_pl.tour_operator_id`                                                                          |
+| `tourOp`                       | `metadata.wakacje_pl.tour_op_code` (optional — omit if absent)                                                  |
 
 #### Response
 
@@ -390,16 +390,16 @@ referer: https://www.wakacje.pl/oferty/...  # metadata.wakacje.offer_page_path
 
 #### Query parameters
 
-| Parameter                                        | Source                                                       |
-| ------------------------------------------------ | ------------------------------------------------------------ |
-| `providerCode`                                   | variant `providerCode`, else `metadata.wakacje.tour_op_code` |
-| `offerHash`                                      | variant `id` from step 1                                     |
-| `offerType`                                      | `tour`                                                       |
-| `includeTfgService`                              | `true`                                                       |
-| `isAlternativeRoom`                              | `false`                                                      |
-| `cityId` / `countryId` / `regionId`              | `metadata.wakacje`                                           |
-| `participantsObject[participants][n][birthDate]` | representative adult `1988-01-01`; children per scrape rules |
-| `participantsObject[participants][n][type]`      | `adult` / `child`                                            |
+| Parameter                                        | Source                                                          |
+| ------------------------------------------------ | --------------------------------------------------------------- |
+| `providerCode`                                   | variant `providerCode`, else `metadata.wakacje_pl.tour_op_code` |
+| `offerHash`                                      | variant `id` from step 1                                        |
+| `offerType`                                      | `tour`                                                          |
+| `includeTfgService`                              | `true`                                                          |
+| `isAlternativeRoom`                              | `false`                                                         |
+| `cityId` / `countryId` / `regionId`              | `metadata.wakacje_pl`                                           |
+| `participantsObject[participants][n][birthDate]` | representative adult `1988-01-01`; children per scrape rules    |
+| `participantsObject[participants][n][type]`      | `adult` / `child`                                               |
 
 #### Headers
 
@@ -434,6 +434,6 @@ Optional catalog: `POST /v2/api/offerConfiguratorV2/filters` with `{ "offerId": 
 
 ### Ingest: fields to persist
 
-On every wakacje.pl row normalized into `Offers`, populate `metadata.wakacje` per [data-model.md](../../architecture/data-model.md#metadatawakacje-required-for-availability-checks). Minimum required keys:
+On every wakacje.pl row normalized into `Offers`, populate `metadata.wakacje_pl` per [data-model.md](../../architecture/data-model.md#metadatawakacje_pl-required-for-availability-checks). Minimum required keys:
 
 `hotel_id`, `tour_operator_id`, `country_id`, `region_id`, `city_id`, `departure_city_id`, `service_id`, `transport_id`, `departure_slug`, `offer_page_path`; `tour_op_code` when present in search results.
