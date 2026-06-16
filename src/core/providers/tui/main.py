@@ -117,7 +117,8 @@ class TuiProvider:
                 )
                 response.raise_for_status()
             except httpx.HTTPError as e:
-                raise ProviderAPIException(f"TUI search API request failed: {e}") from e
+                error_msg = str(e) or e.__class__.__name__
+                raise ProviderAPIException(f"TUI search API request failed: {error_msg}") from e
 
             data = response.json()
             pagination = data.get("pagination") or {}
@@ -252,8 +253,9 @@ class TuiProvider:
             )
             response.raise_for_status()
         except httpx.HTTPError as e:
+            error_msg = str(e) or e.__class__.__name__
             raise ProviderAPIException(
-                f"TUI availability API request failed: {e}"
+                f"TUI availability API request failed: {error_msg}"
             ) from e
 
         payload = response.json()

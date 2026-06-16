@@ -99,6 +99,10 @@ TUI_GS_INITIAL_BODY = {
     "childrenBirthDates": [],
 }
 
+TUI_COUNTRY_ISO_OVERRIDES: dict[str, str] = {
+    "ME": "MX",  # TUI country code "ME" is Mexico in gs/initial
+}
+
 
 def _slugify_departure(label: str) -> str:
     normalized = unicodedata.normalize("NFD", label.lower())
@@ -278,6 +282,7 @@ def build_tui_catalog(client: httpx.Client) -> dict[str, Any]:
         country_code = country_node["code"]
         country_name = country_node.get("label")
         country_iso = destination_to_iso.get(country_code, country_code)
+        country_iso = TUI_COUNTRY_ISO_OVERRIDES.get(country_code, country_iso)
 
         catalog["countries"][country_code] = {
             "iso": country_iso,

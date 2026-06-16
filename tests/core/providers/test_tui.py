@@ -1,9 +1,11 @@
 import pytest
 import respx
 import httpx
+import json
 from decimal import Decimal
 from datetime import date, datetime, timezone
 from unittest.mock import patch
+from pathlib import Path
 
 from core.models.cell import MarketCell
 from core.models.offer import (
@@ -17,6 +19,7 @@ from core.providers.tui.main import (
     TuiProvider,
     SEARCH_URL,
     AVAILABILITY_URL,
+    DEFAULT_FILTERS_PATH,
 )
 from core.exceptions.provider import (
     CountryNotFoundException,
@@ -27,6 +30,9 @@ from core.exceptions.provider import (
     InvalidOfferMetadataException,
     ProviderAPIException,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+COUNTRY_REGISTRY_PATH = PROJECT_ROOT / "src/core/providers/resources/country_registry.json"
 
 
 @pytest.fixture
@@ -43,11 +49,19 @@ def test_tui_provider_identity(tui_provider):
     assert tui_provider.provider == ProviderName.TUI
 
 
+def test_tui_destination_codes_are_registered():
+    filters = json.loads(DEFAULT_FILTERS_PATH.read_text(encoding="utf-8"))
+    registry = json.loads(COUNTRY_REGISTRY_PATH.read_text(encoding="utf-8"))
+    registry_codes = set(registry["codes"].keys())
+    destination_codes = set(filters["destinationsCodes"].keys()) - {"any"}
+    assert destination_codes <= registry_codes
+
+
 @pytest.mark.asyncio
 async def test_search_invalid_country(tui_provider):
     cell = MarketCell(
         cell_id="1234567890abcdef",
-        country="XX",
+        country="EG",
         month="2026-07",
         min_stars=4,
         board=BoardType.ALL_INCLUSIVE,
@@ -55,10 +69,11 @@ async def test_search_invalid_country(tui_provider):
         children=1,
         activation_count=1,
     )
-    with pytest.raises(
-        CountryNotFoundException, match="Country code 'XX' is not supported"
-    ):
-        await tui_provider.search(cell)
+    with patch.dict(tui_provider._destination_codes, {"EG": []}):
+        with pytest.raises(
+            CountryNotFoundException, match="Country code 'EG' is not supported"
+        ):
+            await tui_provider.search(cell)
 
 
 @pytest.mark.asyncio

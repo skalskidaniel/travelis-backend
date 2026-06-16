@@ -316,11 +316,14 @@ Shape:
 }
 ```
 
-- `countries` — TUI destination code → ISO + display name (ISO enriched from `tui_filters.json` `destinationsCodes`)
+- `countries` — TUI destination code → ISO + display name (ISO enriched in our catalog pipeline with manual overrides for known TUI code/ISO mismatches, e.g. Mexico `ME` → `MX`)
 - `regions` — TUI destination/region code → `country_code` + name (single-destination countries also appear here with `country_code` equal to their own code)
 - `departure_airports` — IATA code → code + name
 
 Use `destinationsCodes` / `departuresCodes` in search requests; there is no separate city level.
+
+Canonical app country/destination codes live in `src/core/providers/resources/country_registry.json`.
+When regenerating `tui_filters.json`, generated `destinationsCodes` keys must be present in this registry.
 
 ### Occupancy & Children
 

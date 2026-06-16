@@ -1,12 +1,34 @@
 import re
+import json
+from functools import lru_cache
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field
+from pathlib import Path
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from core.models.offer import BoardType
 from core.models.common import CellId
 
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 COUNTRY_PATTERN = re.compile(r"^[A-Z]{2}$")
+COUNTRY_REGISTRY_PATH = Path(__file__).resolve().parents[1] / "providers/resources/country_registry.json"
+
+
+@lru_cache(maxsize=1)
+def _allowed_country_codes() -> frozenset[str]:
+    payload = json.loads(COUNTRY_REGISTRY_PATH.read_text(encoding="utf-8"))
+    raw_codes = payload.get("codes")
+    if not isinstance(raw_codes, dict):
+        msg = "country registry must contain object field 'codes'"
+        raise RuntimeError(msg)
+    valid_codes = {
+        code
+        for code in raw_codes.keys()
+        if isinstance(code, str) and COUNTRY_PATTERN.fullmatch(code)
+    }
+    if not valid_codes:
+        msg = "country registry must contain at least one two-letter country code"
+        raise RuntimeError(msg)
+    return frozenset(valid_codes)
 
 
 class MarketCell(BaseModel):
@@ -36,3 +58,10 @@ class MarketCell(BaseModel):
         default=None,
         description="UTC timestamp of the last successful scrape for this cell.",
     )
+
+    @field_validator("country")
+    @classmethod
+    def validate_country_is_registered(cls, value: str) -> str:
+        if value not in _allowed_country_codes():
+            raise ValueError(f"Unsupported country code '{value}'")
+        return value

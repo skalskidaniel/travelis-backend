@@ -30,7 +30,20 @@ SUPPORTED_COUNTRY_CODES = tuple(
 SUPPORTED_BOARD_TYPES = tuple(
     BoardType(board_value) for board_value in _TUI_FILTERS["board"].keys()
 )
-MAX_CONCURRENT_LIVE_REQUESTS = 5
+
+
+def _max_concurrent_live_requests() -> int:
+    raw_value = os.environ.get("TUI_TEST_CONCURRENCY")
+    if raw_value is None:
+        return 5
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return 5
+    return max(1, parsed)
+
+
+MAX_CONCURRENT_LIVE_REQUESTS = _max_concurrent_live_requests()
 ALLOWED_MIXED_COUNTRY_LABEL_SETS = {
     frozenset({"Portugalia", "Hiszpania"}),
     frozenset({"Hiszpania", "Wyspy Kanaryjskie"}),
