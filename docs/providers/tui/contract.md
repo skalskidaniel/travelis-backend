@@ -270,6 +270,27 @@ Filters are described in `filters.json`.
 
 TUI uses standard IATA codes directly in the `departuresCodes` array (e.g., `["POZ", "WAW", "KRK"]`). No lookup mapping is needed.
 
+### Travel Dates vs Market Cell Bounds
+
+Our canonical preference/cell model uses an explicit trip window:
+
+- `departure_date` (trip start, inclusive)
+- `return_date` (trip end, inclusive)
+
+TUI search does not accept an explicit return-date bound. Instead, it accepts a departure window:
+
+- `departureDateFrom`
+- `departureDateTo`
+
+This means a TUI result can have a valid `departureDate` but still have a `returnDate` outside the current market cell window.
+
+**Required behavior for TUI ingest/matching:** after receiving offers, always enforce the canonical cell bounds in application code:
+
+- `offer.departure_date` must be within the cell's departure window.
+- `offer.return_date` must be within the cell's return window.
+
+If either boundary fails, discard the offer for that cell (do not persist/match it under that market cell).
+
 ### Destination Codes / Geo Catalog
 
 TUI exposes the destination tree and departure airports via the search bootstrap endpoint:
@@ -315,7 +336,7 @@ Use `destinationsCodes` / `departuresCodes` in search requests; there is no sepa
 ### Other Fields
 
 - `offerUrl` must be prefixed with `https://www.tui.pl` (e.g., `https://www.tui.pl/wypoczynek/...`).
-- Location in the application is normalized to `Country/Region/City`. It is derived from `breadcrumbs[0].label` (country), `breadcrumbs[1].label` (region), and either `breadcrumbs[2].label` (city) if present or the fallback `city` field. All slashes (`/`) in labels are normalized to ` - `.
+- Location in the application is normalized to `Country/Region/City`. It is derived from `breadcrumbs[0].label` (country), `breadcrumbs[1].label` (region), and either `breadcrumbs[2].label` (city) if present or the fallback `city` field. All slashes (`/`) in labels are normalized to `-`.
 
 ### Offer Availability
 
