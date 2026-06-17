@@ -39,7 +39,8 @@ def test_market_cell_rejects_country_not_in_registry():
 
 def test_market_cell_rejects_mismatched_explicit_cell_id():
     with pytest.raises(
-        ValidationError, match="cell_id must match deterministic hash of cell dimensions"
+        ValidationError,
+        match="cell_id must match deterministic hash of cell dimensions",
     ):
         MarketCell(
             cell_id="1234567890abcdef",

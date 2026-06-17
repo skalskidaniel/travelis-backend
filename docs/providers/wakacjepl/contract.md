@@ -3,7 +3,51 @@
 ## Metadata
 
 - Source: reverse-engineering `www.wakacje.pl`
-- Last verified: 2026-06-15
+- Last verified: 2026-06-17
+
+## Response envelope semantics
+
+Wakacje.pl JSON APIs use a **two-layer** status model. Always inspect the JSON body — not only the HTTP status.
+
+| Layer | Field | Meaning |
+| ----- | ----- | ------- |
+| Transport | HTTP status | Usually `200` even when the call logically failed |
+| Application | `success` | `true` = envelope OK; `false` = logical failure |
+| Application | `error.status` / `status` / `statusCode` | Inner status code (often `400`) when `success` is `false` |
+| Application | `error.message` / `msg` | Human-readable or endpoint label (e.g. `getStoreBoxOffers`, `checkOfferAvailability`) |
+
+**Search / calculator** failures observed in contract probing (2026-06-17):
+
+- Most bad requests: **HTTP `200`**, `success: false`, `error.status: 400`.
+- Structural breakage (e.g. removing `params.query`): occasionally **HTTP `500`** with no parseable JSON envelope.
+
+**Availability** can return **HTTP `200`**, `success: false`, `msg: "checkOfferAvailability"`, `data: null` with **no** nested `error.status` — e.g. stale `offerHash`, sold-out variant, or upstream operator error. TraveLis treats this as `ProviderAPIException` when `success` is `false`.
+
+Example (search, invalid `content-type`):
+
+```json
+{
+  "success": false,
+  "type": "error",
+  "msg": "getStoreBoxOffers",
+  "error": {
+    "message": "Cannot read properties of undefined (reading 'params')",
+    "status": 400
+  },
+  "data": null
+}
+```
+
+Example (availability, logical failure without inner status):
+
+```json
+{
+  "success": false,
+  "type": "error",
+  "msg": "checkOfferAvailability",
+  "data": null
+}
+```
 
 ## Auth / Client Identification
 
@@ -431,6 +475,115 @@ Use `data.availability === true` and `data.status === "OK"`. Update `Offers.avai
 URL slugs (`z-wroclawia`, `z-warszawy-chopin`) map to wakacje **city IDs**, not IATA codes. Airport-specific slugs must not be collapsed (Chopin `10119` ≠ generic Warszawa `278` ≠ Modlin `9758`). See `wakacjepl_filters.json` `departure` and ingest-time mapping from `departurePlace`.
 
 Optional catalog: `POST /v2/api/offerConfiguratorV2/filters` with `{ "offerId": … }` lists valid `departurePlaces` for an offer.
+
+## Contract probe — parameter sensitivity
+
+Automated one-by-one mutation probe against live Wakacje.pl (2026-06-17).
+
+- **Script:** `scripts/probe_wakacjepl_api_contract.py`
+- **Artifact:** `scripts/artifacts/wakacjepl_contract_probe.json`
+- **Baseline cell:** `GR`, `2026-07`, `min_stars=4`, `all-inclusive`, `adults=2`, `children=0`
+
+For each endpoint the script sends a valid baseline request, then mutates every header and every body/query field individually:
+
+1. **Remove** the field entirely.
+2. **Invalidate** the value (wrong type / sentinel string).
+
+A field is classified as:
+
+| Classification | Remove tolerated | Invalid value tolerated | Integration implication |
+| -------------- | ---------------- | ----------------------- | ----------------------- |
+| **Required** | No | No | Must be present with a valid value |
+| **Presence-required** | No | Yes | Key must exist; exact value may be loosely validated |
+| **Valid-if-present** | Yes | No | May be omitted; if sent, must be correct |
+| **Optional** | Yes | Yes | Cosmetic / defaulted server-side |
+
+Logical success criteria used by the probe:
+
+- **Search / calculator:** `success !== false` and `data.offers` is a list.
+- **Availability:** `success !== false` and `data` is a dict.
+
+Re-run after API changes:
+
+```bash
+uv run scripts/probe_wakacjepl_api_contract.py
+```
+
+### Search (`POST /v2/api/offers`)
+
+Baseline: **150 mutations**, **30** changed logical outcome (baseline succeeded).
+
+#### Headers
+
+| Header | Classification | Notes |
+| ------ | -------------- | ----- |
+| `content-type` | Valid-if-present | Omit OK; invalid value → `success: false`, `error.status: 400` |
+| `referer` | Valid-if-present | Omit OK; invalid value → logical failure |
+| `accept` | Optional | |
+| `origin` | Optional | |
+
+#### Request body (RPC envelope)
+
+| Field | Classification | Notes |
+| ----- | -------------- | ----- |
+| `method` | Optional | Must stay `search.tripsSearch` in production; probe invalid sentinel was tolerated |
+| `params` | Valid-if-present | Top-level `params` object; invalidating entire block fails |
+| `params.query` | **Required** | Removing breaks search (`HTTP 500` in probe) |
+| `params.query.rooms` | **Required** | Occupancy block must be present |
+| `params.query.rooms[].ages` | **Required** | Must be present (empty list when `kid: 0`) |
+| `params.query.duration` | Presence-required | Object key required; probe tolerated invalid inner values |
+| `params.query.attribute` | Presence-required | Key required; invalid value tolerated in probe |
+| `params.cityId` | **Required** | Key must be present (use `[]` when not filtering by city) |
+| `params.countryId` | Valid-if-present | Omit OK; invalid array content fails |
+| `params.query.departureDate` | Valid-if-present | |
+| `params.query.arrivalDate` | Valid-if-present | |
+| `params.query.service` | Valid-if-present | Board filter IDs |
+| `params.query.minCategory` | Optional | Star filter; probe tolerated removal |
+| `params.query.sort` / `pageNumber` | Valid-if-present | |
+| `params.query.departure` | Valid-if-present | `null` = any airport |
+| `params.limit` | Valid-if-present | |
+| `params.brand`, `flatArray`, `multiSearch`, `imageSizes`, `withPromoOffer`, `qsVersion`, `searchType`, `type`, `priceHistory`, `withHotelRate`, `withPromotionsInfo`, `recommendationVersion`, `firstMinuteTui`, `offersAttributes`, `alternative.*` | Optional | Branding / feature toggles |
+
+> **Practical minimum for TraveLis search:** keep the full envelope shape from the adapter (`WakacjePlProvider._build_search_payload`). Do not drop `params.query`, `params.query.rooms`, `params.cityId`, or `params.query.rooms[].ages`. Send valid `content-type` and `referer` when calling the API.
+
+### Calculator (`POST /v2/api/getCalculatorOfferVariants/{offerId}`)
+
+Baseline: **42 mutations**, **10** changed logical outcome (baseline succeeded).
+
+#### Headers
+
+| Header | Classification |
+| ------ | -------------- |
+| `content-type` | Valid-if-present |
+| `referer` | Valid-if-present |
+| `accept`, `origin` | Optional |
+
+#### Request body
+
+| Field | Classification | Notes |
+| ----- | -------------- | ----- |
+| `departureDate` | **Required** | `YYYY-MM-DD` in calculator payload (adapter uses `yyyyMMdd` internally, formatted at send time) |
+| `tourId` | **Required** | `metadata.wakacje_pl.tour_operator_id` |
+| `kidsAges` | **Required** | Must be present (empty when `kids: 0`) |
+| `adults` | Presence-required | Key required |
+| `transportId` | Valid-if-present | |
+| `departureCityId`, `departureCityCode`, `hotelId`, `serviceId`, `duration`, `kids`, `infants`, `tourOp`, `cruiseId`, `roundTripId`, `isAlternativeRoom`, `isOffer77` | Optional | Probe tolerated removal; keep populated values from ingest for correct variant matching |
+
+> **Practical minimum:** never omit `adults`, `departureDate`, `tourId`, or `kidsAges`. Match occupancy and dates to the persisted offer / scrape cell.
+
+### Availability (`GET /v2/api/checkOfferAvailability`)
+
+Baseline in this probe run: **logical failure** (`success: false`, `msg: "checkOfferAvailability"`, `data: null`) even before mutations.
+
+- **34 / 34** mutations also failed with the same envelope shape.
+- Parameter **required vs optional** could not be determined from this run — sensitivity analysis needs a rerun where step 1 returns a live variant and the availability baseline returns `success: true` with `data.status: "OK"`.
+
+Until a successful baseline probe exists, treat **all** documented query parameters and headers as required:
+
+- Query: `providerCode`, `offerHash`, `offerType`, `includeTfgService`, `isAlternativeRoom`, `cityId`, `countryId`, `regionId`, full `participantsObject[…]` block.
+- Headers: `accept`, `referer`, `customHeaders` (JSON with `Page-Source`, `Tour-Operator-Code`, `Tour-Operator-Id`, `Object-Id`).
+
+TraveLis availability logic: `data.availability === true` **and** `data.status === "OK"`. A `success: false` envelope is an API error, not “sold out”.
 
 ### Ingest: fields to persist
 

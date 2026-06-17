@@ -219,15 +219,15 @@ class Offer(RawOffer):
                 raise InvalidOfferMetadataException(msg)
 
         expected_ttl = int(
-            datetime.combine(self.departure_date, time.min, tzinfo=timezone.utc).timestamp()
+            datetime.combine(
+                self.departure_date, time.min, tzinfo=timezone.utc
+            ).timestamp()
         )
         if self.ttl != expected_ttl:
             msg = "ttl must equal departure_date epoch at 00:00:00 UTC"
             raise ValueError(msg)
 
-        canonical_share_url = (
-            f"{SHARE_URL_PREFIX}{self.cell_id}/{self.offer_id}"
-        )
+        canonical_share_url = f"{SHARE_URL_PREFIX}{self.cell_id}/{self.offer_id}"
         self.share_url = type(self.share_url)(canonical_share_url)
 
         return self

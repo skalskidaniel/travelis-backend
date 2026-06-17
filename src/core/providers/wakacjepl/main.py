@@ -594,6 +594,12 @@ class WakacjePlProvider:
         except (TypeError, ValueError):
             return None
 
+        # Filter out offers where the country ID does not match the requested country ID.
+        # This cleans up dirty data/mismatches from the Wakacje.pl search API (e.g. returning Italy for Maldives/Spain).
+        expected_country_id_str = self._country_ids.get(cell.country)
+        if expected_country_id_str and country_id_int != int(expected_country_id_str):
+            return None
+
         if duration < 1:
             return None
 
