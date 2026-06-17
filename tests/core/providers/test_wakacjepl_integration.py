@@ -48,10 +48,6 @@ def _max_concurrent_live_requests() -> int:
 MAX_CONCURRENT_LIVE_REQUESTS = _max_concurrent_live_requests()
 MAX_RETRY_ATTEMPTS = max(1, int(os.environ.get("PROVIDER_TEST_RETRY_ATTEMPTS", "2")))
 RETRY_BASE_DELAY_SECONDS = float(os.environ.get("PROVIDER_TEST_RETRY_DELAY", "1.0"))
-ALLOWED_MIXED_COUNTRY_LABEL_SETS = {
-    frozenset({"Portugalia", "Hiszpania"}),
-    frozenset({"Hiszpania", "Wyspy Kanaryjskie"}),
-}
 T = TypeVar("T")
 
 
@@ -161,9 +157,7 @@ async def test_search_country_consistency(
 
         if len(top_level_country_labels) == 1:
             return
-
-        labels_set = frozenset(top_level_country_labels)
-        if labels_set not in ALLOWED_MIXED_COUNTRY_LABEL_SETS:
+        else:
             failures.append(
                 f"country={country_code}: unexpected mixed country labels {sorted(top_level_country_labels)}"
             )
