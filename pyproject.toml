@@ -16,7 +16,7 @@ entrypoint = "app.main:app"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-addopts = "-rs"
+addopts = "-rf"
 
 [dependency-groups]
 dev = [
