@@ -96,8 +96,8 @@ async def live_provider() -> TuiProvider:
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_filters_consistency():
     cell = MarketCell(
@@ -129,8 +129,8 @@ async def test_search_filters_consistency():
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_country_consistency(
     live_provider: TuiProvider,
@@ -183,8 +183,8 @@ async def test_search_country_consistency(
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_board_consistency(
     live_provider: TuiProvider,
@@ -223,8 +223,8 @@ async def test_search_board_consistency(
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_hotel_standard_consistency(live_provider: TuiProvider):
     month_bucket = _next_month_bucket()
@@ -261,8 +261,8 @@ async def test_hotel_standard_consistency(live_provider: TuiProvider):
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_check_availability_returns_unavailable(live_provider):
     offer = Offer(
@@ -304,8 +304,8 @@ async def test_check_availability_returns_unavailable(live_provider):
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_currency_is_pln(live_provider):
     cell = MarketCell(
@@ -352,8 +352,8 @@ async def test_search_currency_is_pln(live_provider):
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_departure_date_bounds(live_provider: TuiProvider):
     month_bucket = _next_month_bucket()

@@ -17,11 +17,15 @@
     {
       "label": "Pytest: Integration Tests",
       "type": "shell",
-      "command": "docker stop dynamodb-local-test redis-test >/dev/null 2>&1 || true; docker run -d --name dynamodb-local-test --rm -p 8000:8000 amazon/dynamodb-local && docker run -d --name redis-test --rm -p 6379:6379 dhi.io/redis:8-debian-dev redis-server --protected-mode no && sleep 2 && (RUN_INTEGRATION_TESTS=1 DYNAMODB_ENDPOINT_URL=http://localhost:8000 REDIS_URL=redis://localhost:6379/0 uv run pytest; EXIT_CODE=$?; docker stop dynamodb-local-test redis-test; exit $EXIT_CODE)",
+      "command": "docker stop dynamodb-local-test redis-test >/dev/null 2>&1 || true; docker run -d --name dynamodb-local-test --rm -p 8000:8000 amazon/dynamodb-local && docker run -d --name redis-test --rm -p 6379:6379 dhi.io/redis:8-debian-dev redis-server --protected-mode no && sleep 2 && uv run pytest; EXIT_CODE=$?; docker stop dynamodb-local-test redis-test; exit $EXIT_CODE",
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {
-          "PYTHONPATH": "${workspaceFolder}/src"
+          "PYTHONPATH": "${workspaceFolder}/src",
+          "RUN_REPO_INTEGRATION": "1",
+          "RUN_PROVIDER_INTEGRATION": "1",
+          "DYNAMODB_ENDPOINT_URL": "http://localhost:8000",
+          "REDIS_URL": "redis://localhost:6379/0"
         }
       },
       "group": "test",

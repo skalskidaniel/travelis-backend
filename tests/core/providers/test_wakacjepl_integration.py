@@ -85,8 +85,8 @@ async def live_provider() -> WakacjePlProvider:
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live Wakacje.pl integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_filters_consistency(live_provider):
     cell = MarketCell(
@@ -117,8 +117,8 @@ async def test_search_filters_consistency(live_provider):
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live Wakacje.pl integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_country_consistency(
     live_provider: WakacjePlProvider,
@@ -171,8 +171,8 @@ async def test_search_country_consistency(
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live Wakacje.pl integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_board_consistency(
     live_provider: WakacjePlProvider,
@@ -211,8 +211,8 @@ async def test_search_board_consistency(
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live Wakacje.pl integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_hotel_standard_consistency(
     live_provider: WakacjePlProvider,
@@ -251,8 +251,8 @@ async def test_hotel_standard_consistency(
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live Wakacje.pl integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_currency_is_pln(live_provider):
     cell = MarketCell(
@@ -304,8 +304,8 @@ async def test_search_currency_is_pln(live_provider):
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="Set RUN_INTEGRATION_TESTS=1 to run live Wakacje.pl integration tests.",
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
 )
 async def test_search_departure_date_bounds(live_provider: WakacjePlProvider):
     month_bucket = _next_month_bucket()
