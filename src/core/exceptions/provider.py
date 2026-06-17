@@ -25,12 +25,6 @@ class MinStarsNotSupportedException(ProviderException):
     pass
 
 
-class ProviderAPIException(ProviderException):
-    """Raised when a provider's API call fails or returns an invalid/unexpected response."""
-
-    pass
-
-
 class InvalidOfferMetadataException(ProviderException):
     """Raised when offer metadata required for a provider operation is missing or invalid."""
 
@@ -52,4 +46,22 @@ class DateMismatchException(ProviderException):
 class DurationMismatchException(ProviderException):
     """Raised when the duration does not match return_date - departure_date"""
 
+    pass
+
+
+class ProviderAPIException(ProviderException):
+    """Raised when a provider's API call fails or returns an invalid/unexpected response."""
+
+    pass
+
+
+class ProviderTimeoutException(ProviderAPIException):
+    """Raised when a provider API call times out."""
+
+    pass
+
+
+class TooManyRequestsException(ProviderAPIException):
+    """Raised when the response status code is 429."""
+    
     pass

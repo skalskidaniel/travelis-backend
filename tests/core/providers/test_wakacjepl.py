@@ -168,6 +168,38 @@ async def test_search_api_failure(wakacjepl_provider):
             await wakacjepl_provider.search(cell)
 
 
+@pytest.mark.asyncio
+@respx.mock
+async def test_search_api_envelope_failure(wakacjepl_provider):
+    cell = MarketCell(
+        cell_id="1234567890abcdef",
+        country="EG",
+        month="2026-07",
+        min_stars=4,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=1,
+        activation_count=1,
+    )
+    with (
+        patch.dict(wakacjepl_provider._country_ids, {"EG": "37"}),
+        patch.dict(wakacjepl_provider._service_values, {"all-inclusive": "1"}),
+    ):
+        respx.post(SEARCH_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "success": False,
+                    "msg": "getStoreBoxOffers",
+                    "error": {"message": "backend validation failed", "status": 400},
+                    "data": None,
+                },
+            )
+        )
+        with pytest.raises(ProviderAPIException, match="Wakacje.pl search API failed"):
+            await wakacjepl_provider.search(cell)
+
+
 @pytest.fixture
 def sample_wakacje_offer():
     return Offer(
@@ -404,6 +436,27 @@ async def test_check_availability(wakacjepl_provider, sample_wakacje_offer):
     ):
         await wakacjepl_provider.check_availability(offer_no_meta)
 
+    respx.post(calc_url).mock(
+        return_value=httpx.Response(
+            200, json={"data": {"offers": [{"id": "HASH_123", "providerCode": "GRCS"}]}}
+        )
+    )
+    respx.get(AVAILABILITY_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "success": False,
+                "msg": "checkOfferAvailability",
+                "error": {"message": "provider returned error", "status": 400},
+                "data": None,
+            },
+        )
+    )
+    with pytest.raises(
+        ProviderAPIException, match="Wakacje.pl availability API failed"
+    ):
+        await wakacjepl_provider.check_availability(sample_wakacje_offer)
+
 
 @pytest.mark.asyncio
 @respx.mock
@@ -431,3 +484,17 @@ async def test_check_price(wakacjepl_provider, sample_wakacje_offer):
     )
     price = await wakacjepl_provider.check_price(sample_wakacje_offer)
     assert price == Decimal("6148.00")  # Fallback to original
+
+    respx.post(calc_url).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "success": False,
+                "msg": "getCalculatorOfferVariants",
+                "error": {"message": "variant lookup failed", "status": 400},
+                "data": None,
+            },
+        )
+    )
+    with pytest.raises(ProviderAPIException, match="Wakacje.pl calculator API failed"):
+        await wakacjepl_provider.check_price(sample_wakacje_offer)

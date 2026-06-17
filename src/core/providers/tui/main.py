@@ -15,6 +15,8 @@ from core.exceptions.provider import (
     MinStarsNotSupportedException,
     PastDatesException,
     ProviderAPIException,
+    ProviderTimeoutException,
+    TooManyRequestsException,
 )
 from core.models.cell import MarketCell
 from core.models.offer import RawOffer, Offer, OfferMetadata, ProviderName, TuiMetadata
@@ -104,10 +106,7 @@ class TuiProvider:
                 )
                 response.raise_for_status()
             except httpx.HTTPError as e:
-                error_msg = str(e) or e.__class__.__name__
-                raise ProviderAPIException(
-                    f"TUI search API request failed: {error_msg}"
-                ) from e
+                self._raise_request_exception("search", e)
 
             data = response.json()
             pagination = data.get("pagination") or {}
@@ -242,16 +241,33 @@ class TuiProvider:
             )
             response.raise_for_status()
         except httpx.HTTPError as e:
-            error_msg = str(e) or e.__class__.__name__
-            raise ProviderAPIException(
-                f"TUI availability API request failed: {error_msg}"
-            ) from e
+            self._raise_request_exception("availability", e)
 
         payload = response.json()
         if not isinstance(payload, dict):
             msg = f"unexpected TUI availability response shape: expected dict, got {type(payload).__name__}"
             raise ProviderAPIException(msg)
         return payload
+
+    @staticmethod
+    def _raise_request_exception(api_name: str, error: httpx.HTTPError) -> None:
+        error_msg = str(error) or error.__class__.__name__
+        if isinstance(error, httpx.TimeoutException):
+            raise ProviderTimeoutException(
+                f"TUI {api_name} API request failed: {error_msg}"
+            ) from error
+
+        status_code = None
+        if isinstance(error, httpx.HTTPStatusError) and error.response is not None:
+            status_code = error.response.status_code
+        if status_code == 429:
+            raise TooManyRequestsException(
+                f"TUI {api_name} API request failed with status 429: {error_msg}"
+            ) from error
+
+        raise ProviderAPIException(
+            f"TUI {api_name} API request failed: {error_msg}"
+        ) from error
 
     @staticmethod
     def _map_search_offer(item: dict[str, Any], *, cell: MarketCell) -> RawOffer | None:

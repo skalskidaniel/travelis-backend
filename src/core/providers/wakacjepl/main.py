@@ -16,6 +16,8 @@ from core.exceptions.provider import (
     MinStarsNotSupportedException,
     PastDatesException,
     ProviderAPIException,
+    ProviderTimeoutException,
+    TooManyRequestsException,
 )
 from core.models.cell import MarketCell
 from core.models.offer import (
@@ -112,17 +114,17 @@ class WakacjePlProvider:
                 )
                 response.raise_for_status()
             except httpx.HTTPError as e:
-                error_msg = str(e) or e.__class__.__name__
-                raise ProviderAPIException(
-                    f"Wakacje.pl search API request failed: {error_msg}"
-                ) from e
+                self._raise_request_exception("search", e)
 
             body = response.json()
-            if isinstance(body, dict) and isinstance(body.get("data"), dict):
-                data = body["data"]
-            else:
-                data = {}
+            if not isinstance(body, dict):
+                raise ProviderAPIException(
+                    f"unexpected Wakacje.pl search response shape: expected dict, got {type(body).__name__}"
+                )
+            if body.get("success") is False:
+                self._raise_api_response_exception("search", body)
 
+            data = body.get("data") or {} if isinstance(body.get("data"), dict) else {}
             offers_list = data.get("offers") or []
 
             for item in offers_list:
@@ -349,15 +351,15 @@ class WakacjePlProvider:
             response = await self._client.post(url, json=payload, headers=headers)
             response.raise_for_status()
         except httpx.HTTPError as e:
-            error_msg = str(e) or e.__class__.__name__
-            raise ProviderAPIException(
-                f"Wakacje.pl calculator API request failed: {error_msg}"
-            ) from e
+            self._raise_request_exception("calculator", e)
 
         data = response.json()
         if not isinstance(data, dict):
             msg = f"unexpected Wakacje.pl calculator response shape: expected dict, got {type(data).__name__}"
             raise ProviderAPIException(msg)
+
+        if data.get("success") is False:
+            self._raise_api_response_exception("calculator", data)
 
         return (data.get("data") or {}).get("offers") or []
 
@@ -419,17 +421,75 @@ class WakacjePlProvider:
             )
             response.raise_for_status()
         except httpx.HTTPError as e:
-            error_msg = str(e) or e.__class__.__name__
-            raise ProviderAPIException(
-                f"Wakacje.pl availability API request failed: {error_msg}"
-            ) from e
+            self._raise_request_exception("availability", e)
 
         data = response.json()
         if not isinstance(data, dict):
             msg = f"unexpected Wakacje.pl availability response shape: expected dict, got {type(data).__name__}"
             raise ProviderAPIException(msg)
 
+        if data.get("success") is False:
+            self._raise_api_response_exception("availability", data)
+
         return data.get("data") or {}
+
+    @staticmethod
+    def _status_code_from_error(payload: dict[str, Any]) -> int | None:
+        error_info = payload.get("error")
+        status_value: Any = None
+        if isinstance(error_info, dict):
+            status_value = error_info.get("status")
+        if status_value is None:
+            status_value = payload.get("status") or payload.get("statusCode")
+
+        if isinstance(status_value, int):
+            return status_value
+        if isinstance(status_value, str) and status_value.isdigit():
+            return int(status_value)
+        return None
+
+    def _raise_api_response_exception(self, api_name: str, payload: dict[str, Any]) -> None:
+        error_info = payload.get("error")
+        error_msg = "unknown error"
+        if isinstance(error_info, dict) and error_info.get("message"):
+            error_msg = str(error_info["message"])
+        elif payload.get("msg"):
+            error_msg = str(payload["msg"])
+
+        status_code = self._status_code_from_error(payload)
+        if status_code == 429:
+            raise TooManyRequestsException(
+                f"Wakacje.pl {api_name} API failed with status {status_code}: {error_msg}"
+            )
+        if status_code in {408, 504}:
+            raise ProviderTimeoutException(
+                f"Wakacje.pl {api_name} API failed with status {status_code}: {error_msg}"
+            )
+
+        status_label = status_code if status_code is not None else "unknown status"
+        raise ProviderAPIException(
+            f"Wakacje.pl {api_name} API failed with status {status_label}: {error_msg}"
+        )
+
+    @staticmethod
+    def _raise_request_exception(api_name: str, error: httpx.HTTPError) -> None:
+        error_msg = str(error) or error.__class__.__name__
+        if isinstance(error, httpx.TimeoutException):
+            raise ProviderTimeoutException(
+                f"Wakacje.pl {api_name} API request failed: {error_msg}"
+            ) from error
+
+        status_code = None
+        if isinstance(error, httpx.HTTPStatusError) and error.response is not None:
+            status_code = error.response.status_code
+        if status_code == 429:
+            raise TooManyRequestsException(
+                f"Wakacje.pl {api_name} API request failed with status 429: {error_msg}"
+            ) from error
+
+        raise ProviderAPIException(
+            f"Wakacje.pl {api_name} API request failed: {error_msg}"
+        ) from error
 
     def _map_search_offer(
         self, item: dict[str, Any], *, cell: MarketCell

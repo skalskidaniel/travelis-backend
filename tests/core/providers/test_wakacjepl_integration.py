@@ -5,7 +5,10 @@ from datetime import date
 import os
 import re
 import asyncio
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
+from core.exceptions.provider import ProviderTimeoutException, TooManyRequestsException
 from core.models.cell import MarketCell
 from core.models.offer import (
     BoardType,
@@ -42,10 +45,13 @@ def _max_concurrent_live_requests() -> int:
 
 
 MAX_CONCURRENT_LIVE_REQUESTS = _max_concurrent_live_requests()
+MAX_RETRY_ATTEMPTS = max(1, int(os.environ.get("PROVIDER_TEST_RETRY_ATTEMPTS", "2")))
+RETRY_BASE_DELAY_SECONDS = float(os.environ.get("PROVIDER_TEST_RETRY_DELAY", "1.0"))
 ALLOWED_MIXED_COUNTRY_LABEL_SETS = {
     frozenset({"Portugalia", "Hiszpania"}),
     frozenset({"Hiszpania", "Wyspy Kanaryjskie"}),
 }
+T = TypeVar("T")
 
 
 def _next_month_bucket() -> str:
@@ -55,6 +61,19 @@ def _next_month_bucket() -> str:
     else:
         next_month = date(today.year, today.month + 1, 1)
     return next_month.strftime("%Y-%m")
+
+
+async def _run_with_transient_retry(call: Callable[[], Awaitable[T]]) -> T:
+    for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
+        try:
+            return await call()
+        except (ProviderTimeoutException, TooManyRequestsException):
+            if attempt == MAX_RETRY_ATTEMPTS:
+                raise
+            await asyncio.sleep(RETRY_BASE_DELAY_SECONDS * attempt)
+
+    msg = "Retry loop exited unexpectedly."
+    raise RuntimeError(msg)
 
 
 @pytest_asyncio.fixture
@@ -84,7 +103,7 @@ async def test_search_filters_consistency(live_provider):
         activation_count=1,
     )
 
-    offers = await live_provider.search(cell)
+    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
 
     if not offers:
         pytest.skip(
@@ -124,7 +143,7 @@ async def test_search_country_consistency(
                 children=0,
                 activation_count=1,
             )
-            offers = await live_provider.search(cell)
+            offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
 
         if not offers:
             return
@@ -181,7 +200,7 @@ async def test_search_board_consistency(
                 children=0,
                 activation_count=1,
             )
-            offers = await live_provider.search(cell)
+            offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
 
         if not offers:
             return
@@ -222,7 +241,7 @@ async def test_hotel_standard_consistency(
                 children=0,
                 activation_count=1,
             )
-            offers = await live_provider.search(cell)
+            offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
 
         if not offers:
             return
