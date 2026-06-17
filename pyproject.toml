@@ -5,10 +5,13 @@ description = "Backend service for wakacje-travelis.pl"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "aioboto3>=15.5.0",
     "fastapi[standard]>=0.137.0",
     "httpx>=0.28.1",
     "pandas>=3.0.3",
     "pydantic>=2.13.4",
+    "redis[hiredis]>=8.0.0",
+    "types-aioboto3[dynamodb]>=15.5.0",
 ]
 
 [tool.fastapi]
@@ -20,7 +23,9 @@ addopts = "-rf"
 
 [dependency-groups]
 dev = [
+    "fakeredis[lua]>=2.36.2",
     "ipykernel>=7.3.0",
+    "moto[dynamodb]>=5.2.2",
     "pytest>=9.1.0",
     "pytest-asyncio>=1.4.0",
     "pytest-xdist>=3.8.0",

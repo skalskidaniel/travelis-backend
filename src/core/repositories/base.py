@@ -1,0 +1,100 @@
+from typing import Protocol, runtime_checkable
+from datetime import datetime
+
+from core.models.cell import MarketCell
+from core.models.offer import Offer
+from core.models.user import User, PushSubscription
+
+
+@runtime_checkable
+class CellsRepository(Protocol):
+    async def get(self, cell_id: str) -> MarketCell | None: ...
+
+    async def put(self, cell: MarketCell) -> None: ...
+
+    async def scan(self) -> list[MarketCell]: ...
+
+    async def increment_activations(self, cell_ids: list[str]) -> dict[str, int]: ...
+
+    async def decrement_activations(self, cell_ids: list[str]) -> dict[str, int]: ...
+
+    async def delete(self, cell_id: str) -> None: ...
+
+    async def update_last_scraped(self, cell_ids: list[str], ts: datetime) -> None: ...
+
+
+@runtime_checkable
+class OffersRepository(Protocol):
+    async def get(self, offer_id: str, cell_id: str | None = None) -> Offer | None: ...
+
+    async def put(self, offer: Offer) -> None: ...
+
+    async def put_batch(self, offers: list[Offer]) -> None: ...
+
+    async def query_by_cell(self, cell_id: str) -> list[Offer]: ...
+
+    async def delete(self, cell_id: str, offer_id: str) -> None: ...
+
+    async def delete_batch(self, keys: list[tuple[str, str]]) -> None: ...
+
+
+@runtime_checkable
+class UsersRepository(Protocol):
+    async def get(self, user_id: str) -> User | None: ...
+
+    async def put(self, user: User) -> None: ...
+
+    async def delete(self, user_id: str) -> None: ...
+
+    async def update_push(
+        self, user_id: str, enabled: bool, subscription: PushSubscription | None
+    ) -> None: ...
+
+
+@runtime_checkable
+class UserOffersRepository(Protocol):
+    async def get(self, user_id: str, offer_id: str) -> dict | None: ...
+
+    async def put(
+        self, user_id: str, offer_id: str, cell_id: str, matched_at: datetime
+    ) -> None: ...
+
+    async def query_by_user(self, user_id: str) -> list[dict]: ...
+
+    async def delete(self, user_id: str, offer_id: str) -> None: ...
+
+    async def delete_batch(self, keys: list[tuple[str, str]]) -> None: ...
+
+    async def put_batch(self, items: list[dict]) -> None: ...
+
+
+@runtime_checkable
+class FeedRepository(Protocol):
+    async def get_feed_version(self, user_id: str) -> int: ...
+
+    async def increment_feed_version(self, user_id: str) -> int: ...
+
+    async def get_or_build_sort_zset(
+        self, user_id: str, field: str, order: str, version: int
+    ) -> bool: ...
+
+    async def add_to_sort_zset(
+        self,
+        user_id: str,
+        field: str,
+        order: str,
+        version: int,
+        members: list[tuple[str, float]],
+    ) -> None: ...
+
+    async def get_page(
+        self,
+        user_id: str,
+        field: str,
+        order: str,
+        version: int,
+        offset: int,
+        limit: int,
+    ) -> list[str]: ...
+
+    async def clear_user(self, user_id: str) -> None: ...

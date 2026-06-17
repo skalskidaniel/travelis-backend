@@ -15,6 +15,7 @@ from core.services.scoring.statistical import StatisticalOfferScorer
 
 class NumpyOfferScorer:
     """Numpy-vectorized version of the StatisticalOfferScorer."""
+
     def __init__(self, config: StatisticalScorerConfig | None = None):
         self.config = config or StatisticalScorerConfig()
 
@@ -23,17 +24,17 @@ class NumpyOfferScorer:
             return []
 
         n = len(offers)
-        
+
         # O(N) extraction loop - unavoidable with Pydantic models
         prices = np.zeros(n, dtype=np.float64)
         ratings = np.zeros(n, dtype=np.float64)
         log_reviews = np.zeros(n, dtype=np.float64)
-        
+
         for i, offer in enumerate(offers):
             prices[i] = float(offer.price_per_day_one_person)
             ratings[i] = float(offer.rating)
             log_reviews[i] = math.log1p(offer.review_count)
-            
+
         min_price = np.min(prices)
         max_price = np.max(prices)
         min_rating = np.min(ratings)
@@ -49,15 +50,15 @@ class NumpyOfferScorer:
         else:
             mean_price = np.mean(prices)
             stddev = np.std(prices)
-            
+
             if stddev > 0:
                 z_scores = (prices - mean_price) / stddev
             else:
                 z_scores = np.zeros(n, dtype=np.float64)
-                
+
             passing_mask = z_scores <= self.config.z_threshold
             passing_indices = np.where(passing_mask)[0]
-            
+
             # Apply z-score to metadata
             for i in range(n):
                 offers[i].metadata.price_z_score = float(z_scores[i])
@@ -70,22 +71,34 @@ class NumpyOfferScorer:
         passing_ratings = ratings[passing_indices]
         passing_log_reviews = log_reviews[passing_indices]
 
-        price_norm = (max_price - passing_prices) / (max_price - min_price) if max_price > min_price else np.ones(len(passing_indices))
-        rating_norm = (passing_ratings - min_rating) / (max_rating - min_rating) if max_rating > min_rating else np.ones(len(passing_indices))
-        reviews_norm = (passing_log_reviews - min_log_reviews) / (max_log_reviews - min_log_reviews) if max_log_reviews > min_log_reviews else np.ones(len(passing_indices))
+        price_norm = (
+            (max_price - passing_prices) / (max_price - min_price)
+            if max_price > min_price
+            else np.ones(len(passing_indices))
+        )
+        rating_norm = (
+            (passing_ratings - min_rating) / (max_rating - min_rating)
+            if max_rating > min_rating
+            else np.ones(len(passing_indices))
+        )
+        reviews_norm = (
+            (passing_log_reviews - min_log_reviews)
+            / (max_log_reviews - min_log_reviews)
+            if max_log_reviews > min_log_reviews
+            else np.ones(len(passing_indices))
+        )
 
         composites = (
-            self.config.weight_price * price_norm +
-            self.config.weight_rating * rating_norm +
-            self.config.weight_reviews * reviews_norm
+            self.config.weight_price * price_norm
+            + self.config.weight_rating * rating_norm
+            + self.config.weight_reviews * reviews_norm
         )
 
         results = []
         for idx, composite in zip(passing_indices, composites):
             offer = offers[idx]
             scored_offer = ScoredOffer(
-                **offer.model_dump(),
-                attractiveness_score=float(composite)
+                **offer.model_dump(), attractiveness_score=float(composite)
             )
             results.append(scored_offer)
 
@@ -96,6 +109,7 @@ class NumpyOfferScorer:
 
 class PandasOfferScorer:
     """Pandas-vectorized version of the StatisticalOfferScorer."""
+
     def __init__(self, config: StatisticalScorerConfig | None = None):
         self.config = config or StatisticalScorerConfig()
 
@@ -104,15 +118,17 @@ class PandasOfferScorer:
             return []
 
         n = len(offers)
-        
+
         # O(N) extraction loop - unavoidable with Pydantic models
-        df = pd.DataFrame({
-            "price": [float(o.price_per_day_one_person) for o in offers],
-            "rating": [float(o.rating) for o in offers],
-            "reviews": [o.review_count for o in offers]
-        })
+        df = pd.DataFrame(
+            {
+                "price": [float(o.price_per_day_one_person) for o in offers],
+                "rating": [float(o.rating) for o in offers],
+                "reviews": [o.review_count for o in offers],
+            }
+        )
         df["log_reviews"] = np.log1p(df["reviews"])
-        
+
         min_price = df["price"].min()
         max_price = df["price"].max()
         min_rating = df["rating"].min()
@@ -126,15 +142,17 @@ class PandasOfferScorer:
             passing_df = df.nsmallest(keep_count, "price")
         else:
             mean_price = df["price"].mean()
-            stddev = df["price"].std(ddof=0) # ddof=0 to match numpy/math exact population stddev
-            
+            stddev = df["price"].std(
+                ddof=0
+            )  # ddof=0 to match numpy/math exact population stddev
+
             if stddev > 0:
                 df["z_score"] = (df["price"] - mean_price) / stddev
             else:
                 df["z_score"] = 0.0
-                
+
             passing_df = df[df["z_score"] <= self.config.z_threshold]
-            
+
             # Apply z-score to metadata
             for i, row in df.iterrows():
                 offers[i].metadata.price_z_score = float(row["z_score"])
@@ -143,26 +161,39 @@ class PandasOfferScorer:
             return []
 
         # Stage 2
-        price_norm = 1.0 if max_price == min_price else (max_price - passing_df["price"]) / (max_price - min_price)
-        rating_norm = 1.0 if max_rating == min_rating else (passing_df["rating"] - min_rating) / (max_rating - min_rating)
-        reviews_norm = 1.0 if max_log_reviews == min_log_reviews else (passing_df["log_reviews"] - min_log_reviews) / (max_log_reviews - min_log_reviews)
+        price_norm = (
+            1.0
+            if max_price == min_price
+            else (max_price - passing_df["price"]) / (max_price - min_price)
+        )
+        rating_norm = (
+            1.0
+            if max_rating == min_rating
+            else (passing_df["rating"] - min_rating) / (max_rating - min_rating)
+        )
+        reviews_norm = (
+            1.0
+            if max_log_reviews == min_log_reviews
+            else (passing_df["log_reviews"] - min_log_reviews)
+            / (max_log_reviews - min_log_reviews)
+        )
 
         passing_df["composite"] = (
-            self.config.weight_price * price_norm +
-            self.config.weight_rating * rating_norm +
-            self.config.weight_reviews * reviews_norm
+            self.config.weight_price * price_norm
+            + self.config.weight_rating * rating_norm
+            + self.config.weight_reviews * reviews_norm
         )
 
         results = []
         for idx, row in passing_df.iterrows():
             offer = offers[idx]
             scored_offer = ScoredOffer(
-                **offer.model_dump(),
-                attractiveness_score=float(row["composite"])
+                **offer.model_dump(), attractiveness_score=float(row["composite"])
             )
             results.append(scored_offer)
 
         return results
+
 
 def create_mock_offer(
     price_total: int,
@@ -186,7 +217,9 @@ def create_mock_offer(
         rating=rating,
         review_count=review_count,
         price_total=Decimal(price_total),
-        price_per_day_one_person=round(Decimal(price_total) / duration / (adults + children), 2),
+        price_per_day_one_person=round(
+            Decimal(price_total) / duration / (adults + children), 2
+        ),
         referral_url="https://example.com",
         available=True,
         room_type="Standard",
@@ -208,47 +241,43 @@ def main():
                 review_count=random.randint(0, 2000),
             )
         )
-        
+
     print("\nBenchmarking Pure Python Scorer...")
     python_scorer = StatisticalOfferScorer()
-    
+
     # Warm-up (to pre-load any lazy imports or JIT if applicable)
     # python_scorer.score(offers[:10])
-    
+
     start = time.perf_counter()
     python_res = python_scorer.score(offers)
     python_time = time.perf_counter() - start
-    
+
     print("\nBenchmarking Numpy Scorer...")
     numpy_scorer = NumpyOfferScorer()
-    
+
     # Warm-up (especially important for numpy to load C-extensions)
     # numpy_scorer.score(offers[:10])
-    
+
     start = time.perf_counter()
     numpy_res = numpy_scorer.score(offers)
     numpy_time = time.perf_counter() - start
-    
+
     print("\nBenchmarking Pandas Scorer...")
     pandas_scorer = PandasOfferScorer()
-    
+
     # Warm-up (pandas init can be slow)
     # pandas_scorer.score(offers[:10])
-    
+
     start = time.perf_counter()
     pandas_res = pandas_scorer.score(offers)
     pandas_time = time.perf_counter() - start
-    
-    print(f"\n--- Results ---")
+
+    print("\n--- Results ---")
     print(f"Pure Python: {python_time:.4f} seconds ({len(python_res)} passed)")
     print(f"Numpy:       {numpy_time:.4f} seconds ({len(numpy_res)} passed)")
     print(f"Pandas:      {pandas_time:.4f} seconds ({len(pandas_res)} passed)")
-    
-    times = {
-        "Pure Python": python_time,
-        "Numpy": numpy_time,
-        "Pandas": pandas_time
-    }
+
+    times = {"Pure Python": python_time, "Numpy": numpy_time, "Pandas": pandas_time}
     fastest = min(times, key=times.get)
     print(f"\n{fastest} was the fastest!")
 
