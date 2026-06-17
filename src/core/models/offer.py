@@ -161,16 +161,18 @@ class RawOffer(BaseModel):
     metadata: OfferMetadata = Field(
         description="Provider-specific metadata captured at ingest."
     )
-
-
-class Offer(RawOffer):
-    cell_id: CellId = Field(description="Market cell this offer belongs to.")
-    offer_id: OfferId
+    
+class ScoredOffer(RawOffer):
     attractiveness_score: float = Field(
         ge=0,
         le=1,
         description="Stage-2 composite score used for feed sorting.",
     )
+
+
+class Offer(ScoredOffer):
+    cell_id: CellId = Field(description="Market cell this offer belongs to.")
+    offer_id: OfferId
     share_url: HttpUrl = Field(
         description=f"Public share URL; must start with {SHARE_URL_PREFIX}",
     )
