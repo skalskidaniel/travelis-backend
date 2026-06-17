@@ -1,5 +1,6 @@
 import math
 from typing import Sequence
+import numpy as np
 
 from core.models.offer import RawOffer, ScoredOffer
 from core.services.scoring.base import OfferScorer
@@ -16,85 +17,66 @@ class StatisticalOfferScorer(OfferScorer):
 
         n = len(offers)
         
-        # 1. Extract and calculate base metrics for the entire comparison pool
-        pool_metrics = []
-        for offer in offers:
-            # price_total is a Decimal, cast to float for math
-            price_pp = float(offer.price_per_day_one_person)
-            log_reviews = math.log1p(offer.review_count)
-            pool_metrics.append({
-                "offer": offer,
-                "price_pp": price_pp,
-                "rating": float(offer.rating),
-                "log_reviews": log_reviews,
-            })
+        prices = np.zeros(n, dtype=np.float64)
+        ratings = np.zeros(n, dtype=np.float64)
+        log_reviews = np.zeros(n, dtype=np.float64)
+        
+        for i, offer in enumerate(offers):
+            prices[i] = float(offer.price_per_day_one_person)
+            ratings[i] = float(offer.rating)
+            log_reviews[i] = math.log1p(offer.review_count)
+            
+        min_price = np.min(prices)
+        max_price = np.max(prices)
+        min_rating = np.min(ratings)
+        max_rating = np.max(ratings)
+        min_log_reviews = np.min(log_reviews)
+        max_log_reviews = np.max(log_reviews)
 
-        # 2. Find min/max for normalization across the entire pool
-        min_price = min(m["price_pp"] for m in pool_metrics)
-        max_price = max(m["price_pp"] for m in pool_metrics)
-        
-        min_rating = min(m["rating"] for m in pool_metrics)
-        max_rating = max(m["rating"] for m in pool_metrics)
-        
-        min_log_reviews = min(m["log_reviews"] for m in pool_metrics)
-        max_log_reviews = max(m["log_reviews"] for m in pool_metrics)
-
-        # 3. Stage 1: Z-score gate or small sample fallback
-        passing_metrics = []
-        
+        # Stage 1
         if n < self.config.small_sample_threshold:
-            # Small sample fallback: bypass Z-score, take top N cheapest
             keep_count = max(1, math.ceil(n * self.config.small_sample_keep_ratio))
-            # Set Z-score to None since it's not applicable
-            for m in pool_metrics:
-                m["offer"].metadata.price_z_score = None
-            
-            # Sort by price ascending
-            pool_metrics.sort(key=lambda x: x["price_pp"])
-            passing_metrics = pool_metrics[:keep_count]
+            sorted_indices = np.argsort(prices)
+            passing_indices = sorted_indices[:keep_count]
         else:
-            # Calculate Z-scores
-            mean_price = sum(m["price_pp"] for m in pool_metrics) / n
-            variance = sum((m["price_pp"] - mean_price) ** 2 for m in pool_metrics) / n
-            stddev = math.sqrt(variance)
+            mean_price = np.mean(prices)
+            stddev = np.std(prices)
             
-            for m in pool_metrics:
-                z = (m["price_pp"] - mean_price) / stddev if stddev > 0.0 else 0.0
-                m["offer"].metadata.price_z_score = z
+            if stddev > 0:
+                z_scores = (prices - mean_price) / stddev
+            else:
+                z_scores = np.zeros(n, dtype=np.float64)
                 
-                if z <= self.config.z_threshold:
-                    passing_metrics.append(m)
+            passing_mask = z_scores <= self.config.z_threshold
+            passing_indices = np.where(passing_mask)[0]
+            
+            for i in range(n):
+                offers[i].metadata.price_z_score = float(z_scores[i])
 
-        # 4. Stage 2: Composite Score
+        if len(passing_indices) == 0:
+            return []
+
+        # Stage 2
+        passing_prices = prices[passing_indices]
+        passing_ratings = ratings[passing_indices]
+        passing_log_reviews = log_reviews[passing_indices]
+
+        price_norm = (max_price - passing_prices) / (max_price - min_price) if max_price > min_price else np.ones(len(passing_indices))
+        rating_norm = (passing_ratings - min_rating) / (max_rating - min_rating) if max_rating > min_rating else np.ones(len(passing_indices))
+        reviews_norm = (passing_log_reviews - min_log_reviews) / (max_log_reviews - min_log_reviews) if max_log_reviews > min_log_reviews else np.ones(len(passing_indices))
+
+        composites = (
+            self.config.weight_price * price_norm +
+            self.config.weight_rating * rating_norm +
+            self.config.weight_reviews * reviews_norm
+        )
+
         results = []
-        for m in passing_metrics:
-            # Price normalization: 1.0 is best (lowest price)
-            if max_price == min_price:
-                price_norm = 1.0
-            else:
-                price_norm = (max_price - m["price_pp"]) / (max_price - min_price)
-                
-            # Rating normalization: 1.0 is best (highest rating)
-            if max_rating == min_rating:
-                rating_norm = 1.0
-            else:
-                rating_norm = (m["rating"] - min_rating) / (max_rating - min_rating)
-                
-            # Reviews normalization: 1.0 is best (highest log_reviews)
-            if max_log_reviews == min_log_reviews:
-                reviews_norm = 1.0
-            else:
-                reviews_norm = (m["log_reviews"] - min_log_reviews) / (max_log_reviews - min_log_reviews)
-                
-            composite = (
-                self.config.weight_price * price_norm +
-                self.config.weight_rating * rating_norm +
-                self.config.weight_reviews * reviews_norm
-            )
-            
+        for idx, composite in zip(passing_indices, composites):
+            offer = offers[idx]
             scored_offer = ScoredOffer(
-                **m["offer"].model_dump(),
-                attractiveness_score=composite
+                **offer.model_dump(),
+                attractiveness_score=float(composite)
             )
             results.append(scored_offer)
 
