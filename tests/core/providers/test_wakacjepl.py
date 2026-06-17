@@ -20,6 +20,7 @@ from core.providers.wakacjepl.main import (
     CALCULATOR_URL,
     AVAILABILITY_URL,
 )
+
 from core.exceptions.provider import (
     CountryNotFoundException,
     BoardTypeNotSupportedException,

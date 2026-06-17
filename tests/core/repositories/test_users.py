@@ -9,6 +9,8 @@ from core.models.user import (
 )
 from core.repositories.users import DynamoUsersRepository
 
+pytestmark = pytest.mark.asyncio
+
 
 @pytest.fixture
 def test_user():

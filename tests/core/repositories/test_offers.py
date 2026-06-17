@@ -6,6 +6,8 @@ from core.models.common import BoardType, ProviderName
 from core.models.offer import Offer, OfferMetadata, TuiMetadata
 from core.repositories.offers import DynamoOffersRepository
 
+pytestmark = pytest.mark.asyncio
+
 
 @pytest.fixture
 def test_offer():

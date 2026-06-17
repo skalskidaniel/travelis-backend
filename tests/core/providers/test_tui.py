@@ -19,6 +19,7 @@ from core.providers.tui.main import (
     AVAILABILITY_URL,
 )
 from core.providers.resources import country_registry, tui_filters
+
 from core.exceptions.provider import (
     CountryNotFoundException,
     BoardTypeNotSupportedException,
