@@ -128,7 +128,7 @@ def test_wakacje_pl_requires_wakacje_metadata(valid_offer_kwargs):
     valid_offer_kwargs["metadata"] = OfferMetadata(wakacje_pl=None)
 
     with pytest.raises(
-        ValidationError, match="metadata.wakacje is required for wakacje offers"
+        ValidationError, match="metadata.wakacje_pl is required for wakacje.pl offers"
     ):
         Offer(**valid_offer_kwargs)
 
@@ -143,7 +143,7 @@ def test_tui_requires_tui_metadata(valid_offer_kwargs):
         Offer(**valid_offer_kwargs)
 
 
-def test_tui_requires_external_id_to_match_metadata_code(valid_offer_kwargs):
+def test_tui_requires_external_id(valid_offer_kwargs):
     valid_offer_kwargs["provider"] = ProviderName.TUI
     valid_offer_kwargs["external_offer_id"] = "TUI-OFFER-123"
     valid_offer_kwargs["metadata"] = OfferMetadata(
@@ -151,6 +151,6 @@ def test_tui_requires_external_id_to_match_metadata_code(valid_offer_kwargs):
     )
 
     with pytest.raises(
-        ValidationError, match="provider_id must match metadata.tui.offer_code"
+        ValidationError, match="external_offer_id must match metadata.tui.offer_code"
     ):
         Offer(**valid_offer_kwargs)

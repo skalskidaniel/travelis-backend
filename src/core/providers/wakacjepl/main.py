@@ -245,7 +245,7 @@ class WakacjePlProvider:
                         "departureDate": _format_wakacje_date(departure_from),
                         "arrivalDate": _format_wakacje_date(departure_to),
                         "departure": None,
-                        "type": ["wczasy"],
+                        "type": [],
                         "duration": {
                             "min": MIN_DURATION_NIGHTS,
                             "max": MAX_DURATION_NIGHTS,
@@ -528,7 +528,7 @@ class WakacjePlProvider:
             departure_date = datetime.strptime(departure_date_raw, "%Y-%m-%d").date()
             return_date = datetime.strptime(return_date_raw, "%Y-%m-%d").date()
             duration = int(duration_nights)
-            stars = int(category) // 10
+            stars = int(category) // 10 if int(category) >= 10 else int(category)
         except (TypeError, ValueError):
             return None
 

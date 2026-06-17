@@ -171,7 +171,7 @@ async def test_search_country_consistency(
     os.environ.get("RUN_INTEGRATION_TESTS") != "1",
     reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
 )
-async def test_search_board_filter_consistency(
+async def test_search_board_consistency(
     live_provider: TuiProvider,
 ):
     month_bucket = _next_month_bucket()
