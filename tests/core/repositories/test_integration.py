@@ -225,10 +225,6 @@ async def test_offers_repo_integration_lifecycle(offers_table, test_offer):
     assert fetched.hotel_name == "Integration Test Hotel"
     assert fetched.price_total == Decimal("5000.00")
 
-    fetched_scan = await repo.get(test_offer.offer_id)
-    assert fetched_scan is not None
-    assert fetched_scan.offer_id == test_offer.offer_id
-
     cell_offers = await repo.query_by_cell(test_offer.cell_id)
     assert len(cell_offers) == 1
     assert cell_offers[0].offer_id == test_offer.offer_id

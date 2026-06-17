@@ -121,6 +121,9 @@ The fan-out concurrency strategy lives in the orchestration layer (`app/jobs/coo
 
 ### Scaffolding status
 
-- `src/core/` is currently **empty** and needs to be scaffolded with the full structure listed above (`models/`, `providers/`, `repositories/`, `services/`, `config.py`, `container.py`).
+- `src/core/` is partially built:
+  - `models/`, `providers/`, `exceptions/`, `services/`, and `repositories/` are built.
+  - `config.py` and `container.py` are **not yet built**.
+- `src/app/` controllers (`auth`, `user`, `offers`) are currently stubs with empty models.
 - `src/app/health/` directory exists but is **empty** (no handler or router yet).
-- All listed modules and packages are to be created during the implementation phase.
+- `src/app/jobs/` is **not yet built**.

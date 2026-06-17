@@ -44,7 +44,7 @@ CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the ev
 ### Scraping & Integration
 
 - [x] Find a way to check wakacje.pl offer availability — verified in `notebooks/wakacje_pl_availability.ipynb` (`getCalculatorOfferVariants` + `checkOfferAvailability`). Pipeline integration pending; ingest must persist `metadata.wakacje_pl` (see [data-model.md](data-model.md#metadatawakacje_pl-required-for-availability-checks)).
-- [ ] Persist `metadata.wakacje_pl` on ingest for every wakacje.pl offer.
+- [x] Persist `metadata.wakacje_pl` on ingest for every wakacje.pl offer.
 - [ ] Wire `jobs.availability` to the wakacje.pl JSON API (after metadata is populated).
 
 ## User preferences

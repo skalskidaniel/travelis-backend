@@ -144,8 +144,10 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
    - If it exists, the system **merges** the existing and new items instead of performing a blind overwrite:
      - The existing item is loaded from DynamoDB.
      - The `sources` lists from both the existing and new offers are merged and deduplicated (using provider name and native ID).
-     - The variant with the **lowest `price_total`** across all combined sources is selected as the winner.
-     - The top-level offer fields (`price_total`, `price_per_day_one_person`, `provider`, `external_offer_id`, `referral_url`) are updated to reflect the winning variant.
+     - The top-level winner selection is deterministic and source-aware:
+       - If the existing and new records come from the **same provider**, the **newly scraped record** becomes the winner (fresh snapshot wins).
+       - If they come from **different providers**, the winner is selected by comparing `price_total` between the top-level existing and new records.
+     - The top-level offer fields (`price_total`, `price_per_day_one_person`, `provider`, `external_offer_id`, `referral_url`) are updated from the selected winner record.
      - The provider-specific metadata blocks (`metadata.wakacje_pl` and `metadata.tui`) are both preserved if variants from both providers exist in the merged sources list.
      - The `updated_at` and `scraped_at` timestamps are refreshed, and the merged offer is saved back to DynamoDB.
 
@@ -155,10 +157,10 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
 
 ### Common keys (all providers)
 
-| Key             | Type   | Description                                                                  |
-| --------------- | ------ | ---------------------------------------------------------------------------- |
-| `price_z_score` | Number | Stage-1 price z-score (debugging / attractiveness)                           |
-| `sources[]`     | List   | Collapsed provider variants after dedup (lowest price wins on the top level) |
+| Key             | Type   | Description                                                                             |
+| --------------- | ------ | --------------------------------------------------------------------------------------- |
+| `price_z_score` | Number | Stage-1 price z-score (debugging / attractiveness)                                      |
+| `sources[]`     | List   | Collapsed provider variants after dedup (top-level winner follows DB merge rules above) |
 
 Each `sources[]` entry mirrors the provider-specific availability block below for that variant (same shape as `metadata.wakacje_pl` or `metadata.tui`).
 

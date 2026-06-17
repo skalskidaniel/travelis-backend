@@ -19,24 +19,12 @@ class DynamoOffersRepository(OffersRepository):
     def __init__(self, table: Any) -> None:
         self.table = table
 
-    async def get(self, offer_id: str, cell_id: str | None = None) -> Offer | None:
-        if cell_id is not None:
-            response = await self.table.get_item(
-                Key={"cell_id": cell_id, "offer_id": offer_id}
-            )
-            item = response.get("Item")
-            if not item:
-                return None
-            return Offer(**deserialize_item(item))
-        else:
-            response = await self.table.scan(
-                FilterExpression="offer_id = :offer_id",
-                ExpressionAttributeValues={":offer_id": offer_id},
-            )
-            items = response.get("Items", [])
-            if not items:
-                return None
-            return Offer(**deserialize_item(items[0]))
+    async def get(self, offer_id: str, cell_id: str) -> Offer | None:
+        response = await self.table.get_item(Key={"cell_id": cell_id, "offer_id": offer_id})
+        item = response.get("Item")
+        if not item:
+            return None
+        return Offer(**deserialize_item(item))
 
     async def put(self, offer: Offer) -> None:
         item = serialize_item(offer.model_dump())

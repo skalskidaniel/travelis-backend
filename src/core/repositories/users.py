@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any
+from botocore.exceptions import ClientError
 
+from core.exceptions.repository import ItemNotFoundException
 from core.models.user import User, PushSubscription
 from core.repositories.base import UsersRepository
 from core.repositories.utils import serialize_item, deserialize_item
@@ -31,13 +33,19 @@ class DynamoUsersRepository(UsersRepository):
     ) -> None:
         sub_item = serialize_item(subscription.model_dump()) if subscription else None
         now_str = datetime.now(timezone.utc).isoformat()
-
-        await self.table.update_item(
-            Key={"user_id": user_id},
-            UpdateExpression="SET push_enabled = :enabled, push_subscription = :sub, updated_at = :updated_at",
-            ExpressionAttributeValues={
-                ":enabled": enabled,
-                ":sub": sub_item,
-                ":updated_at": now_str,
-            },
-        )
+        try:
+            await self.table.update_item(
+                Key={"user_id": user_id},
+                UpdateExpression="SET push_enabled = :enabled, push_subscription = :sub, updated_at = :updated_at",
+                ExpressionAttributeValues={
+                    ":enabled": enabled,
+                    ":sub": sub_item,
+                    ":updated_at": now_str,
+                },
+                ConditionExpression="attribute_exists(user_id)",
+            )
+        except ClientError as exc:
+            error_code = exc.response.get("Error", {}).get("Code")
+            if error_code == "ConditionalCheckFailedException":
+                raise ItemNotFoundException(f"User not found: {user_id}") from exc
+            raise

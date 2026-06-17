@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime
 
+from core.exceptions.repository import ItemNotFoundException
 from core.models.cell import MarketCell
 from core.models.common import BoardType
 from core.repositories.cells import DynamoCellsRepository
@@ -74,3 +75,17 @@ async def test_cells_repo_delete(cells_table):
 
     await repo.delete(cell.cell_id)
     assert await repo.get(cell.cell_id) is None
+
+
+async def test_cells_repo_increment_raises_when_cell_missing(cells_table):
+    repo = DynamoCellsRepository(cells_table)
+
+    with pytest.raises(ItemNotFoundException, match="Cell not found: missing-cell"):
+        await repo.increment_activations(["missing-cell"])
+
+
+async def test_cells_repo_decrement_raises_when_cell_missing(cells_table):
+    repo = DynamoCellsRepository(cells_table)
+
+    with pytest.raises(ItemNotFoundException, match="Cell not found: missing-cell"):
+        await repo.decrement_activations(["missing-cell"])

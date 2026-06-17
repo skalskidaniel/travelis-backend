@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime
 
+from core.exceptions.repository import ItemNotFoundException
 from core.models.user import (
     User,
     UserPreferences,
@@ -54,3 +55,10 @@ async def test_users_repo_lifecycle(users_table, test_user):
 
     await repo.delete(test_user.user_id)
     assert await repo.get(test_user.user_id) is None
+
+
+async def test_users_repo_update_push_raises_when_user_missing(users_table):
+    repo = DynamoUsersRepository(users_table)
+
+    with pytest.raises(ItemNotFoundException, match="User not found: missing-user"):
+        await repo.update_push("missing-user", enabled=True, subscription=None)

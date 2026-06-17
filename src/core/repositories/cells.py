@@ -1,7 +1,9 @@
 import asyncio
 from datetime import datetime
 from typing import Any
+from botocore.exceptions import ClientError
 
+from core.exceptions.repository import ItemNotFoundException
 from core.models.cell import MarketCell
 from core.repositories.base import CellsRepository
 from core.repositories.utils import serialize_item, deserialize_item
@@ -46,12 +48,19 @@ class DynamoCellsRepository(CellsRepository):
             return {}
 
         async def _update(cell_id: str) -> tuple[str, int]:
-            response = await self.table.update_item(
-                Key={"cell_id": cell_id},
-                UpdateExpression="ADD activation_count :one",
-                ExpressionAttributeValues={":one": 1},
-                ReturnValues="UPDATED_NEW",
-            )
+            try:
+                response = await self.table.update_item(
+                    Key={"cell_id": cell_id},
+                    UpdateExpression="ADD activation_count :one",
+                    ExpressionAttributeValues={":one": 1},
+                    ConditionExpression="attribute_exists(cell_id)",
+                    ReturnValues="UPDATED_NEW",
+                )
+            except ClientError as exc:
+                error_code = exc.response.get("Error", {}).get("Code")
+                if error_code == "ConditionalCheckFailedException":
+                    raise ItemNotFoundException(f"Cell not found: {cell_id}") from exc
+                raise
             new_count = int(response["Attributes"]["activation_count"])
             return cell_id, new_count
 
@@ -63,12 +72,19 @@ class DynamoCellsRepository(CellsRepository):
             return {}
 
         async def _update(cell_id: str) -> tuple[str, int]:
-            response = await self.table.update_item(
-                Key={"cell_id": cell_id},
-                UpdateExpression="ADD activation_count :neg_one",
-                ExpressionAttributeValues={":neg_one": -1},
-                ReturnValues="UPDATED_NEW",
-            )
+            try:
+                response = await self.table.update_item(
+                    Key={"cell_id": cell_id},
+                    UpdateExpression="ADD activation_count :neg_one",
+                    ExpressionAttributeValues={":neg_one": -1},
+                    ConditionExpression="attribute_exists(cell_id)",
+                    ReturnValues="UPDATED_NEW",
+                )
+            except ClientError as exc:
+                error_code = exc.response.get("Error", {}).get("Code")
+                if error_code == "ConditionalCheckFailedException":
+                    raise ItemNotFoundException(f"Cell not found: {cell_id}") from exc
+                raise
             new_count = int(response["Attributes"]["activation_count"])
             if new_count <= 0:
                 await self.table.delete_item(Key={"cell_id": cell_id})
