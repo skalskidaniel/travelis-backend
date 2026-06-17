@@ -270,7 +270,7 @@ async def test_hotel_standard_consistency(live_provider: TuiProvider):
     os.environ.get("RUN_INTEGRATION_TESTS") != "1",
     reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
 )
-async def test_check_availability_returns_unavailable(tui_provider):
+async def test_check_availability_returns_unavailable(live_provider):
     offer = Offer(
         provider=ProviderName.TUI,
         external_offer_id="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
@@ -302,5 +302,80 @@ async def test_check_availability_returns_unavailable(tui_provider):
         updated_at=datetime.now(timezone.utc),
         ttl=1782086400,
     )
-    available = await tui_provider.check_availability(offer)
+    available = await live_provider.check_availability(offer)
     assert available is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+)
+async def test_search_currency_is_pln(live_provider):
+    cell = MarketCell(
+        country="EG",
+        month=_next_month_bucket(),
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+
+    destination_codes = live_provider._destination_codes.get(cell.country)
+    board_codes = live_provider._board_codes_for_cell(cell)
+    min_hotel_category = live_provider._min_hotel_category_values.get(
+        str(cell.min_stars)
+    )
+
+    payload = live_provider._build_search_payload(
+        cell=cell,
+        page=0,
+        destination_codes=destination_codes,
+        board_codes=board_codes,
+        min_hotel_category=min_hotel_category,
+    )
+
+    response = await live_provider._client.post(
+        "https://www.tui.pl/api/services/tui-search/api/search/offers",
+        json=payload,
+        headers=live_provider._search_headers(),
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    offers = data.get("offers") or []
+    if not offers:
+        pytest.skip("No live offers returned to check currency.")
+
+    for item in offers:
+        assert item.get("currency") == "PLN", (
+            f"Expected currency PLN, got {item.get('currency')}"
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+)
+async def test_search_departure_date_bounds(live_provider: TuiProvider):
+    month_bucket = _next_month_bucket()
+    cell = MarketCell(
+        country="EG",
+        month=month_bucket,
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+    if not offers:
+        pytest.skip(f"No live offers returned for TUI next-month cell {month_bucket}.")
+
+    for offer in offers:
+        assert offer.departure_date.strftime("%Y-%m") == cell.month, (
+            f"Offer {offer.external_offer_id} departure date {offer.departure_date} "
+            f"falls outside requested month {cell.month}"
+        )

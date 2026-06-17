@@ -130,7 +130,7 @@ async def test_search_date_mismatch(tui_provider):
         children=1,
         activation_count=1,
     )
-    with patch("core.providers.tui.main._month_date_bounds") as mock_bounds:
+    with patch("core.providers.tui.main.month_date_bounds") as mock_bounds:
         mock_bounds.return_value = (date(2026, 7, 31), date(2026, 7, 1))
         with pytest.raises(
             DateMismatchException, match="Departure date .* is after return/end date"
@@ -220,43 +220,6 @@ async def test_check_availability(tui_provider, sample_offer):
         ProviderAPIException, match="unexpected TUI availability response shape"
     ):
         await tui_provider.check_availability(sample_offer)
-
-
-@pytest.mark.asyncio
-async def test_check_availability_returns_unavailable(tui_provider):
-    offer = Offer(
-        provider=ProviderName.TUI,
-        external_offer_id="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
-        hotel_name="Hotel Kent",
-        location="Włochy/Dolny Adriatyk/Rimini",
-        departure_airport="KRK",
-        departure_date=date(2026, 6, 22),
-        return_date=date(2026, 6, 27),
-        duration=5,
-        board=BoardType.BED_AND_BREAKFAST,
-        stars=3,
-        rating=Decimal("4.0"),
-        review_count=10,
-        price_total=Decimal("3000.00"),
-        price_per_day_one_person=Decimal("1500.00"),
-        referral_url="https://www.tui.pl/wypoczynek/wlochy/dolny-adriatyk/hotel-kent-rmi17050/OfferCodeWS/KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
-        available=True,
-        room_type="Standard Room",
-        metadata=OfferMetadata(
-            tui=TuiMetadata(
-                offer_code="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM"
-            ),
-        ),
-        cell_id="1234567890abcdef",
-        offer_id="abcdefabcdefabcdefabcdefabcdef12",
-        attractiveness_score=0.8,
-        share_url="https://wakacje-travelis.pl/offer/123",
-        scraped_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
-        ttl=1782086400,
-    )
-    available = await tui_provider.check_availability(offer)
-    assert available is False
 
 
 @pytest.mark.asyncio

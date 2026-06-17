@@ -282,14 +282,12 @@ TUI search does not accept an explicit return-date bound. Instead, it accepts a 
 - `departureDateFrom`
 - `departureDateTo`
 
-This means a TUI result can have a valid `departureDate` but still have a `returnDate` outside the current market cell window.
+This means a TUI result can have a valid `departureDate` but still have a `returnDate` outside the current market cell's month.
 
-**Required behavior for TUI ingest/matching:** after receiving offers, always enforce the canonical cell bounds in application code:
+**Required behavior for TUI ingest/matching:** after receiving offers, enforce that the offer's `departure_date` falls within the cell's departure month window. We do **not** restrict the `return_date` to the departure month, as a package departing near the end of the month will naturally return in the following month (up to the maximum package duration of 28 nights).
 
-- `offer.departure_date` must be within the cell's departure window.
-- `offer.return_date` must be within the cell's return window.
-
-If either boundary fails, discard the offer for that cell (do not persist/match it under that market cell).
+- `offer.departure_date` must be within `[departure_from, departure_to]` computed from `cell.month`.
+- `offer.return_date` has no upper month boundary enforced, but trip `duration` must be positive.
 
 ### Destination Codes / Geo Catalog
 

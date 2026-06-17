@@ -131,7 +131,7 @@ async def test_search_date_mismatch(wakacjepl_provider):
         children=1,
         activation_count=1,
     )
-    with patch("core.providers.wakacjepl.main._month_date_bounds") as mock_bounds:
+    with patch("core.providers.wakacjepl.main.month_date_bounds") as mock_bounds:
         mock_bounds.return_value = (date(2026, 7, 31), date(2026, 7, 1))
         with pytest.raises(
             DateMismatchException, match="Departure date .* is after return/end date"
@@ -290,7 +290,7 @@ async def test_search_happy_path(wakacjepl_provider):
         },
     }
 
-    with patch("core.providers.wakacjepl.main._month_date_bounds") as mock_bounds:
+    with patch("core.providers.wakacjepl.main.month_date_bounds") as mock_bounds:
         mock_bounds.return_value = (date(2026, 8, 1), date(2026, 8, 31))
 
         with (
@@ -367,7 +367,7 @@ async def test_search_skips_rows_with_invalid_provider_metadata(wakacjepl_provid
         },
     }
 
-    with patch("core.providers.wakacjepl.main._month_date_bounds") as mock_bounds:
+    with patch("core.providers.wakacjepl.main.month_date_bounds") as mock_bounds:
         mock_bounds.return_value = (date(2026, 8, 1), date(2026, 8, 31))
 
         with (
@@ -489,3 +489,112 @@ async def test_check_price(wakacjepl_provider, sample_wakacje_offer):
     )
     with pytest.raises(ProviderAPIException, match="Wakacje.pl calculator API failed"):
         await wakacjepl_provider.check_price(sample_wakacje_offer)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_search_cross_month_dates(wakacjepl_provider):
+    cell = MarketCell(
+        country="GR",
+        month="2026-08",
+        min_stars=5,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    mock_response = {
+        "success": True,
+        "data": {
+            "count": 2,
+            "offers": [
+                {
+                    "offerId": 916232,
+                    "name": "Kakkos Terra Blue (Valid)",
+                    "place": {
+                        "country": {"id": 29, "name": "Grecja", "slug": "grecja"},
+                        "region": {"id": 29004, "name": "Kreta", "slug": "kreta"},
+                        "city": {
+                            "id": 29011912,
+                            "name": "Ierapetra",
+                            "slug": "ierapetra",
+                        },
+                    },
+                    "departureDate": "2026-08-28",  # Within August
+                    "returnDate": "2026-09-04",
+                    "durationNights": 7,
+                    "departurePlace": "Rzeszów",
+                    "departurePlaceCode": "RZE",
+                    "service": 1,
+                    "category": 50,
+                    "ratingValue": 7.5,
+                    "ratingReservationCount": 40,
+                    "price": 6148,
+                    "roomType": "Pokój standard",
+                    "urlName": "kakkos-terra-blue",
+                    "hotelId": 17001,
+                    "tourOperator": 1588,
+                    "tourOpCode": "GRCS",
+                    "departureType": 1,
+                },
+                {
+                    "offerId": 916233,
+                    "name": "Kakkos Terra Blue (Invalid/September Departure)",
+                    "place": {
+                        "country": {"id": 29, "name": "Grecja", "slug": "grecja"},
+                        "region": {"id": 29004, "name": "Kreta", "slug": "kreta"},
+                        "city": {
+                            "id": 29011912,
+                            "name": "Ierapetra",
+                            "slug": "ierapetra",
+                        },
+                    },
+                    "departureDate": "2026-09-02",  # Outside August (in September)
+                    "returnDate": "2026-09-09",
+                    "durationNights": 7,
+                    "departurePlace": "Rzeszów",
+                    "departurePlaceCode": "RZE",
+                    "service": 1,
+                    "category": 50,
+                    "ratingValue": 7.5,
+                    "ratingReservationCount": 40,
+                    "price": 6248,
+                    "roomType": "Pokój standard",
+                    "urlName": "kakkos-terra-blue",
+                    "hotelId": 17001,
+                    "tourOperator": 1588,
+                    "tourOpCode": "GRCS",
+                    "departureType": 1,
+                },
+            ],
+        },
+    }
+
+    with patch("core.providers.wakacjepl.main.month_date_bounds") as mock_bounds:
+        mock_bounds.return_value = (date(2026, 8, 1), date(2026, 8, 31))
+
+        with (
+            patch.dict(wakacjepl_provider._country_ids, {"GR": "29"}),
+            patch.dict(wakacjepl_provider._service_values, {"all-inclusive": "1"}),
+            patch.dict(
+                wakacjepl_provider._departure_places_map,
+                {"RZE": {"name": "Rzeszów", "id": 1909, "slug": "z-rzeszowa"}},
+            ),
+        ):
+            route = respx.post(SEARCH_URL).mock(
+                return_value=httpx.Response(200, json=mock_response)
+            )
+            offers = await wakacjepl_provider.search(cell)
+
+            # Check that query arrivalDate was extended by 28 days: August 31st + 28 days = Sept 28th
+            assert route.called
+            import json
+
+            request_payload = json.loads(route.calls.last.request.content)
+            arrival_date_sent = request_payload[0]["params"]["query"]["arrivalDate"]
+            assert arrival_date_sent == "2026-09-28"
+
+            # Check that only the valid August departure was kept, and the September departure was discarded
+            assert len(offers) == 1
+            assert offers[0].external_offer_id == "916232"
+            assert offers[0].hotel_name == "Kakkos Terra Blue (Valid)"

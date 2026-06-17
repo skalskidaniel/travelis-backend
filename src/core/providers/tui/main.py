@@ -183,7 +183,11 @@ class TuiProvider:
                 board_codes=board_codes,
                 min_hotel_category=min_hotel_category,
             ),
-            "metaData": {"page": page, "pageSize": PAGE_SIZE, "sorting": "price"},
+            "metaData": {
+                "page": page,
+                "pageSize": PAGE_SIZE,
+                "sorting": "qualifier42DESC",
+            },
         }
 
     @staticmethod
@@ -334,8 +338,6 @@ class TuiProvider:
 
         departure_from, departure_to = month_date_bounds(cell.month)
         if not (departure_from <= departure_date <= departure_to):
-            return None
-        if not (departure_from <= return_date <= departure_to):
             return None
 
         duration = (return_date - departure_date).days

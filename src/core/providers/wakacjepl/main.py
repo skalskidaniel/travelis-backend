@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -201,6 +201,7 @@ class WakacjePlProvider:
     ) -> list[dict[str, Any]]:
         child_birthday = representative_child_birthday()
         children_birthdays = [child_birthday] * cell.children
+        extended_arrival_date = departure_to + timedelta(days=MAX_DURATION_NIGHTS)
 
         return [
             {
@@ -250,7 +251,7 @@ class WakacjePlProvider:
                         "not-attribute": False,
                         "pageNumber": page,
                         "departureDate": format_wakacje_date(departure_from),
-                        "arrivalDate": format_wakacje_date(departure_to),
+                        "arrivalDate": format_wakacje_date(extended_arrival_date),
                         "departure": None,
                         "type": [],
                         "duration": {
@@ -607,6 +608,11 @@ class WakacjePlProvider:
             duration = int(duration_nights)
             stars = int(category) // 10 if int(category) >= 10 else int(category)
         except (TypeError, ValueError):
+            return None
+
+        # Filter out offers whose departure date falls outside the target cell's month
+        departure_from, departure_to = month_date_bounds(cell.month)
+        if not (departure_from <= departure_date <= departure_to):
             return None
 
         # Wakacje.pl sometimes return offers from different countries, it must be sorted out below

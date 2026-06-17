@@ -332,6 +332,22 @@ Observation from the UI (selecting "Grecja → Kreta"):
   - `kid`: number of children.
   - `ages`: list of children's birth dates (format `yyyyMMdd`). When scraping for dimensions with children, use a representative birth date of an 8-year-old child (e.g., `(current_year-8)0101`).
 
+### Travel Dates vs Market Cell Bounds
+
+Unlike TUI, Wakacje.pl's search API accepts:
+- `departureDate`: The earliest departure date (trip start)
+- `arrivalDate`: The absolute latest return date (trip end)
+
+To ensure that package tours departing near the end of a month (e.g., June 28th) and returning in the following month (e.g., July 5th) are retrieved and visible, we handle dates as follows:
+
+1. **Query Payload bounds**:
+   - `departureDate` is set to the start of the cell's month (`departure_from`).
+   - `arrivalDate` is extended to `departure_to + 28 days` (using `MAX_DURATION_NIGHTS = 28`), allowing late-month departures of any valid duration to return in the following month.
+
+2. **In-Memory Filtering**:
+   - Because the extended `arrivalDate` allows the API to return tours that both depart and return in the following month (e.g. departing July 3rd), the adapter's mapping code enforces cell month limits on the departure date.
+   - Any raw offer where `offer.departure_date` does not fall strictly within `[departure_from, departure_to]` is discarded.
+
 ### Aggregation & Deduplication
 
 - wakacje.pl often returns offers with the same parameters differing only in price or tour operator — per application requirements, these are treated as "the same offer". Deduplication is performed in the integration service layer (`core/services/ingest.py`).

@@ -15,6 +15,7 @@ from core.models.offer import (
     RawOffer,
     ProviderName,
 )
+from core.providers.utils import month_date_bounds
 from core.providers.wakacjepl.main import WakacjePlProvider
 from core.providers.resources import wakacjepl_filters
 
@@ -252,3 +253,85 @@ async def test_hotel_standard_consistency(
     )
     if failures:
         pytest.fail("\n".join(failures))
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Set RUN_INTEGRATION_TESTS=1 to run live Wakacje.pl integration tests.",
+)
+async def test_search_currency_is_pln(live_provider):
+    cell = MarketCell(
+        country="EG",
+        month=_next_month_bucket(),
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+
+    country_id_str = live_provider._country_ids.get(cell.country)
+    country_id = int(country_id_str)
+    service_str = live_provider._service_values.get(cell.board.value)
+    service_id = int(service_str)
+    departure_from, departure_to = month_date_bounds(cell.month)
+
+    payload = live_provider._build_search_payload(
+        cell=cell,
+        page=1,
+        country_id=country_id,
+        service_id=service_id,
+        departure_from=departure_from,
+        departure_to=departure_to,
+    )
+
+    response = await live_provider._client.post(
+        "https://www.wakacje.pl/v2/api/offers",
+        json=payload,
+        headers=live_provider._search_headers(),
+    )
+    response.raise_for_status()
+    body = response.json()
+
+    data = body.get("data") or {}
+    offers = data.get("offers") or []
+    if not offers:
+        pytest.skip("No live offers returned to check currency.")
+
+    for item in offers:
+        assert item.get("originalCurrency") == "PLN", (
+            f"Expected originalCurrency PLN, got {item.get('originalCurrency')}"
+        )
+        assert item.get("shownCurrency") == "PLN", (
+            f"Expected shownCurrency PLN, got {item.get('shownCurrency')}"
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Set RUN_INTEGRATION_TESTS=1 to run live Wakacje.pl integration tests.",
+)
+async def test_search_departure_date_bounds(live_provider: WakacjePlProvider):
+    month_bucket = _next_month_bucket()
+    cell = MarketCell(
+        country="EG",
+        month=month_bucket,
+        min_stars=4,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+    if not offers:
+        pytest.skip(
+            f"No live offers returned for Wakacje.pl next-month cell {month_bucket}."
+        )
+
+    for offer in offers:
+        assert offer.departure_date.strftime("%Y-%m") == cell.month, (
+            f"Offer {offer.external_offer_id} departure date {offer.departure_date} "
+            f"falls outside requested month {cell.month}"
+        )
