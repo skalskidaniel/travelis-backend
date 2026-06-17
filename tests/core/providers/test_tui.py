@@ -175,6 +175,8 @@ def sample_offer():
         referral_url="https://www.tui.pl/details-eg-1",
         available=True,
         room_type="Family Room Standard",
+        adults=2,
+        children=0,
         metadata=OfferMetadata(
             tui=TuiMetadata(offer_code="TUI-OFFER-1"),
         ),

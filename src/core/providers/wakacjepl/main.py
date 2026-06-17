@@ -677,6 +677,8 @@ class WakacjePlProvider:
             referral_url=referral_url,
             available=True,
             room_type=str(room_type).strip(),
+            adults=cell.adults,
+            children=cell.children,
             metadata=OfferMetadata(
                 wakacje_pl=wakacje_metadata,
             ),

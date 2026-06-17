@@ -158,10 +158,15 @@ class RawOffer(BaseModel):
     room_type: str = Field(
         min_length=1, description="Normalized room type used for fingerprinting."
     )
+    adults: int = Field(ge=1, description="Number of adults in the scrape occupancy.")
+    children: int = Field(
+        ge=0, description="Number of children in the scrape occupancy."
+    )
     metadata: OfferMetadata = Field(
         description="Provider-specific metadata captured at ingest."
     )
-    
+
+
 class ScoredOffer(RawOffer):
     attractiveness_score: float = Field(
         ge=0,

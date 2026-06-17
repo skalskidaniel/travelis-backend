@@ -389,6 +389,8 @@ class TuiProvider:
             referral_url=f"{TUI_ORIGIN}{offer_url}",
             available=True,
             room_type=str(room_name).strip(),
+            adults=cell.adults,
+            children=cell.children,
             metadata=OfferMetadata(
                 tui=TuiMetadata(offer_code=offer_code),
             ),

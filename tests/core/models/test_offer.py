@@ -32,13 +32,15 @@ def valid_offer_kwargs():
         "referral_url": "https://www.tui.pl/details-gre-123",
         "available": True,
         "room_type": "Superior Double Room",
+        "adults": 2,
+        "children": 0,
         "metadata": OfferMetadata(
             tui=TuiMetadata(offer_code="TUI-OFFER-123"),
         ),
         "cell_id": "1234567890abcdef",
-        "offer_id": "abcdefabcdefabcdefabcdefabcdef12",
+        "offer_id": "ad258b057090875a5b049b126e8196b5",
         "attractiveness_score": 0.95,
-        "share_url": "https://wakacje-travelis.pl/offer/1234567890abcdef/abcdefabcdefabcdefabcdefabcdef12",
+        "share_url": "https://wakacje-travelis.pl/offer/1234567890abcdef/ad258b057090875a5b049b126e8196b5",
         "scraped_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
         "ttl": 1783814400,
@@ -109,7 +111,7 @@ def test_share_url_is_normalized_to_canonical_offer_route(valid_offer_kwargs):
     offer = Offer(**valid_offer_kwargs)
     assert (
         str(offer.share_url)
-        == "https://wakacje-travelis.pl/offer/1234567890abcdef/abcdefabcdefabcdefabcdefabcdef12"
+        == "https://wakacje-travelis.pl/offer/1234567890abcdef/ad258b057090875a5b049b126e8196b5"
     )
 
 
@@ -117,6 +119,7 @@ def test_date_mismatch_validation(valid_offer_kwargs):
     valid_offer_kwargs["departure_date"] = date(2026, 7, 19)
     valid_offer_kwargs["return_date"] = date(2026, 7, 12)
     valid_offer_kwargs["duration"] = 7
+    valid_offer_kwargs["offer_id"] = "abcdefabcdefabcdefabcdefabcdef12"
 
     with pytest.raises(
         DateMismatchException, match="return_date must be on or after departure_date"

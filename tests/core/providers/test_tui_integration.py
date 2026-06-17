@@ -283,6 +283,8 @@ async def test_check_availability_returns_unavailable(live_provider):
         referral_url="https://www.tui.pl/wypoczynek/wlochy/dolny-adriatyk/hotel-kent-rmi17050/OfferCodeWS/KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
         available=True,
         room_type="Standard Room",
+        adults=2,
+        children=0,
         metadata=OfferMetadata(
             tui=TuiMetadata(
                 offer_code="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM"

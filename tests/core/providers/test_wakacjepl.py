@@ -213,6 +213,8 @@ def sample_wakacje_offer():
         referral_url="https://www.wakacje.pl/wczasy/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html",
         available=True,
         room_type="Pokój standard",
+        adults=2,
+        children=0,
         metadata=OfferMetadata(
             wakacje_pl=WakacjePlMetadata(
                 hotel_id=17001,

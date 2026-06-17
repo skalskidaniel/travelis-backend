@@ -190,6 +190,8 @@ def create_mock_offer(
         referral_url="https://example.com",
         available=True,
         room_type="Standard",
+        adults=adults,
+        children=children,
         metadata=OfferMetadata(),
     )
 
