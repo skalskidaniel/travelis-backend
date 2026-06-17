@@ -101,7 +101,6 @@ async def live_provider() -> TuiProvider:
 )
 async def test_search_filters_consistency():
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month=_next_month_bucket(),
         min_stars=3,
@@ -143,7 +142,6 @@ async def test_search_country_consistency(
     async def _check_country(country_code: str) -> None:
         async with semaphore:
             cell = MarketCell(
-                cell_id="1234567890abcdef",
                 country=country_code,
                 month=month_bucket,
                 min_stars=3,
@@ -200,7 +198,6 @@ async def test_search_board_consistency(
     async def _check_board(board_type: BoardType) -> None:
         async with semaphore:
             cell = MarketCell(
-                cell_id="1234567890abcdef",
                 country="GR",
                 month=month_bucket,
                 min_stars=3,
@@ -239,7 +236,6 @@ async def test_hotel_standard_consistency(live_provider: TuiProvider):
     async def _check_min_stars(min_stars: int) -> None:
         async with semaphore:
             cell = MarketCell(
-                cell_id="1234567890abcdef",
                 country="GR",
                 month=month_bucket,
                 min_stars=min_stars,

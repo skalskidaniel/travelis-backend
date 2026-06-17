@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time, timezone
 from typing import Self
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -22,9 +22,14 @@ from core.models.common import (
     ProviderName,
     BoardType,
 )
-from core.exceptions.provider import DateMismatchException, DurationMismatchException
+from core.exceptions.provider import (
+    DateMismatchException,
+    DurationMismatchException,
+    InvalidOfferMetadataException,
+)
 
-SHARE_URL_PREFIX = "https://wakacje-travelis.pl/"
+FRONTEND_URL_PREFIX = "https://wakacje-travelis.pl/"
+SHARE_URL_PREFIX = f"{FRONTEND_URL_PREFIX}offer/"
 REFERRAL_PARAMS = {
     "utm_source": "travellead",
     "utm_medium": "cps",
@@ -203,15 +208,27 @@ class Offer(RawOffer):
             and self.metadata.wakacje_pl is None
         ):
             msg = "metadata.wakacje_pl is required for wakacje.pl offers"
-            raise ValueError(msg)
+            raise InvalidOfferMetadataException(msg)
 
         if self.provider is ProviderName.TUI:
             if self.metadata.tui is None:
                 msg = "metadata.tui is required for tui offers"
-                raise ValueError(msg)
+                raise InvalidOfferMetadataException(msg)
             if self.external_offer_id != self.metadata.tui.offer_code:
                 msg = "external_offer_id must match metadata.tui.offer_code"
-                raise ValueError(msg)
+                raise InvalidOfferMetadataException(msg)
+
+        expected_ttl = int(
+            datetime.combine(self.departure_date, time.min, tzinfo=timezone.utc).timestamp()
+        )
+        if self.ttl != expected_ttl:
+            msg = "ttl must equal departure_date epoch at 00:00:00 UTC"
+            raise ValueError(msg)
+
+        canonical_share_url = (
+            f"{SHARE_URL_PREFIX}{self.cell_id}/{self.offer_id}"
+        )
+        self.share_url = type(self.share_url)(canonical_share_url)
 
         return self
 

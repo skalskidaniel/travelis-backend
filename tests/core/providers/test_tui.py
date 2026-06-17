@@ -53,7 +53,6 @@ def test_destination_codes_are_registered():
 @pytest.mark.asyncio
 async def test_search_invalid_country(tui_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -72,7 +71,6 @@ async def test_search_invalid_country(tui_provider):
 @pytest.mark.asyncio
 async def test_search_unsupported_board(tui_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -91,7 +89,6 @@ async def test_search_unsupported_board(tui_provider):
 @pytest.mark.asyncio
 async def test_search_unsupported_stars(tui_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=2,
@@ -110,7 +107,6 @@ async def test_search_unsupported_stars(tui_provider):
 @pytest.mark.asyncio
 async def test_search_past_dates(tui_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2020-01",
         min_stars=4,
@@ -126,7 +122,6 @@ async def test_search_past_dates(tui_provider):
 @pytest.mark.asyncio
 async def test_search_date_mismatch(tui_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -147,7 +142,6 @@ async def test_search_date_mismatch(tui_provider):
 @respx.mock
 async def test_search_api_failure(tui_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -187,7 +181,7 @@ def sample_offer():
         cell_id="1234567890abcdef",
         offer_id="abcdefabcdefabcdefabcdefabcdef12",
         attractiveness_score=0.8,
-        share_url="https://wakacje-travelis.pl/123",
+        share_url="https://wakacje-travelis.pl/offer/123",
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
         ttl=1783814400,
@@ -256,10 +250,10 @@ async def test_check_availability_returns_unavailable(tui_provider):
         cell_id="1234567890abcdef",
         offer_id="abcdefabcdefabcdefabcdefabcdef12",
         attractiveness_score=0.8,
-        share_url="https://wakacje-travelis.pl/123",
+        share_url="https://wakacje-travelis.pl/offer/123",
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
-        ttl=1783814400,
+        ttl=1782086400,
     )
     available = await tui_provider.check_availability(offer)
     assert available is False

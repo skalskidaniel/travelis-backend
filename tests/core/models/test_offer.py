@@ -5,7 +5,11 @@ from pydantic import ValidationError
 
 from core.models.offer import Offer, OfferMetadata, TuiMetadata
 from core.models.common import BoardType, ProviderName
-from core.exceptions.provider import DateMismatchException, DurationMismatchException
+from core.exceptions.provider import (
+    DateMismatchException,
+    DurationMismatchException,
+    InvalidOfferMetadataException,
+)
 
 
 @pytest.fixture
@@ -100,6 +104,15 @@ def test_share_url_prefix_validation(valid_offer_kwargs):
     assert "share_url must start with" in str(exc_info.value)
 
 
+def test_share_url_is_normalized_to_canonical_offer_route(valid_offer_kwargs):
+    valid_offer_kwargs["share_url"] = "https://wakacje-travelis.pl/offer/123"
+    offer = Offer(**valid_offer_kwargs)
+    assert (
+        str(offer.share_url)
+        == "https://wakacje-travelis.pl/offer/1234567890abcdef/abcdefabcdefabcdefabcdefabcdef12"
+    )
+
+
 def test_date_mismatch_validation(valid_offer_kwargs):
     valid_offer_kwargs["departure_date"] = date(2026, 7, 19)
     valid_offer_kwargs["return_date"] = date(2026, 7, 12)
@@ -128,7 +141,8 @@ def test_wakacje_pl_requires_wakacje_metadata(valid_offer_kwargs):
     valid_offer_kwargs["metadata"] = OfferMetadata(wakacje_pl=None)
 
     with pytest.raises(
-        ValidationError, match="metadata.wakacje_pl is required for wakacje.pl offers"
+        InvalidOfferMetadataException,
+        match="metadata.wakacje_pl is required for wakacje.pl offers",
     ):
         Offer(**valid_offer_kwargs)
 
@@ -138,7 +152,8 @@ def test_tui_requires_tui_metadata(valid_offer_kwargs):
     valid_offer_kwargs["metadata"] = OfferMetadata(tui=None)
 
     with pytest.raises(
-        ValidationError, match="metadata.tui is required for tui offers"
+        InvalidOfferMetadataException,
+        match="metadata.tui is required for tui offers",
     ):
         Offer(**valid_offer_kwargs)
 
@@ -151,6 +166,16 @@ def test_tui_requires_external_id(valid_offer_kwargs):
     )
 
     with pytest.raises(
-        ValidationError, match="external_offer_id must match metadata.tui.offer_code"
+        InvalidOfferMetadataException,
+        match="external_offer_id must match metadata.tui.offer_code",
+    ):
+        Offer(**valid_offer_kwargs)
+
+
+def test_ttl_must_match_departure_date_epoch(valid_offer_kwargs):
+    valid_offer_kwargs["ttl"] = 1783814401
+
+    with pytest.raises(
+        ValidationError, match="ttl must equal departure_date epoch at 00:00:00 UTC"
     ):
         Offer(**valid_offer_kwargs)

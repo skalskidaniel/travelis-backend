@@ -1,10 +1,11 @@
-import re
-from functools import lru_cache
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from functools import lru_cache
+import hashlib
+import re
 
-from core.models.offer import BoardType
-from core.models.common import CellId
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from core.models.common import CellId, BoardType
 from core.providers.resources import country_registry
 
 MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -31,7 +32,10 @@ def _allowed_country_codes() -> frozenset[str]:
 class MarketCell(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    cell_id: CellId = Field(description="Deterministic hash of the cell dimensions.")
+    cell_id: CellId | None = Field(
+        default=None,
+        description="Deterministic hash of the cell dimensions.",
+    )
     country: str = Field(
         pattern=COUNTRY_PATTERN,
         description="Destination country as ISO 3166-1 alpha-2.",
@@ -62,3 +66,18 @@ class MarketCell(BaseModel):
         if value not in _allowed_country_codes():
             raise ValueError(f"Unsupported country code '{value}'")
         return value
+
+    @model_validator(mode="after")
+    def set_or_validate_cell_id(self) -> "MarketCell":
+        raw_key = (
+            f"{self.country}:{self.month}:{self.min_stars}:{self.board.value}:"
+            f"{self.adults}:{self.children}"
+        )
+        expected_cell_id = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:16]
+
+        if self.cell_id is not None and self.cell_id != expected_cell_id:
+            msg = "cell_id must match deterministic hash of cell dimensions"
+            raise ValueError(msg)
+
+        self.cell_id = expected_cell_id
+        return self

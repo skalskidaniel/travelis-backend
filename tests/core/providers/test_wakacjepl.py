@@ -48,7 +48,6 @@ def test_provider_identity(wakacjepl_provider):
 @pytest.mark.asyncio
 async def test_search_invalid_country(wakacjepl_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -67,7 +66,6 @@ async def test_search_invalid_country(wakacjepl_provider):
 @pytest.mark.asyncio
 async def test_search_unsupported_board(wakacjepl_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -88,7 +86,6 @@ async def test_search_unsupported_board(wakacjepl_provider):
 @pytest.mark.asyncio
 async def test_search_unsupported_stars(wakacjepl_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -111,7 +108,6 @@ async def test_search_unsupported_stars(wakacjepl_provider):
 @pytest.mark.asyncio
 async def test_search_past_dates(wakacjepl_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2020-01",
         min_stars=4,
@@ -127,7 +123,6 @@ async def test_search_past_dates(wakacjepl_provider):
 @pytest.mark.asyncio
 async def test_search_date_mismatch(wakacjepl_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -148,7 +143,6 @@ async def test_search_date_mismatch(wakacjepl_provider):
 @respx.mock
 async def test_search_api_failure(wakacjepl_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -172,7 +166,6 @@ async def test_search_api_failure(wakacjepl_provider):
 @respx.mock
 async def test_search_api_envelope_failure(wakacjepl_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="EG",
         month="2026-07",
         min_stars=4,
@@ -240,10 +233,10 @@ def sample_wakacje_offer():
         cell_id="1234567890abcdef",
         offer_id="abcdefabcdefabcdefabcdefabcdef12",
         attractiveness_score=0.8,
-        share_url="https://wakacje-travelis.pl/123",
+        share_url="https://wakacje-travelis.pl/offer/123",
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
-        ttl=1783814400,
+        ttl=1787702400,
     )
 
 
@@ -251,7 +244,6 @@ def sample_wakacje_offer():
 @respx.mock
 async def test_search_happy_path(wakacjepl_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="GR",
         month="2026-08",
         min_stars=5,
@@ -329,7 +321,6 @@ async def test_search_happy_path(wakacjepl_provider):
 @respx.mock
 async def test_search_skips_rows_with_invalid_provider_metadata(wakacjepl_provider):
     cell = MarketCell(
-        cell_id="1234567890abcdef",
         country="GR",
         month="2026-08",
         min_stars=5,
