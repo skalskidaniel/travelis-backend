@@ -448,7 +448,9 @@ class WakacjePlProvider:
             return int(status_value)
         return None
 
-    def _raise_api_response_exception(self, api_name: str, payload: dict[str, Any]) -> None:
+    def _raise_api_response_exception(
+        self, api_name: str, payload: dict[str, Any]
+    ) -> None:
         error_info = payload.get("error")
         error_msg = "unknown error"
         if isinstance(error_info, dict) and error_info.get("message"):

@@ -5,11 +5,8 @@ description = "Backend service for wakacje-travelis.pl"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "bs4>=0.0.2",
-    "crawlee[all]>=1.7.2",
     "fastapi[standard]>=0.137.0",
     "httpx>=0.28.1",
-    "ipykernel>=7.3.0",
     "pandas>=3.0.3",
     "pydantic>=2.13.4",
 ]
@@ -23,6 +20,7 @@ addopts = "-rs"
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.3.0",
     "pytest>=9.1.0",
     "pytest-asyncio>=1.4.0",
     "pytest-xdist>=3.8.0",

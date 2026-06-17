@@ -63,5 +63,5 @@ class ProviderTimeoutException(ProviderAPIException):
 
 class TooManyRequestsException(ProviderAPIException):
     """Raised when the response status code is 429."""
-    
+
     pass
