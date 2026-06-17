@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from core.models.common import BoardType
 
@@ -16,15 +16,15 @@ BOARD_CODE_TO_TYPE: dict[str, BoardType] = {
 }
 
 
-def _format_tui_date(value: date) -> str:
+def format_tui_date(value: date) -> str:
     return value.strftime("%d.%m.%Y")
 
 
-def _parse_tui_date(value: str) -> date:
+def parse_tui_date(value: str) -> date:
     return datetime.strptime(value, "%d.%m.%Y").date()
 
 
-def _representative_child_birthday(today: date | None = None) -> str:
-    today = today or date.today()
+def representative_child_birthday(today: date | None = None) -> str:
+    today = today or datetime.now(timezone.utc).date()
     birth_year = today.year - REPRESENTATIVE_CHILD_AGE_YEARS
-    return _format_tui_date(date(birth_year, 1, 1))
+    return format_tui_date(date(birth_year, 1, 1))

@@ -30,7 +30,7 @@ if str(SRC) not in sys.path:
 
 from core.models.cell import MarketCell  # noqa: E402
 from core.models.offer import BoardType  # noqa: E402
-from core.providers.utils import _month_date_bounds  # noqa: E402
+from core.providers.utils import month_date_bounds  # noqa: E402
 from core.providers.wakacjepl.main import (  # noqa: E402
     AVAILABILITY_URL,
     CALCULATOR_URL,
@@ -38,8 +38,8 @@ from core.providers.wakacjepl.main import (  # noqa: E402
     WakacjePlProvider,
 )
 from core.providers.wakacjepl.utils import (  # noqa: E402
-    _format_wakacje_date,
-    _representative_child_birthday,
+    format_wakacje_date,
+    representative_child_birthday,
 )
 
 
@@ -327,7 +327,7 @@ async def _probe_endpoint(
 def _build_search_endpoint_spec(
     provider: WakacjePlProvider, cell: MarketCell
 ) -> EndpointSpec:
-    departure_from, departure_to = _month_date_bounds(cell.month)
+    departure_from, departure_to = month_date_bounds(cell.month)
     country_id = int(provider._country_ids[cell.country])  # noqa: SLF001
     service_id = int(provider._service_values[cell.board.value])  # noqa: SLF001
     payload = provider._build_search_payload(  # noqa: SLF001
@@ -351,7 +351,7 @@ def _build_search_endpoint_spec(
 def _build_calculator_payload(
     search_item: dict[str, Any], adults: int, children: int
 ) -> dict[str, Any]:
-    child_birthday = _representative_child_birthday()
+    child_birthday = representative_child_birthday()
     children_birthdays = [child_birthday] * children
 
     service_id = int(search_item.get("service", 1))
@@ -375,7 +375,7 @@ def _build_calculator_payload(
         "kidsAges": children_birthdays,
         "serviceId": service_id,
         "duration": duration,
-        "departureDate": _format_wakacje_date(
+        "departureDate": format_wakacje_date(
             datetime.fromisoformat(departure_date).date()
         ),
         "transportId": transport_id,
@@ -433,7 +433,7 @@ def _build_availability_spec(
         params[f"participantsObject[participants][{i}][userAllocateId]"] = i + 1
 
     idx = adults
-    child_birthday_fmt = _representative_child_birthday()
+    child_birthday_fmt = representative_child_birthday()
     child_iso = (
         f"{child_birthday_fmt[:4]}-{child_birthday_fmt[4:6]}-{child_birthday_fmt[6:]}"
     )

@@ -28,11 +28,11 @@ from core.models.offer import (
     WakacjePlMetadata,
 )
 from core.providers.resources import wakacjepl_filters
-from core.providers.utils import _month_date_bounds
+from core.providers.utils import month_date_bounds
 from core.providers.wakacjepl.utils import (
     SERVICE_TO_BOARD,
-    _format_wakacje_date,
-    _representative_child_birthday,
+    format_wakacje_date,
+    representative_child_birthday,
 )
 
 SEARCH_URL = "https://www.wakacje.pl/v2/api/offers"
@@ -63,7 +63,7 @@ class WakacjePlProvider:
         up to the provider's limits, and maps the provider's JSON response format
         into our unified `RawOffer` model.
         """
-        departure_from, departure_to = _month_date_bounds(cell.month)
+        departure_from, departure_to = month_date_bounds(cell.month)
         today = date.today()
         if departure_from > departure_to:
             raise DateMismatchException(
@@ -97,7 +97,7 @@ class WakacjePlProvider:
         page = 1
         has_more = True
 
-        while has_more:
+        while has_more and page < 30:
             payload = self._build_search_payload(
                 cell=cell,
                 page=page,
@@ -116,7 +116,12 @@ class WakacjePlProvider:
             except httpx.HTTPError as e:
                 self._raise_request_exception("search", e)
 
-            body = response.json()
+            try:
+                body = response.json()
+            except (json.JSONDecodeError, ValueError) as e:
+                raise ProviderAPIException(
+                    f"Wakacje.pl search API returned invalid JSON: {e}"
+                ) from e
             if not isinstance(body, dict):
                 raise ProviderAPIException(
                     f"unexpected Wakacje.pl search response shape: expected dict, got {type(body).__name__}"
@@ -194,7 +199,7 @@ class WakacjePlProvider:
         departure_from: date,
         departure_to: date,
     ) -> list[dict[str, Any]]:
-        child_birthday = _representative_child_birthday()
+        child_birthday = representative_child_birthday()
         children_birthdays = [child_birthday] * cell.children
 
         return [
@@ -244,8 +249,8 @@ class WakacjePlProvider:
                         "category": False,
                         "not-attribute": False,
                         "pageNumber": page,
-                        "departureDate": _format_wakacje_date(departure_from),
-                        "arrivalDate": _format_wakacje_date(departure_to),
+                        "departureDate": format_wakacje_date(departure_from),
+                        "arrivalDate": format_wakacje_date(departure_to),
                         "departure": None,
                         "type": [],
                         "duration": {
@@ -314,7 +319,7 @@ class WakacjePlProvider:
         """
         meta = self._metadata_for_offer(offer)
 
-        child_birthday = _representative_child_birthday()
+        child_birthday = representative_child_birthday()
         children_birthdays = [child_birthday] * meta.children
 
         payload = {
@@ -324,7 +329,7 @@ class WakacjePlProvider:
             "kidsAges": children_birthdays,
             "serviceId": meta.service_id,
             "duration": offer.duration,
-            "departureDate": _format_wakacje_date(offer.departure_date),
+            "departureDate": format_wakacje_date(offer.departure_date),
             "transportId": meta.transport_id,
             "departureCityId": meta.departure_city_id,
             "departureCityCode": offer.departure_airport,
@@ -353,7 +358,12 @@ class WakacjePlProvider:
         except httpx.HTTPError as e:
             self._raise_request_exception("calculator", e)
 
-        data = response.json()
+        try:
+            data = response.json()
+        except (json.JSONDecodeError, ValueError) as e:
+            raise ProviderAPIException(
+                f"Wakacje.pl calculator API returned invalid JSON: {e}"
+            ) from e
         if not isinstance(data, dict):
             msg = f"unexpected Wakacje.pl calculator response shape: expected dict, got {type(data).__name__}"
             raise ProviderAPIException(msg)
@@ -406,7 +416,7 @@ class WakacjePlProvider:
             params[f"participantsObject[participants][{i}][userAllocateId]"] = i + 1
 
         idx = meta.adults
-        child_birthday_fmt = _representative_child_birthday()
+        child_birthday_fmt = representative_child_birthday()
         child_iso = f"{child_birthday_fmt[:4]}-{child_birthday_fmt[4:6]}-{child_birthday_fmt[6:]}"
 
         for i in range(meta.children):
@@ -423,7 +433,12 @@ class WakacjePlProvider:
         except httpx.HTTPError as e:
             self._raise_request_exception("availability", e)
 
-        data = response.json()
+        try:
+            data = response.json()
+        except (json.JSONDecodeError, ValueError) as e:
+            raise ProviderAPIException(
+                f"Wakacje.pl availability API returned invalid JSON: {e}"
+            ) from e
         if not isinstance(data, dict):
             msg = f"unexpected Wakacje.pl availability response shape: expected dict, got {type(data).__name__}"
             raise ProviderAPIException(msg)
@@ -594,8 +609,7 @@ class WakacjePlProvider:
         except (TypeError, ValueError):
             return None
 
-        # Filter out offers where the country ID does not match the requested country ID.
-        # This cleans up dirty data/mismatches from the Wakacje.pl search API (e.g. returning Italy for Maldives/Spain).
+        # Wakacje.pl sometimes return offers from different countries, it must be sorted out below
         expected_country_id_str = self._country_ids.get(cell.country)
         if expected_country_id_str and country_id_int != int(expected_country_id_str):
             return None

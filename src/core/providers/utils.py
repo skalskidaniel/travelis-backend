@@ -2,7 +2,7 @@ from datetime import date
 from calendar import monthrange
 
 
-def _month_date_bounds(month: str) -> tuple[date, date]:
+def month_date_bounds(month: str) -> tuple[date, date]:
     year_str, month_str = month.split("-", maxsplit=1)
     year = int(year_str)
     month_number = int(month_str)

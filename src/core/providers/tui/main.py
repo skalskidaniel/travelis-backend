@@ -4,6 +4,8 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+import json
+
 import httpx
 from pydantic import ValidationError
 
@@ -20,14 +22,14 @@ from core.exceptions.provider import (
 )
 from core.models.cell import MarketCell
 from core.models.offer import RawOffer, Offer, OfferMetadata, ProviderName, TuiMetadata
-from core.providers.resources import tui_filters
+from core.providers.resources import country_registry, tui_filters
 from core.providers.tui.utils import (
     BOARD_CODE_TO_TYPE,
-    _representative_child_birthday,
-    _format_tui_date,
-    _parse_tui_date,
+    representative_child_birthday,
+    format_tui_date,
+    parse_tui_date,
 )
-from core.providers.utils import _month_date_bounds
+from core.providers.utils import month_date_bounds
 
 SEARCH_URL = "https://www.tui.pl/api/services/tui-search/api/search/offers"
 AVAILABILITY_URL = "https://www.tui.pl/api/www/hotel-cards/offers"
@@ -57,7 +59,7 @@ class TuiProvider:
         return ProviderName.TUI
 
     async def search(self, cell: MarketCell) -> list[RawOffer]:
-        departure_from, departure_to = _month_date_bounds(cell.month)
+        departure_from, departure_to = month_date_bounds(cell.month)
         today = date.today()
         if departure_from > departure_to:
             raise DateMismatchException(
@@ -90,7 +92,7 @@ class TuiProvider:
         page = 0
         pages_count = 1
 
-        while page < pages_count:
+        while page < pages_count and page < 30:
             payload = self._build_search_payload(
                 cell=cell,
                 page=page,
@@ -108,7 +110,12 @@ class TuiProvider:
             except httpx.HTTPError as e:
                 self._raise_request_exception("search", e)
 
-            data = response.json()
+            try:
+                data = response.json()
+            except (json.JSONDecodeError, ValueError) as e:
+                raise ProviderAPIException(
+                    f"TUI search API returned invalid JSON: {e}"
+                ) from e
             pagination = data.get("pagination") or {}
             pages_count = int(pagination.get("pagesCount") or 0)
 
@@ -151,14 +158,14 @@ class TuiProvider:
         board_codes: list[str],
         min_hotel_category: str,
     ) -> dict[str, Any]:
-        departure_from, departure_to = _month_date_bounds(cell.month)
-        child_birthday = _representative_child_birthday()
+        departure_from, departure_to = month_date_bounds(cell.month)
+        child_birthday = representative_child_birthday()
         children_birthdays = [child_birthday] * cell.children
 
         return {
             "childrenBirthdays": children_birthdays,
-            "departureDateFrom": _format_tui_date(departure_from),
-            "departureDateTo": _format_tui_date(departure_to),
+            "departureDateFrom": format_tui_date(departure_from),
+            "departureDateTo": format_tui_date(departure_to),
             "departuresCodes": self._departure_airport_codes,
             "destinationsCodes": destination_codes,
             "durationFrom": MIN_DURATION_NIGHTS,
@@ -243,7 +250,12 @@ class TuiProvider:
         except httpx.HTTPError as e:
             self._raise_request_exception("availability", e)
 
-        payload = response.json()
+        try:
+            payload = response.json()
+        except (json.JSONDecodeError, ValueError) as e:
+            raise ProviderAPIException(
+                f"TUI availability API returned invalid JSON: {e}"
+            ) from e
         if not isinstance(payload, dict):
             msg = f"unexpected TUI availability response shape: expected dict, got {type(payload).__name__}"
             raise ProviderAPIException(msg)
@@ -317,8 +329,15 @@ class TuiProvider:
         if not departure_airport:
             return None
 
-        departure_date = _parse_tui_date(departure_date_raw)
-        return_date = _parse_tui_date(return_date_raw)
+        departure_date = parse_tui_date(departure_date_raw)
+        return_date = parse_tui_date(return_date_raw)
+
+        departure_from, departure_to = month_date_bounds(cell.month)
+        if not (departure_from <= departure_date <= departure_to):
+            return None
+        if not (departure_from <= return_date <= departure_to):
+            return None
+
         duration = (return_date - departure_date).days
         if duration < 1:
             return None
@@ -335,6 +354,10 @@ class TuiProvider:
             )
 
         country_label = str(breadcrumbs[0]["label"]).replace("/", " - ")
+        # Tui return offers with different country, when the destination airport is in different country
+        expected_country_name = country_registry.get("codes", {}).get(cell.country)
+        if expected_country_name and country_label != expected_country_name:
+            return None
         region_label = str(breadcrumbs[1]["label"]).replace("/", " - ")
         if len(breadcrumbs) > 2 and breadcrumbs[2].get("label"):
             city_label = str(breadcrumbs[2]["label"])

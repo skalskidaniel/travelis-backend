@@ -12,12 +12,12 @@ SERVICE_TO_BOARD: dict[int, BoardType] = {
 }
 
 
-def _format_wakacje_date(value: date) -> str:
+def format_wakacje_date(value: date) -> str:
     """YYYY-MM-DD for request dates."""
     return value.isoformat()
 
 
-def _representative_child_birthday(today: date | None = None) -> str:
+def representative_child_birthday(today: date | None = None) -> str:
     """Compact yyyyMMdd for an 8-year-old."""
     today = today or date.today()
     birth_year = today.year - REPRESENTATIVE_CHILD_AGE_YEARS

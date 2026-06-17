@@ -1,12 +1,13 @@
 import pytest
 import pytest_asyncio
 import httpx
-from datetime import date
+from datetime import date, datetime, timezone
 import os
 import re
 import asyncio
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
+from decimal import Decimal
 
 from core.exceptions.provider import ProviderTimeoutException, TooManyRequestsException
 from core.models.cell import MarketCell
@@ -14,6 +15,9 @@ from core.models.offer import (
     BoardType,
     RawOffer,
     ProviderName,
+    Offer,
+    OfferMetadata,
+    TuiMetadata,
 )
 from core.providers.tui.main import (
     TuiProvider,
@@ -259,3 +263,44 @@ async def test_hotel_standard_consistency(live_provider: TuiProvider):
     )
     if failures:
         pytest.fail("\n".join(failures))
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Set RUN_INTEGRATION_TESTS=1 to run live TUI integration tests.",
+)
+async def test_check_availability_returns_unavailable(tui_provider):
+    offer = Offer(
+        provider=ProviderName.TUI,
+        external_offer_id="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
+        hotel_name="Hotel Kent",
+        location="Włochy/Dolny Adriatyk/Rimini",
+        departure_airport="KRK",
+        departure_date=date(2026, 6, 22),
+        return_date=date(2026, 6, 27),
+        duration=5,
+        board=BoardType.BED_AND_BREAKFAST,
+        stars=3,
+        rating=Decimal("4.0"),
+        review_count=10,
+        price_total=Decimal("3000.00"),
+        price_per_day_one_person=Decimal("1500.00"),
+        referral_url="https://www.tui.pl/wypoczynek/wlochy/dolny-adriatyk/hotel-kent-rmi17050/OfferCodeWS/KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
+        available=True,
+        room_type="Standard Room",
+        metadata=OfferMetadata(
+            tui=TuiMetadata(
+                offer_code="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM"
+            ),
+        ),
+        cell_id="1234567890abcdef",
+        offer_id="abcdefabcdefabcdefabcdefabcdef12",
+        attractiveness_score=0.8,
+        share_url="https://wakacje-travelis.pl/offer/123",
+        scraped_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        ttl=1782086400,
+    )
+    available = await tui_provider.check_availability(offer)
+    assert available is False
