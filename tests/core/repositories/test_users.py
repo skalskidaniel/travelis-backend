@@ -62,3 +62,24 @@ async def test_users_repo_update_push_raises_when_user_missing(users_table):
 
     with pytest.raises(ItemNotFoundException, match="User not found: missing-user"):
         await repo.update_push("missing-user", enabled=True, subscription=None)
+
+
+async def test_users_repo_scan(users_table, test_user):
+    repo = DynamoUsersRepository(users_table)
+
+    empty_scan = await repo.scan()
+    assert len(empty_scan) == 0
+
+    await repo.put(test_user)
+
+    scanned = await repo.scan()
+    assert len(scanned) == 1
+    assert scanned[0].user_id == test_user.user_id
+
+    second_user = test_user.model_copy(update={"user_id": "usr_456"})
+    await repo.put(second_user)
+
+    scanned = await repo.scan()
+    assert len(scanned) == 2
+    user_ids = {u.user_id for u in scanned}
+    assert user_ids == {"usr_123", "usr_456"}

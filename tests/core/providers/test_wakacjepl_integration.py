@@ -343,7 +343,10 @@ async def test_referral_url_matches_offer_page(
             f"Live Wakacje.pl search returned no offers for next-month cell with board {board.value}."
         )
 
-    from tests.core.providers.utils import verify_wakacje_offer_urls, offer_url_check_sample_size
+    from tests.core.providers.utils import (
+        verify_wakacje_offer_urls,
+        offer_url_check_sample_size,
+    )
 
     failures = await verify_wakacje_offer_urls(
         playwright_browser,

@@ -49,3 +49,20 @@ class DynamoUsersRepository(UsersRepository):
             if error_code == "ConditionalCheckFailedException":
                 raise ItemNotFoundException(f"User not found: {user_id}") from exc
             raise
+
+    async def scan(self) -> list[User]:
+        items = []
+        exclusive_start_key = None
+        while True:
+            kwargs = {}
+            if exclusive_start_key:
+                kwargs["ExclusiveStartKey"] = exclusive_start_key
+
+            response = await self.table.scan(**kwargs)
+            items.extend(response.get("Items", []))
+
+            exclusive_start_key = response.get("LastEvaluatedKey")
+            if not exclusive_start_key:
+                break
+
+        return [User(**deserialize_item(item)) for item in items]

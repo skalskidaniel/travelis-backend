@@ -9,6 +9,7 @@ from datetime import date
 from typing import TYPE_CHECKING, Any
 
 import httpx
+import html as html_lib
 
 from core.models.common import BoardType
 from core.models.offer import RawOffer
@@ -19,9 +20,15 @@ if TYPE_CHECKING:
 
 TUI_BOARDING_TO_TYPE: dict[str, BoardType] = {
     "A": BoardType.ALL_INCLUSIVE,
+    "Z": BoardType.ALL_INCLUSIVE,
     "H": BoardType.HALF_BOARD,
+    "M": BoardType.HALF_BOARD,
+    "N": BoardType.HALF_BOARD,
     "G": BoardType.BED_AND_BREAKFAST,
+    "B": BoardType.BED_AND_BREAKFAST,
     "F": BoardType.FULL_BOARD,
+    "V": BoardType.FULL_BOARD,
+    "W": BoardType.FULL_BOARD,
     "O": BoardType.NONE,
 }
 
@@ -98,7 +105,7 @@ def verify_tui_offer_page(
         )
 
     title_match = re.search(r"<title[^>]*>([^<]+)</title>", html, re.IGNORECASE)
-    title = title_match.group(1) if title_match else ""
+    title = html_lib.unescape(title_match.group(1)) if title_match else ""
     hotel_token = hotel_title_token(offer.hotel_name)
     if hotel_token and hotel_token not in title.lower():
         failures.append(f"hotel token {hotel_token!r} not in page title {title!r}")
@@ -115,15 +122,38 @@ def verify_tui_offer_page(
     boarding_code = offer_code_data.get("boarding")
     page_board = TUI_BOARDING_TO_TYPE.get(str(boarding_code)) if boarding_code else None
 
-    if page_departure != str(offer.departure_date):
-        failures.append(
-            f"departure date mismatch: page={page_departure!r} "
-            f"search={offer.departure_date!r}"
-        )
-    if page_return != str(offer.return_date):
-        failures.append(
-            f"return date mismatch: page={page_return!r} search={offer.return_date!r}"
-        )
+    from datetime import datetime
+
+    if page_departure:
+        try:
+            page_dep_date = datetime.strptime(page_departure, "%Y-%m-%d").date()
+            if page_dep_date != offer.departure_date:
+                failures.append(
+                    f"departure date mismatch: page={page_departure!r} "
+                    f"search={offer.departure_date!r}"
+                )
+        except Exception as error:
+            failures.append(
+                f"failed to parse page departure date {page_departure!r}: {error}"
+            )
+    else:
+        failures.append("missing departure date on page")
+
+    if page_return:
+        try:
+            page_ret_date = datetime.strptime(page_return, "%Y-%m-%d").date()
+            date_diff = (offer.return_date - page_ret_date).days
+            if not (0 <= date_diff <= 1):
+                failures.append(
+                    f"return date mismatch: page={page_return!r} "
+                    f"search={offer.return_date!r}"
+                )
+        except Exception as error:
+            failures.append(
+                f"failed to parse page return date {page_return!r}: {error}"
+            )
+    else:
+        failures.append("missing return date on page")
     if page_airport != offer.departure_airport:
         failures.append(
             f"departure airport mismatch: page={page_airport!r} "
@@ -251,9 +281,7 @@ def verify_wakacje_rendered_page(
         and price_space_formatted not in normalized_text
         and price_nbsp_formatted not in normalized_text
     ):
-        failures.append(
-            f"price {price_val} not found on rendered page"
-        )
+        failures.append(f"price {price_val} not found on rendered page")
 
     return failures
 

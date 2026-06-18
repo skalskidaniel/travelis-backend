@@ -1,0 +1,211 @@
+import logging
+from datetime import date, datetime, timezone
+import pandas as pd
+
+from core.models.user import UserPreferences
+from core.models.offer import Offer
+from core.repositories.base import (
+    UsersRepository,
+    OffersRepository,
+    UserOffersRepository,
+    FeedRepository,
+)
+from core.services.activation import generate_required_cells, ActivationService
+from core.services.notifications import NotificationsService
+
+logger = logging.getLogger(__name__)
+
+
+class MatchingService:
+    """Orchestrates comparing offers against user travel preferences, persisting matches, and sending alerts."""
+
+    def __init__(
+        self,
+        users_repo: UsersRepository,
+        offers_repo: OffersRepository,
+        user_offers_repo: UserOffersRepository,
+        feed_repo: FeedRepository,
+        notifications_service: NotificationsService,
+        activation_service: ActivationService,
+    ) -> None:
+        self.users_repo = users_repo
+        self.offers_repo = offers_repo
+        self.user_offers_repo = user_offers_repo
+        self.feed_repo = feed_repo
+        self.notifications_service = notifications_service
+        self.activation_service = activation_service
+
+    async def match_user_offers(
+        self, user_id: str, reference_date: date | None = None
+    ) -> bool:
+        """Matches offers for a single user, updates their matches in UserOffers, and invalidates feed."""
+        user = await self.users_repo.get(user_id)
+        if not user:
+            logger.warning(f"User not found for matching: {user_id}")
+            return False
+
+        ref = reference_date or date.today()
+        prefs = user.preferences
+
+        # 1. Self-Healing Month Shifting
+        if prefs.date_from is None and prefs.date_to is None:
+            updated_date = user.updated_at.date()
+            if ref.year != updated_date.year or ref.month != updated_date.month:
+                logger.info(
+                    f"Self-healing: shifting active months for user {user_id} from {updated_date} to {ref}"
+                )
+                await self.activation_service.update_cell_activations(
+                    new_prefs=prefs,
+                    old_prefs=prefs,
+                    new_reference_date=ref,
+                    old_reference_date=updated_date,
+                )
+                current_time = datetime.now(timezone.utc).time()
+                user.updated_at = datetime.combine(
+                    ref, current_time, tzinfo=timezone.utc
+                )
+                await self.users_repo.put(user)
+
+        # 2. Resolve required cell IDs
+        required_cells = generate_required_cells(prefs, ref)
+        if not required_cells:
+            return False
+
+        # 3. Query Offers for those cells
+        offers = []
+        for cell in required_cells:
+            cell_offers = await self.offers_repo.query_by_cell(cell.cell_id)
+            offers.extend(cell_offers)
+
+        # 4. Filter offers in Python using Pandas/NumPy
+        matched_offers = self._filter_offers_vectorized(offers, prefs)
+
+        # 5. Sync UserOffers rows
+        existing_items = await self.user_offers_repo.query_by_user(user_id)
+        existing_offer_ids = {item["offer_id"] for item in existing_items}
+        new_offer_ids = {o.offer_id for o in matched_offers}
+
+        to_delete_ids = existing_offer_ids - new_offer_ids
+        to_insert_offers = [
+            o for o in matched_offers if o.offer_id not in existing_offer_ids
+        ]
+
+        feed_changed = len(to_delete_ids) > 0 or len(to_insert_offers) > 0
+
+        if to_delete_ids:
+            await self.user_offers_repo.delete_batch(
+                [(user_id, oid) for oid in to_delete_ids]
+            )
+
+        if to_insert_offers:
+            matched_at = datetime.now(timezone.utc)
+            items_to_insert = [
+                {
+                    "user_id": user_id,
+                    "offer_id": o.offer_id,
+                    "cell_id": o.cell_id,
+                    "matched_at": matched_at,
+                }
+                for o in to_insert_offers
+            ]
+            await self.user_offers_repo.put_batch(items_to_insert)
+
+        # 6. If feed changed, increment feed version in Redis and send Web Push
+        if feed_changed:
+            await self.feed_repo.increment_feed_version(user_id)
+            if user.push_enabled and user.push_subscription:
+                await self.notifications_service.send_random_notification(
+                    user.push_subscription
+                )
+
+        return feed_changed
+
+    def _filter_offers_vectorized(
+        self, offers: list[Offer], prefs: UserPreferences
+    ) -> list[Offer]:
+        """Apply vectorized NumPy/Pandas filtering on a list of Offer objects."""
+        if not offers:
+            return []
+
+        offers_data = [
+            {
+                "rating": o.rating,
+                "departure_airport": o.departure_airport,
+                "duration": o.duration,
+                "departure_date": o.departure_date,
+                "return_date": o.return_date,
+                "children": o.children,
+            }
+            for o in offers
+        ]
+        df = pd.DataFrame(offers_data)
+
+        df = df[df["rating"] >= prefs.min_rating]
+        if df.empty:
+            return []
+
+        if prefs.departure_airports:
+            pref_airports = {a.upper().strip() for a in prefs.departure_airports}
+            df = df[df["departure_airport"].str.upper().str.strip().isin(pref_airports)]
+            if df.empty:
+                return []
+
+        df = df[df["duration"] >= prefs.duration_min]
+        if prefs.duration_max is not None:
+            df = df[df["duration"] <= prefs.duration_max]
+        if df.empty:
+            return []
+
+        if prefs.date_from is not None:
+            df = df[df["departure_date"] >= prefs.date_from]
+        if prefs.date_to is not None:
+            df = df[df["return_date"] <= prefs.date_to]
+        if df.empty:
+            return []
+
+        df = df[df["children"] == len(prefs.children)]
+        if df.empty:
+            return []
+
+        if prefs.children:
+            departure_dates = pd.to_datetime(df["departure_date"])
+            for dob in prefs.children:
+                years_diff = departure_dates.dt.year - dob.year
+                is_before_birthday = (departure_dates.dt.month < dob.month) | (
+                    (departure_dates.dt.month == dob.month)
+                    & (departure_dates.dt.day < dob.day)
+                )
+                ages = years_diff - is_before_birthday.astype(int)
+                df = df[(ages >= 0) & (ages < 18)]
+                if df.empty:
+                    return []
+
+        return [offers[i] for i in df.index]
+
+    async def bulk_match_users(
+        self,
+        affected_cell_ids: list[str],
+        reference_date: date | None = None,
+    ) -> list[str]:
+        """Scan all users, identify those whose preferences overlap with the affected cells,
+        and perform matching for them. Returns the list of matched user IDs.
+        """
+        if not affected_cell_ids:
+            return []
+
+        affected_set = set(affected_cell_ids)
+        users = await self.users_repo.scan()
+
+        matched_user_ids = []
+        for user in users:
+            user_cells = generate_required_cells(user.preferences, reference_date)
+            user_cell_ids = {c.cell_id for c in user_cells}
+
+            if user_cell_ids & affected_set:
+                feed_changed = await self.match_user_offers(
+                    user.user_id, reference_date
+                )
+                if feed_changed:
+                    matched_user_ids.append(user.user_id)
+
+        return matched_user_ids

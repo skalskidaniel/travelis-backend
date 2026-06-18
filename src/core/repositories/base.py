@@ -50,6 +50,8 @@ class UsersRepository(Protocol):
         self, user_id: str, enabled: bool, subscription: PushSubscription | None
     ) -> None: ...
 
+    async def scan(self) -> list[User]: ...
+
 
 @runtime_checkable
 class UserOffersRepository(Protocol):

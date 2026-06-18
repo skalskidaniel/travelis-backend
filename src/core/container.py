@@ -1,0 +1,109 @@
+from contextlib import AsyncExitStack
+from typing import Any
+import aioboto3
+from redis.asyncio import Redis
+
+from core.config import Settings
+from core.repositories.cells import DynamoCellsRepository
+from core.repositories.offers import DynamoOffersRepository
+from core.repositories.users import DynamoUsersRepository
+from core.repositories.user_offers import DynamoUserOffersRepository
+from core.repositories.feed import RedisFeedRepository
+
+
+class Container:
+    """Composition root for managing application dependencies and resources lifecycle."""
+
+    def __init__(self) -> None:
+        self.settings = Settings()
+        self.exit_stack: AsyncExitStack | None = None
+
+        # Clients / Resources
+        self.dynamodb_resource: Any = None
+        self.redis_client: Redis | None = None
+
+        # Repositories
+        self.users_repo: DynamoUsersRepository | None = None
+        self.cells_repo: DynamoCellsRepository | None = None
+        self.offers_repo: DynamoOffersRepository | None = None
+        self.user_offers_repo: DynamoUserOffersRepository | None = None
+        self.feed_repo: RedisFeedRepository | None = None
+
+        # Services
+        self.activation_service: Any = None
+        self.matching_service: Any = None
+        self.notifications_service: Any = None
+
+    async def initialize(self) -> None:
+        """Initialize all shared resources once per cold start."""
+        if self.exit_stack is not None:
+            return
+
+        self.exit_stack = AsyncExitStack()
+
+        # 1. AWS Services
+        session = aioboto3.Session()
+        self.dynamodb_resource = await self.exit_stack.enter_async_context(
+            session.resource("dynamodb", region_name=self.settings.aws_region)
+        )
+
+        # 2. Get DynamoDB tables
+        users_table = await self.dynamodb_resource.Table(self.settings.db.users_table)
+        cells_table = await self.dynamodb_resource.Table(self.settings.db.cells_table)
+        offers_table = await self.dynamodb_resource.Table(self.settings.db.offers_table)
+        user_offers_table = await self.dynamodb_resource.Table(
+            self.settings.db.user_offers_table
+        )
+
+        # 3. Instantiate DynamoDB repositories
+        self.users_repo = DynamoUsersRepository(users_table)
+        self.cells_repo = DynamoCellsRepository(cells_table)
+        self.offers_repo = DynamoOffersRepository(offers_table)
+        self.user_offers_repo = DynamoUserOffersRepository(user_offers_table)
+
+        # 4. Redis connection
+        self.redis_client = Redis.from_url(
+            self.settings.redis_url, decode_responses=True
+        )
+        self.exit_stack.push_async_callback(self.redis_client.aclose)
+        self.feed_repo = RedisFeedRepository(self.redis_client)
+
+        # 5. Services
+        from core.services.activation import ActivationService
+        from core.services.notifications import NotificationsService
+        from core.services.matching import MatchingService
+
+        self.activation_service = ActivationService(
+            cells_repo=self.cells_repo,
+        )
+        self.notifications_service = NotificationsService(
+            vapid_private_key=self.settings.push.vapid_private_key,
+            vapid_public_key=self.settings.push.vapid_public_key,
+        )
+        self.matching_service = MatchingService(
+            users_repo=self.users_repo,
+            offers_repo=self.offers_repo,
+            user_offers_repo=self.user_offers_repo,
+            feed_repo=self.feed_repo,
+            notifications_service=self.notifications_service,
+            activation_service=self.activation_service,
+        )
+
+    async def cleanup(self) -> None:
+        """Close and release all resources cleanly."""
+        if self.exit_stack is not None:
+            await self.exit_stack.aclose()
+            self.exit_stack = None
+            self.dynamodb_resource = None
+            self.redis_client = None
+            self.users_repo = None
+            self.cells_repo = None
+            self.offers_repo = None
+            self.user_offers_repo = None
+            self.feed_repo = None
+            self.activation_service = None
+            self.matching_service = None
+            self.notifications_service = None
+
+
+container = Container()
