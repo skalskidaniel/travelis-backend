@@ -20,7 +20,9 @@ class DynamoOffersRepository(OffersRepository):
         self.table = table
 
     async def get(self, offer_id: str, cell_id: str) -> Offer | None:
-        response = await self.table.get_item(Key={"cell_id": cell_id, "offer_id": offer_id})
+        response = await self.table.get_item(
+            Key={"cell_id": cell_id, "offer_id": offer_id}
+        )
         item = response.get("Item")
         if not item:
             return None

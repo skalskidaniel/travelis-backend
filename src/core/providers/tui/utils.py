@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
 from core.models.common import BoardType
+from core.providers.utils import parse_optional_http_url
 
 REPRESENTATIVE_CHILD_AGE_YEARS = 8
 
@@ -28,3 +29,7 @@ def representative_child_birthday(today: date | None = None) -> str:
     today = today or datetime.now(timezone.utc).date()
     birth_year = today.year - REPRESENTATIVE_CHILD_AGE_YEARS
     return format_tui_date(date(birth_year, 1, 1))
+
+
+def parse_tui_image_url(value: object) -> str | None:
+    return parse_optional_http_url(value)

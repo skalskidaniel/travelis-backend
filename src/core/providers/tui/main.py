@@ -28,6 +28,7 @@ from core.providers.tui.utils import (
     representative_child_birthday,
     format_tui_date,
     parse_tui_date,
+    parse_tui_image_url,
 )
 from core.providers.utils import month_date_bounds
 
@@ -371,6 +372,8 @@ class TuiProvider:
         if not room_name:
             return None
 
+        image_url = parse_tui_image_url(item.get("imageUrl"))
+
         return RawOffer(
             provider=ProviderName.TUI,
             external_offer_id=offer_code,
@@ -387,6 +390,7 @@ class TuiProvider:
             price_total=price_total,
             price_per_day_one_person=price_per_day_one_person,
             referral_url=f"{TUI_ORIGIN}{offer_url}",
+            image_url=image_url,
             available=True,
             room_type=str(room_name).strip(),
             adults=cell.adults,

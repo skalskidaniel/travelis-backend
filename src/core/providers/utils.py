@@ -1,6 +1,22 @@
 from datetime import date
 from calendar import monthrange
 
+from pydantic import AnyHttpUrl, TypeAdapter, ValidationError
+
+_http_url_adapter = TypeAdapter(AnyHttpUrl)
+
+
+def parse_optional_http_url(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    try:
+        return str(_http_url_adapter.validate_python(raw))
+    except ValidationError:
+        return None
+
 
 def month_date_bounds(month: str) -> tuple[date, date]:
     year_str, month_str = month.split("-", maxsplit=1)

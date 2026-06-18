@@ -152,6 +152,9 @@ class RawOffer(BaseModel):
     price_total: PricePLN
     price_per_day_one_person: PricePLN
     referral_url: AnyHttpUrl = Field(description="Provider deep link.")
+    image_url: AnyHttpUrl | None = Field(
+        default=None, description="Link for first offer image."
+    )
     available: bool = Field(
         description="Whether the provider marks the offer as bookable."
     )

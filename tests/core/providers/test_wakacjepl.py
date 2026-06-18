@@ -211,7 +211,10 @@ def sample_wakacje_offer():
         review_count=40,
         price_total=Decimal("6148.00"),
         price_per_day_one_person=Decimal("439.14"),
-        referral_url="https://www.wakacje.pl/wczasy/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html",
+        referral_url=(
+            "https://www.wakacje.pl/oferty/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html"
+            "?od-2026-08-26,7-dni,all-inclusive,z-rzeszowa,2dorosle"
+        ),
         available=True,
         room_type="Pokój standard",
         adults=2,
@@ -228,7 +231,7 @@ def sample_wakacje_offer():
                 service_id=1,
                 transport_id=1,
                 departure_slug="z-rzeszowa",
-                offer_page_path="/wczasy/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html",
+                offer_page_path="/oferty/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html",
                 adults=2,
                 children=0,
             ),
@@ -246,6 +249,101 @@ def sample_wakacje_offer():
 @pytest.mark.asyncio
 @respx.mock
 async def test_search_happy_path(wakacjepl_provider):
+    cell = MarketCell(
+        country="GR",
+        month="2026-08",
+        min_stars=5,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    mock_response = {
+        "success": True,
+        "data": {
+            "count": 1,
+            "offers": [
+                {
+                    "offerId": 916232,
+                    "name": "Kakkos Terra Blue",
+                    "place": {
+                        "country": {"id": 29, "name": "Grecja", "slug": "grecja"},
+                        "region": {"id": 29004, "name": "Kreta", "slug": "kreta"},
+                        "city": {
+                            "id": 29011912,
+                            "name": "Ierapetra",
+                            "slug": "ierapetra",
+                        },
+                    },
+                    "departureDate": "2026-08-26",
+                    "returnDate": "2026-09-02",
+                    "durationNights": 7,
+                    "departurePlace": "Rzeszów",
+                    "departurePlaceCode": "RZE",
+                    "service": 1,
+                    "category": 50,
+                    "ratingValue": 7.5,
+                    "ratingReservationCount": 40,
+                    "price": 6148,
+                    "roomType": "Pokój standard",
+                    "urlName": "kakkos-terra-blue",
+                    "hotelId": 17001,
+                    "tourOperator": 1588,
+                    "tourOpCode": "GRCS",
+                    "departureType": 1,
+                    "photos": {
+                        "570,428": [
+                            "/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
+                        ]
+                    },
+                }
+            ],
+        },
+    }
+
+    with patch("core.providers.wakacjepl.main.month_date_bounds") as mock_bounds:
+        mock_bounds.return_value = (date(2026, 8, 1), date(2026, 8, 31))
+
+        with (
+            patch.dict(wakacjepl_provider._country_ids, {"GR": "29"}),
+            patch.dict(wakacjepl_provider._service_values, {"all-inclusive": "1"}),
+            patch.dict(
+                wakacjepl_provider._departure_places_map,
+                {"RZE": {"name": "Rzeszów", "id": 1909, "slug": "z-rzeszowa"}},
+            ),
+        ):
+            respx.post(SEARCH_URL).mock(
+                return_value=httpx.Response(200, json=mock_response)
+            )
+            offers = await wakacjepl_provider.search(cell)
+
+            assert len(offers) == 1
+            offer = offers[0]
+            assert isinstance(offer, RawOffer)
+            assert offer.rating == Decimal("3.8")
+            assert offer.board == BoardType.ALL_INCLUSIVE
+            assert offer.stars == 5
+            assert offer.location == "Grecja/Kreta/Ierapetra"
+            assert offer.price_total == Decimal("6148.00")
+            assert offer.metadata.wakacje_pl.tour_op_code == "GRCS"
+            assert (
+                str(offer.referral_url)
+                == "https://www.wakacje.pl/oferty/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html"
+                "?od-2026-08-26,7-dni,all-inclusive,z-rzeszowa,2dorosle"
+            )
+            assert (
+                offer.metadata.wakacje_pl.offer_page_path
+                == "/oferty/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html"
+            )
+            assert (
+                str(offer.image_url)
+                == "https://www.wakacje.pl/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
+            )
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_search_maps_missing_photos_to_none_image_url(wakacjepl_provider):
     cell = MarketCell(
         country="GR",
         month="2026-08",
@@ -310,14 +408,7 @@ async def test_search_happy_path(wakacjepl_provider):
             offers = await wakacjepl_provider.search(cell)
 
             assert len(offers) == 1
-            offer = offers[0]
-            assert isinstance(offer, RawOffer)
-            assert offer.rating == Decimal("3.8")
-            assert offer.board == BoardType.ALL_INCLUSIVE
-            assert offer.stars == 5
-            assert offer.location == "Grecja/Kreta/Ierapetra"
-            assert offer.price_total == Decimal("6148.00")
-            assert offer.metadata.wakacje_pl.tour_op_code == "GRCS"
+            assert offers[0].image_url is None
 
 
 @pytest.mark.asyncio

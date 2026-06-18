@@ -157,6 +157,75 @@ async def test_search_api_failure(tui_provider):
 
 
 @pytest.fixture
+def tui_search_item():
+    return {
+        "offerCode": "TUI-OFFER-1",
+        "hotelName": "Test Hotel",
+        "boardCode": "GT06-AI",
+        "city": "Hurghada",
+        "breadcrumbs": [
+            {"label": "Egipt"},
+            {"label": "Hurghada"},
+            {"label": "Hurghada City"},
+        ],
+        "departureDate": "12.07.2026",
+        "returnDate": "19.07.2026",
+        "offerUrl": "/wypoczynek/eg-test",
+        "discountFullPrice": 5000,
+        "discountPerPersonPrice": 2500,
+        "hotelStandard": 4,
+        "tripAdvisorRating": 4.5,
+        "tripAdvisorReviewsNo": 100,
+        "departureFlight": {"departure": {"airportCode": "WAW"}},
+        "roomName": "Family Room Standard",
+    }
+
+
+@pytest.fixture
+def tui_search_cell():
+    return MarketCell(
+        country="EG",
+        month="2026-07",
+        min_stars=4,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+
+
+def test_map_search_offer_image_url(tui_provider, tui_search_item, tui_search_cell):
+    item = {
+        **tui_search_item,
+        "imageUrl": "https://r.cdn.redgalaxy.com/scale/o2/TUI/hotels/example.jpg?quality=80",
+    }
+
+    with patch("core.providers.tui.main.month_date_bounds") as mock_bounds:
+        mock_bounds.return_value = (date(2026, 7, 1), date(2026, 7, 31))
+        offer = tui_provider._map_search_offer(item, cell=tui_search_cell)
+
+    assert offer is not None
+    assert (
+        str(offer.image_url)
+        == "https://r.cdn.redgalaxy.com/scale/o2/TUI/hotels/example.jpg?quality=80"
+    )
+
+
+@pytest.mark.parametrize("image_url", [None, "", "not-a-url"])
+def test_map_search_offer_missing_or_invalid_image_url(
+    tui_provider, tui_search_item, tui_search_cell, image_url
+):
+    item = {**tui_search_item, "imageUrl": image_url}
+
+    with patch("core.providers.tui.main.month_date_bounds") as mock_bounds:
+        mock_bounds.return_value = (date(2026, 7, 1), date(2026, 7, 31))
+        offer = tui_provider._map_search_offer(item, cell=tui_search_cell)
+
+    assert offer is not None
+    assert offer.image_url is None
+
+
+@pytest.fixture
 def sample_offer():
     return Offer(
         provider=ProviderName.TUI,

@@ -392,6 +392,7 @@ async def redis_client():
     await client.flushdb()
     await client.aclose()
 
+
 @pytest.mark.skipif(
     os.environ.get("RUN_REPO_INTEGRATION") != "1",
     reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
@@ -405,6 +406,7 @@ async def test_feed_repo_integration_version(redis_client):
     new_ver = await repo.increment_feed_version(user_id)
     assert new_ver == 1
     assert await repo.get_feed_version(user_id) == 1
+
 
 @pytest.mark.skipif(
     os.environ.get("RUN_REPO_INTEGRATION") != "1",
@@ -429,6 +431,7 @@ async def test_feed_repo_integration_zset(redis_client):
 
     page_desc = await repo.get_page(user_id, field, "desc", 1, offset=0, limit=10)
     assert page_desc == ["offer_int_3", "offer_int_1", "offer_int_2"]
+
 
 @pytest.mark.skipif(
     os.environ.get("RUN_REPO_INTEGRATION") != "1",
