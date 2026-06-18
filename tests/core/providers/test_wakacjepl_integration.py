@@ -5,8 +5,10 @@ from datetime import date
 import os
 import re
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import TypeVar
+
+from playwright.async_api import Browser, async_playwright
 
 from core.exceptions.provider import ProviderTimeoutException, TooManyRequestsException
 from core.models.cell import MarketCell
@@ -81,6 +83,16 @@ async def live_provider() -> WakacjePlProvider:
     )
     async with httpx.AsyncClient(timeout=30.0, limits=limits) as live_client:
         yield WakacjePlProvider(client=live_client)
+
+
+@pytest_asyncio.fixture
+async def playwright_browser() -> AsyncIterator[Browser]:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        try:
+            yield browser
+        finally:
+            await browser.close()
 
 
 @pytest.mark.asyncio
@@ -329,3 +341,38 @@ async def test_search_departure_date_bounds(live_provider: WakacjePlProvider):
             f"Offer {offer.external_offer_id} departure date {offer.departure_date} "
             f"falls outside requested month {cell.month}"
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live Wakacje.pl integration tests.",
+)
+async def test_referral_url_matches_offer_page(
+    live_provider: WakacjePlProvider,
+    playwright_browser: Browser,
+):
+    cell = MarketCell(
+        country="EG",
+        month=_next_month_bucket(),
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+    if not offers:
+        pytest.skip(
+            "Live Wakacje.pl search returned no offers for the configured next-month cell."
+        )
+
+    from tests.core.providers.utils import verify_wakacje_offer_urls
+
+    failures = await verify_wakacje_offer_urls(
+        playwright_browser,
+        offers,
+        live_provider._departure_places_map,
+    )
+    if failures:
+        pytest.fail("\n".join(failures))

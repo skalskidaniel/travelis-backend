@@ -45,6 +45,12 @@ pytest -k "test_name"            # filtered run
 - HTTP mocking: `respx` (used in provider tests to mock `httpx`).
 - Repository tests: use `moto` (DynamoDB) + `fakeredis` in `tests/core/repositories/conftest.py`.
 - Integration tests: gated behind `RUN_INTEGRATION_TESTS=1` env var. Live provider tests hit real TUI/wakacje.pl APIs.
+- Provider URL consistency integration tests (`RUN_PROVIDER_INTEGRATION=1`) require Playwright Chromium:
+
+```bash
+uv run playwright install chromium
+RUN_PROVIDER_INTEGRATION=1 pytest -xvs tests/core/providers/test_wakacjepl_integration.py -k referral_url
+```
 
 ## Architecture rules (not in agent-guidelines.md)
 

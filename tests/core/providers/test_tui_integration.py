@@ -375,3 +375,36 @@ async def test_search_departure_date_bounds(live_provider: TuiProvider):
             f"Offer {offer.external_offer_id} departure date {offer.departure_date} "
             f"falls outside requested month {cell.month}"
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.environ.get("RUN_PROVIDER_INTEGRATION") != "1",
+    reason="Set RUN_PROVIDER_INTEGRATION=1 to run live TUI integration tests.",
+)
+async def test_referral_url_matches_offer_page(live_provider: TuiProvider):
+    cell = MarketCell(
+        country="EG",
+        month=_next_month_bucket(),
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+    if not offers:
+        pytest.skip(
+            "Live TUI search returned no offers for the configured next-month cell."
+        )
+
+    from tests.core.providers.utils import PAGE_FETCH_HEADERS, verify_tui_offer_urls
+
+    async with httpx.AsyncClient(
+        timeout=30.0,
+        follow_redirects=True,
+        headers=PAGE_FETCH_HEADERS,
+    ) as page_client:
+        failures = await verify_tui_offer_urls(page_client, offers)
+    if failures:
+        pytest.fail("\n".join(failures))

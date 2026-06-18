@@ -38,9 +38,22 @@ from core.providers.wakacjepl.main import (  # noqa: E402
     WakacjePlProvider,
 )
 from core.providers.wakacjepl.utils import (  # noqa: E402
+    build_wakacje_offer_page_path,
     format_wakacje_date,
     representative_child_birthday,
 )
+
+
+def _offer_page_referer(search_item: dict[str, Any]) -> str:
+    place = search_item["place"]
+    offer_page_path = build_wakacje_offer_page_path(
+        country_slug=place["country"]["slug"],
+        region_slug=place["region"]["slug"],
+        city_slug=place["city"]["slug"],
+        url_name=search_item["urlName"],
+        offer_id=search_item["offerId"],
+    )
+    return f"https://www.wakacje.pl{offer_page_path}"
 
 
 def _next_month_yyyy_mm() -> str:
@@ -412,7 +425,7 @@ def _build_availability_spec(
     )
     headers = {
         "accept": "application/json",
-        "referer": f"https://www.wakacje.pl/wczasy/{place['country']['slug']}/{place['region']['slug']}/{place['city']['slug']}/{search_item['urlName']}-{search_item['offerId']}.html",
+        "referer": _offer_page_referer(search_item),
         "customHeaders": custom_headers,
     }
 
@@ -496,7 +509,7 @@ async def run_probe(args: argparse.Namespace) -> Path:
                 "accept": "application/json",
                 "content-type": "application/json",
                 "origin": "https://www.wakacje.pl",
-                "referer": f"https://www.wakacje.pl/wczasy/{search_item['place']['country']['slug']}/{search_item['place']['region']['slug']}/{search_item['place']['city']['slug']}/{search_item['urlName']}-{search_item['offerId']}.html",
+                "referer": _offer_page_referer(search_item),
             },
             payload=_build_calculator_payload(search_item, args.adults, args.children),
             payload_mode="json",

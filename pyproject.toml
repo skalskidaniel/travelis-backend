@@ -26,6 +26,7 @@ dev = [
     "fakeredis[lua]>=2.36.2",
     "ipykernel>=7.3.0",
     "moto[dynamodb]>=5.2.2",
+    "playwright>=1.60.0",
     "pytest>=9.1.0",
     "pytest-asyncio>=1.4.0",
     "pytest-xdist>=3.8.0",
