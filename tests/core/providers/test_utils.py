@@ -71,7 +71,7 @@ def test_verify_wakacje_rendered_page_passes_for_matching_text():
     offer = _sample_raw_offer()
     page_text = (
         "Jaz Lamaya Resort\n2 dorosłych\n25.07.2026 - 28.07.2026 / 3 nocy\n"
-        "Gdańsk\nAll Inclusive\nCena razem"
+        "Gdańsk\nAll Inclusive\nCena razem\n5000"
     )
     failures = verify_wakacje_rendered_page(
         offer=offer,

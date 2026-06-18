@@ -351,13 +351,17 @@ async def test_search_departure_date_bounds(live_provider: TuiProvider):
         )
 
 
+@pytest.mark.parametrize("board", list(BoardType))
 @pytest.mark.asyncio
-async def test_referral_url_matches_offer_page(live_provider: TuiProvider):
+async def test_referral_url_matches_offer_page(
+    live_provider: TuiProvider,
+    board: BoardType,
+):
     cell = MarketCell(
         country="EG",
         month=_next_month_bucket(),
         min_stars=3,
-        board=BoardType.ALL_INCLUSIVE,
+        board=board,
         adults=2,
         children=0,
         activation_count=1,
@@ -365,10 +369,14 @@ async def test_referral_url_matches_offer_page(live_provider: TuiProvider):
     offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
     if not offers:
         pytest.skip(
-            "Live TUI search returned no offers for the configured next-month cell."
+            f"Live TUI search returned no offers for next-month cell with board {board.value}."
         )
 
-    from tests.core.providers.utils import PAGE_FETCH_HEADERS, verify_tui_offer_urls
+    from tests.core.providers.utils import (
+        PAGE_FETCH_HEADERS,
+        verify_tui_offer_urls,
+        offer_url_check_sample_size,
+    )
 
     async with httpx.AsyncClient(
         timeout=30.0,
@@ -376,5 +384,27 @@ async def test_referral_url_matches_offer_page(live_provider: TuiProvider):
         headers=PAGE_FETCH_HEADERS,
     ) as page_client:
         failures = await verify_tui_offer_urls(page_client, offers)
+
+    sample_size = offer_url_check_sample_size()
+    for offer in offers[:sample_size]:
+        try:
+            price = await live_provider.check_price(offer)
+            if price <= 0:
+                failures.append(
+                    f"offer={offer.external_offer_id}: check_price returned non-positive price {price}"
+                )
+            else:
+                diff_pct = abs(price - offer.price_total) / offer.price_total
+                if diff_pct > 0.10:
+                    failures.append(
+                        f"offer={offer.external_offer_id}: price mismatch: "
+                        f"check_price={price}, search price={offer.price_total} "
+                        f"(diff={diff_pct:.2%})"
+                    )
+        except Exception as error:
+            failures.append(
+                f"offer={offer.external_offer_id}: check_price failed: {error}"
+            )
+
     if failures:
         pytest.fail("\n".join(failures))

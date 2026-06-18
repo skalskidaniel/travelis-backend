@@ -242,6 +242,19 @@ def verify_wakacje_rendered_page(
     if not board_label_matches(offer.board, page_text):
         failures.append(f"board {offer.board.value!r} not found on rendered page")
 
+    price_val = int(offer.price_total)
+    price_str = str(price_val)
+    price_space_formatted = f"{price_val:,}".replace(",", " ")
+    price_nbsp_formatted = f"{price_val:,}".replace(",", "\xa0")
+    if (
+        price_str not in normalized_text
+        and price_space_formatted not in normalized_text
+        and price_nbsp_formatted not in normalized_text
+    ):
+        failures.append(
+            f"price {price_val} not found on rendered page"
+        )
+
     return failures
 
 
