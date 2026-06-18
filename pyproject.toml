@@ -20,6 +20,10 @@ entrypoint = "app.main:app"
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 addopts = "-rf"
+markers = [
+    "provider_integration: marks test as a provider integration test",
+    "repo_integration: marks test as a repo integration test",
+]
 
 [dependency-groups]
 dev = [

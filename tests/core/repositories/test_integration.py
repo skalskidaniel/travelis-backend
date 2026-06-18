@@ -21,7 +21,7 @@ from core.repositories.user_offers import DynamoUserOffersRepository
 import redis.asyncio as aioredis
 from core.repositories.feed import RedisFeedRepository
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.repo_integration]
 
 ENDPOINT_URL = os.environ.get("DYNAMODB_ENDPOINT_URL", "http://localhost:8000")
 
@@ -119,10 +119,6 @@ async def user_offers_table(dynamodb_resource):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.environ.get("RUN_REPO_INTEGRATION") != "1",
-    reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
-)
 async def test_cells_repo_integration_lifecycle(cells_table):
     repo = DynamoCellsRepository(cells_table)
 
@@ -210,10 +206,6 @@ def test_offer():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.environ.get("RUN_REPO_INTEGRATION") != "1",
-    reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
-)
 async def test_offers_repo_integration_lifecycle(offers_table, test_offer):
     repo = DynamoOffersRepository(offers_table)
 
@@ -234,10 +226,6 @@ async def test_offers_repo_integration_lifecycle(offers_table, test_offer):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.environ.get("RUN_REPO_INTEGRATION") != "1",
-    reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
-)
 async def test_offers_repo_integration_batch(offers_table, test_offer):
     repo = DynamoOffersRepository(offers_table)
 
@@ -286,10 +274,6 @@ def test_user():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.environ.get("RUN_REPO_INTEGRATION") != "1",
-    reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
-)
 async def test_users_repo_integration_lifecycle(users_table, test_user):
     repo = DynamoUsersRepository(users_table)
 
@@ -318,10 +302,6 @@ async def test_users_repo_integration_lifecycle(users_table, test_user):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.environ.get("RUN_REPO_INTEGRATION") != "1",
-    reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
-)
 async def test_user_offers_repo_integration_lifecycle(user_offers_table):
     repo = DynamoUserOffersRepository(user_offers_table)
 
@@ -346,10 +326,6 @@ async def test_user_offers_repo_integration_lifecycle(user_offers_table):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.environ.get("RUN_REPO_INTEGRATION") != "1",
-    reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
-)
 async def test_user_offers_repo_integration_batch(user_offers_table):
     repo = DynamoUserOffersRepository(user_offers_table)
 
@@ -393,10 +369,6 @@ async def redis_client():
     await client.aclose()
 
 
-@pytest.mark.skipif(
-    os.environ.get("RUN_REPO_INTEGRATION") != "1",
-    reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
-)
 async def test_feed_repo_integration_version(redis_client):
     repo = RedisFeedRepository(redis_client)
 
@@ -408,10 +380,6 @@ async def test_feed_repo_integration_version(redis_client):
     assert await repo.get_feed_version(user_id) == 1
 
 
-@pytest.mark.skipif(
-    os.environ.get("RUN_REPO_INTEGRATION") != "1",
-    reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
-)
 async def test_feed_repo_integration_zset(redis_client):
     repo = RedisFeedRepository(redis_client)
 
@@ -433,10 +401,6 @@ async def test_feed_repo_integration_zset(redis_client):
     assert page_desc == ["offer_int_3", "offer_int_1", "offer_int_2"]
 
 
-@pytest.mark.skipif(
-    os.environ.get("RUN_REPO_INTEGRATION") != "1",
-    reason="Set RUN_REPO_INTEGRATION=1 to run live Wakacje.pl integration tests.",
-)
 async def test_feed_repo_integration_clear_user(redis_client):
     repo = RedisFeedRepository(redis_client)
 

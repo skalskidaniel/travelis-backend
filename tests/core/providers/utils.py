@@ -101,9 +101,7 @@ def verify_tui_offer_page(
     title = title_match.group(1) if title_match else ""
     hotel_token = hotel_title_token(offer.hotel_name)
     if hotel_token and hotel_token not in title.lower():
-        failures.append(
-            f"hotel token {hotel_token!r} not in page title {title!r}"
-        )
+        failures.append(f"hotel token {hotel_token!r} not in page title {title!r}")
 
     try:
         offer_code_data = parse_tui_offer_code_data(html)
@@ -181,13 +179,9 @@ def verify_wakacje_referral_url(offer: RawOffer) -> list[str]:
         return failures
 
     if meta.offer_page_path not in url:
-        failures.append(
-            f"offer page path {meta.offer_page_path!r} not in referral URL"
-        )
+        failures.append(f"offer page path {meta.offer_page_path!r} not in referral URL")
     if meta.departure_slug not in url:
-        failures.append(
-            f"departure slug {meta.departure_slug!r} not in referral URL"
-        )
+        failures.append(f"departure slug {meta.departure_slug!r} not in referral URL")
     if f"od-{offer.departure_date.isoformat()}" not in url:
         failures.append(
             f"departure date selector od-{offer.departure_date.isoformat()} "
@@ -271,7 +265,9 @@ async def wait_for_wakacje_booking_widget(page: Page, *, offer: RawOffer) -> Non
     await page.wait_for_timeout(1_500)
 
 
-async def open_wakacje_offer_page(page: Page, referral_url: str, *, offer: RawOffer) -> str:
+async def open_wakacje_offer_page(
+    page: Page, referral_url: str, *, offer: RawOffer
+) -> str:
     last_error: Exception | None = None
     for attempt in range(1, 3):
         try:
@@ -297,7 +293,9 @@ async def fetch_and_verify_wakacje_offer_url(
     offer: RawOffer,
 ) -> list[str]:
     failures = verify_wakacje_referral_url(offer)
-    page_text = await open_wakacje_offer_page(page, str(offer.referral_url), offer=offer)
+    page_text = await open_wakacje_offer_page(
+        page, str(offer.referral_url), offer=offer
+    )
     failures.extend(
         verify_wakacje_rendered_page(
             offer=offer,

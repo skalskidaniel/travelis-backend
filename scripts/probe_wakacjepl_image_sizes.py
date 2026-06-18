@@ -86,7 +86,21 @@ def _read_image_pixel_size(data: bytes) -> tuple[int, int] | None:
             if data[offset] != 0xFF:
                 return None
             marker = data[offset + 1]
-            if marker in {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}:
+            if marker in {
+                0xC0,
+                0xC1,
+                0xC2,
+                0xC3,
+                0xC5,
+                0xC6,
+                0xC7,
+                0xC9,
+                0xCA,
+                0xCB,
+                0xCD,
+                0xCE,
+                0xCF,
+            }:
                 height = struct.unpack(">H", data[offset + 5 : offset + 7])[0]
                 width = struct.unpack(">H", data[offset + 7 : offset + 9])[0]
                 return width, height
@@ -308,7 +322,9 @@ def _analyze_offer(
         matches = True
         notes.append("downloaded pixels match requested size")
     elif pixel_dimensions is not None:
-        notes.append(f"downloaded pixels are {pixel_dimensions[0]}x{pixel_dimensions[1]}")
+        notes.append(
+            f"downloaded pixels are {pixel_dimensions[0]}x{pixel_dimensions[1]}"
+        )
 
     return SizeProbeResult(
         requested=requested,
@@ -342,11 +358,7 @@ def _print_table(rows: list[dict[str, Any]], *, show_pixels: bool) -> None:
     print(header)
     print("-" * len(header))
     for row in rows:
-        print(
-            " ".join(
-                str(row[col]).ljust(width)[:width] for col, width in columns
-            )
-        )
+        print(" ".join(str(row[col]).ljust(width)[:width] for col, width in columns))
 
 
 async def run_probe(args: argparse.Namespace) -> int:
@@ -382,11 +394,11 @@ async def run_probe(args: argparse.Namespace) -> int:
 
         hotel_id = int(baseline_offer["hotelId"])
         target_offer_id = str(baseline_offer["offerId"])
-        hotel_name = baseline_offer.get("hotelName") or baseline_offer.get("name") or "?"
-
-        print(
-            f"Pinned offer {target_offer_id} ({hotel_name}) via hotelId={hotel_id}\n"
+        hotel_name = (
+            baseline_offer.get("hotelName") or baseline_offer.get("name") or "?"
         )
+
+        print(f"Pinned offer {target_offer_id} ({hotel_name}) via hotelId={hotel_id}\n")
 
         results: list[SizeProbeResult] = []
         for requested in args.sizes:
@@ -398,9 +410,7 @@ async def run_probe(args: argparse.Namespace) -> int:
                 hotel_id=hotel_id,
                 target_offer_id=target_offer_id,
             )
-            image_url = (
-                parse_wakacje_image_url(offer.get("photos")) if offer else None
-            )
+            image_url = parse_wakacje_image_url(offer.get("photos")) if offer else None
             pixel_dims = None
             if args.fetch_pixels and image_url:
                 pixel_dims, fetch_status = await _fetch_pixel_size(
@@ -423,7 +433,11 @@ async def run_probe(args: argparse.Namespace) -> int:
                 pixel_dimensions=pixel_dims,
             )
             if result_notes_extra:
-                result.notes = f"{result.notes}; {result_notes_extra}" if result.notes else result_notes_extra
+                result.notes = (
+                    f"{result.notes}; {result_notes_extra}"
+                    if result.notes
+                    else result_notes_extra
+                )
             results.append(result)
             if args.delay_seconds:
                 await asyncio.sleep(args.delay_seconds)
@@ -435,9 +449,7 @@ async def run_probe(args: argparse.Namespace) -> int:
     distinct_keys = sorted({",".join(r.photo_keys) or "-" for r in results})
     distinct_url_dims = sorted(
         {
-            f"{r.url_dimensions[0]}x{r.url_dimensions[1]}"
-            if r.url_dimensions
-            else "-"
+            f"{r.url_dimensions[0]}x{r.url_dimensions[1]}" if r.url_dimensions else "-"
             for r in results
         }
     )

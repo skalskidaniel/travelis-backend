@@ -39,10 +39,8 @@ def test_build_wakacje_occupancy_selector_with_one_child():
         == "2dorosle-1dziecko-20180101"
     )
 
-@pytest.mark.parametrize(
-    "children_count",
-    [2, 3, 4, 5]
-)
+
+@pytest.mark.parametrize("children_count", [2, 3, 4, 5])
 def test_build_wakacje_occupancy_selector_with_multiple_children(children_count):
     today = date(2026, 6, 18)
     expected_birthdays = "-".join(["20180101"] * children_count)
@@ -50,6 +48,7 @@ def test_build_wakacje_occupancy_selector_with_multiple_children(children_count)
         build_wakacje_occupancy_selector(2, children_count, today=today)
         == f"2dorosle-{children_count}dzieci-{expected_birthdays}"
     )
+
 
 def test_build_wakacje_offer_selector():
     today = date(2026, 6, 18)
@@ -69,9 +68,7 @@ def test_build_wakacje_offer_selector():
 
 def test_parse_wakacje_image_url_relative_path():
     photos = {
-        "570,428": [
-            "/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
-        ]
+        "570,428": ["/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"]
     }
     assert (
         parse_wakacje_image_url(photos)
@@ -80,9 +77,7 @@ def test_parse_wakacje_image_url_relative_path():
 
 
 def test_parse_wakacje_image_url_absolute_path():
-    photos = {
-        "570,428": ["https://i.wakacje.pl/media/hotel/example.jpg"]
-    }
+    photos = {"570,428": ["https://i.wakacje.pl/media/hotel/example.jpg"]}
     assert (
         parse_wakacje_image_url(photos)
         == "https://i.wakacje.pl/media/hotel/example.jpg"
@@ -97,8 +92,7 @@ def test_parse_wakacje_image_url_picks_first():
         ]
     }
     assert (
-        parse_wakacje_image_url(photos)
-        == "https://i.wakacje.pl/media/hotel/first.jpg"
+        parse_wakacje_image_url(photos) == "https://i.wakacje.pl/media/hotel/first.jpg"
     )
 
 

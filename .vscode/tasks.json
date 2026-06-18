@@ -15,15 +15,41 @@
       "problemMatcher": []
     },
     {
-      "label": "Pytest: Integration Tests",
+      "label": "Pytest: Provider Integration Tests",
       "type": "shell",
-      "command": "docker stop dynamodb-local-test redis-test >/dev/null 2>&1 || true; docker run -d --name dynamodb-local-test --rm -p 8000:8000 amazon/dynamodb-local && docker run -d --name redis-test --rm -p 6379:6379 dhi.io/redis:8-debian-dev redis-server --protected-mode no && sleep 2 && uv run pytest; EXIT_CODE=$?; docker stop dynamodb-local-test redis-test; exit $EXIT_CODE",
+      "command": "uv run pytest --run-provider",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/src"
+        }
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Pytest: Repository Integration Tests",
+      "type": "shell",
+      "command": "docker stop dynamodb-local-test redis-test >/dev/null 2>&1 || true; docker run -d --name dynamodb-local-test --rm -p 8000:8000 amazon/dynamodb-local && docker run -d --name redis-test --rm -p 6379:6379 dhi.io/redis:8-debian-dev redis-server --protected-mode no && sleep 2 && uv run pytest --run-repo; EXIT_CODE=$?; docker stop dynamodb-local-test redis-test; exit $EXIT_CODE",
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {
           "PYTHONPATH": "${workspaceFolder}/src",
-          "RUN_REPO_INTEGRATION": "1",
-          "RUN_PROVIDER_INTEGRATION": "1",
+          "DYNAMODB_ENDPOINT_URL": "http://localhost:8000",
+          "REDIS_URL": "redis://localhost:6379/0"
+        }
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Pytest: All Integration Tests",
+      "type": "shell",
+      "command": "docker stop dynamodb-local-test redis-test >/dev/null 2>&1 || true; docker run -d --name dynamodb-local-test --rm -p 8000:8000 amazon/dynamodb-local && docker run -d --name redis-test --rm -p 6379:6379 dhi.io/redis:8-debian-dev redis-server --protected-mode no && sleep 2 && uv run pytest --run-repo --run-provider; EXIT_CODE=$?; docker stop dynamodb-local-test redis-test; exit $EXIT_CODE",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/src",
           "DYNAMODB_ENDPOINT_URL": "http://localhost:8000",
           "REDIS_URL": "redis://localhost:6379/0"
         }
