@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import date, datetime, timezone
 import pandas as pd
@@ -11,7 +12,7 @@ from core.repositories.base import (
     FeedRepository,
 )
 from core.services.activation import generate_required_cells, ActivationService
-from core.services.notifications import NotificationsService
+from core.services.notifications import NotificationsService, PushSendResult
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,9 @@ class MatchingService:
             offers.extend(cell_offers)
 
         # 4. Filter offers in Python using Pandas/NumPy
-        matched_offers = self._filter_offers_vectorized(offers, prefs)
+        matched_offers = await asyncio.to_thread(
+            self._filter_offers_vectorized, offers, prefs
+        )
 
         # 5. Sync UserOffers rows
         existing_items = await self.user_offers_repo.query_by_user(user_id)
@@ -114,9 +117,13 @@ class MatchingService:
         if feed_changed:
             await self.feed_repo.increment_feed_version(user_id)
             if user.push_enabled and user.push_subscription:
-                await self.notifications_service.send_random_notification(
+                result = await self.notifications_service.send_random_notification(
                     user.push_subscription
                 )
+                if result is PushSendResult.EXPIRED:
+                    await self.users_repo.update_push(
+                        user_id, enabled=False, subscription=None
+                    )
 
         return feed_changed
 

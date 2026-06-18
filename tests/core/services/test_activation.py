@@ -1,8 +1,6 @@
 from datetime import date
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-
-from core.exceptions.repository import ItemNotFoundException
 from core.models.cell import MarketCell
 from core.models.common import BoardType
 from core.models.user import UserPreferences
@@ -62,9 +60,8 @@ def test_generate_required_cells():
 @pytest.mark.asyncio
 async def test_update_cell_activations():
     cells_repo = MagicMock()
-    cells_repo.increment_activations = AsyncMock(return_value={})
+    cells_repo.activate_cells = AsyncMock(return_value={})
     cells_repo.decrement_activations = AsyncMock()
-    cells_repo.put = AsyncMock()
 
     service = ActivationService(cells_repo)
 
@@ -86,18 +83,16 @@ async def test_update_cell_activations():
     dec_args = cells_repo.decrement_activations.call_args[0][0]
     assert len(dec_args) == 1
 
-    cells_repo.increment_activations.assert_called_once()
-    inc_args = cells_repo.increment_activations.call_args[0][0]
-    assert len(inc_args) == 1
+    cells_repo.activate_cells.assert_called_once()
+    activated_cells = cells_repo.activate_cells.call_args[0][0]
+    assert len(activated_cells) == 1
+    assert activated_cells[0].country == "IT"
 
 
 @pytest.mark.asyncio
 async def test_update_cell_activations_creates_missing_cell():
     cells_repo = MagicMock()
-    cells_repo.increment_activations = AsyncMock(
-        side_effect=ItemNotFoundException("missing")
-    )
-    cells_repo.put = AsyncMock()
+    cells_repo.activate_cells = AsyncMock(return_value={})
 
     service = ActivationService(cells_repo)
 
@@ -110,9 +105,8 @@ async def test_update_cell_activations_creates_missing_cell():
     ref = date(2026, 6, 15)
     await service.update_cell_activations(new_prefs, None, ref)
 
-    cells_repo.increment_activations.assert_called_once()
-    cells_repo.put.assert_called_once()
-    created_cell = cells_repo.put.call_args[0][0]
+    cells_repo.activate_cells.assert_called_once()
+    created_cell = cells_repo.activate_cells.call_args[0][0][0]
     assert isinstance(created_cell, MarketCell)
     assert created_cell.country == "GR"
     assert created_cell.month == "2026-07"

@@ -67,6 +67,44 @@ class DynamoCellsRepository(CellsRepository):
         results = await asyncio.gather(*[_update(cid) for cid in cell_ids])
         return dict(results)
 
+    async def activate_cells(self, cells: list[MarketCell]) -> dict[str, int]:
+        if not cells:
+            return {}
+
+        async def _activate(cell: MarketCell) -> tuple[str, int]:
+            if cell.cell_id is None:
+                msg = "cell_id is required to activate a market cell"
+                raise ValueError(msg)
+
+            response = await self.table.update_item(
+                Key={"cell_id": cell.cell_id},
+                UpdateExpression=(
+                    "SET country = if_not_exists(country, :country), "
+                    "#month = if_not_exists(#month, :month), "
+                    "min_stars = if_not_exists(min_stars, :min_stars), "
+                    "board = if_not_exists(board, :board), "
+                    "adults = if_not_exists(adults, :adults), "
+                    "children = if_not_exists(children, :children) "
+                    "ADD activation_count :one"
+                ),
+                ExpressionAttributeNames={"#month": "month"},
+                ExpressionAttributeValues={
+                    ":country": cell.country,
+                    ":month": cell.month,
+                    ":min_stars": cell.min_stars,
+                    ":board": cell.board.value,
+                    ":adults": cell.adults,
+                    ":children": cell.children,
+                    ":one": 1,
+                },
+                ReturnValues="UPDATED_NEW",
+            )
+            new_count = int(response["Attributes"]["activation_count"])
+            return cell.cell_id, new_count
+
+        results = await asyncio.gather(*[_activate(cell) for cell in cells])
+        return dict(results)
+
     async def decrement_activations(self, cell_ids: list[str]) -> dict[str, int]:
         if not cell_ids:
             return {}

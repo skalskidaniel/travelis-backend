@@ -110,20 +110,21 @@ On `PATCH /api/v2/user/preferences`:
 For each claimed user:
 
 1. Load preferences.
-2. Resolve required `cell_id` set.
-3. Query `Offers` for those cells.
-4. Filter in Python using the user's exact preferences:
+2. **Self-healing month shift** (open-ended dates only): when `date_from` and `date_to` are both unset, matching compares the reference date to the month stored in `user.updated_at`. If the calendar month changed, re-run cell activation for the rolling 9-month window anchored to the new reference date, then persist `updated_at` with the new month. This keeps active cells aligned with "Any" travel dates without a sweeper cron. Users who never match still rely on the next preference PATCH or bulk post-scrape match to refresh cells.
+3. Resolve required `cell_id` set.
+4. Query `Offers` for those cells.
+5. Filter in Python using the user's exact preferences:
    - Match departure airports (if list is not empty `[]`).
    - Match exact stay duration bounds (`duration_min` to `duration_max`).
    - Match travel date range (`date_from` to `date_to`).
    - Match minimum TripAdvisor rating (`min_rating`).
    - Match children exact ages/birthdays (re-checking suitability if children are present).
-5. **Sync `UserOffers` rows**:
+6. **Sync `UserOffers` rows**:
    - Query existing `UserOffers` keys for the user.
    - Diff the new matches against the old matches.
    - Batch-delete obsolete matches and batch-write new matches (limits DynamoDB write churn).
-6. Rebuild Redis feed (increment `feed_version`, invalidating cached ZSETs).
-7. If push enabled and feed changed → send generic _"New deals available"_ notification (in Polish language).
+7. Rebuild Redis feed (increment `feed_version`, invalidating cached ZSETs).
+8. If push enabled and feed changed → send generic _"New deals available"_ notification (in Polish language). If the push endpoint returns HTTP 404/410 (expired subscription), disable push on the user record.
 
 ## Availability check (`jobs.availability`)
 

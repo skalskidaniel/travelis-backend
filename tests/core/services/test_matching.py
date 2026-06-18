@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,6 +12,74 @@ from core.models.user import (
 )
 from core.services.activation import generate_required_cells
 from core.services.matching import MatchingService
+from core.services.notifications import PushSendResult
+
+
+def make_offer(
+    *,
+    offer_id: str = "0123456789abcdef0123456789abcdef",
+    departure_airport: str = "WAW",
+    departure_date: date = date(2026, 7, 10),
+    return_date: date | None = None,
+    duration: int | None = None,
+    rating: float = 4.5,
+    children: int = 0,
+) -> Offer:
+    if return_date is None:
+        resolved_return_date = date.fromordinal(departure_date.toordinal() + 7)
+    else:
+        resolved_return_date = return_date
+    resolved_duration = duration
+    if resolved_duration is None:
+        resolved_duration = (resolved_return_date - departure_date).days
+    ttl = int(
+        datetime.combine(departure_date, time.min, tzinfo=timezone.utc).timestamp()
+    )
+    meta_wak = WakacjePlMetadata(
+        hotel_id=123,
+        tour_operator_id=456,
+        tour_op_code="TUIY",
+        country_id=1,
+        region_id=2,
+        city_id=3,
+        departure_city_id=4,
+        service_id=1,
+        transport_id=1,
+        departure_slug="z-warszawy",
+        offer_page_path="/oferta-123.html",
+        adults=2,
+        children=children,
+    )
+    return Offer(
+        cell_id="0123456789abcdef",
+        offer_id=offer_id,
+        provider=ProviderName.WAKACJE_PL,
+        external_offer_id=f"wak_{offer_id[:8]}",
+        hotel_name="Greece Resort",
+        location="GR/Crete/Chania",
+        departure_airport=departure_airport,
+        departure_date=departure_date,
+        return_date=resolved_return_date,
+        duration=resolved_duration,
+        board=BoardType.ALL_INCLUSIVE,
+        stars=4,
+        rating=rating,
+        review_count=100,
+        price_total=3000.0,
+        price_per_day_one_person=428.5,
+        attractiveness_score=0.8,
+        referral_url="https://wakacje.pl/ref1",
+        image_url="https://image.com/1",
+        available=True,
+        room_type="Double Room",
+        adults=2,
+        children=children,
+        metadata=OfferMetadata(price_z_score=-1.5, wakacje_pl=meta_wak),
+        share_url=f"https://wakacje-travelis.pl/offer/0123456789abcdef/{offer_id}",
+        scraped_at=datetime(2026, 6, 18, 12, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 18, 12, 0, 0, tzinfo=timezone.utc),
+        ttl=ttl,
+    )
 
 
 @pytest.fixture
@@ -244,3 +312,150 @@ async def test_bulk_match_users(test_user):
         )
         assert matched == []
         mock_match.assert_not_called()
+
+
+def test_filter_departure_airports():
+    service = MatchingService(
+        users_repo=MagicMock(),
+        offers_repo=MagicMock(),
+        user_offers_repo=MagicMock(),
+        feed_repo=MagicMock(),
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+    prefs = UserPreferences(
+        countries=["GR"],
+        departure_airports=["WAW"],
+        min_rating=4,
+    )
+    offers = [
+        make_offer(offer_id="a" * 32, departure_airport="WAW"),
+        make_offer(offer_id="b" * 32, departure_airport="KRK"),
+    ]
+
+    matched = service._filter_offers_vectorized(offers, prefs)
+
+    assert [o.offer_id for o in matched] == ["a" * 32]
+
+
+def test_filter_duration_bounds():
+    service = MatchingService(
+        users_repo=MagicMock(),
+        offers_repo=MagicMock(),
+        user_offers_repo=MagicMock(),
+        feed_repo=MagicMock(),
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+    prefs = UserPreferences(
+        countries=["GR"],
+        min_rating=4,
+        duration_min=5,
+        duration_max=7,
+    )
+    offers = [
+        make_offer(
+            offer_id="a" * 32,
+            departure_date=date(2026, 7, 1),
+            return_date=date(2026, 7, 5),
+            duration=4,
+        ),
+        make_offer(
+            offer_id="b" * 32,
+            departure_date=date(2026, 7, 1),
+            return_date=date(2026, 7, 6),
+            duration=5,
+        ),
+        make_offer(
+            offer_id="c" * 32,
+            departure_date=date(2026, 7, 1),
+            return_date=date(2026, 7, 8),
+            duration=7,
+        ),
+        make_offer(
+            offer_id="d" * 32,
+            departure_date=date(2026, 7, 1),
+            return_date=date(2026, 7, 9),
+            duration=8,
+        ),
+    ]
+
+    matched = service._filter_offers_vectorized(offers, prefs)
+
+    assert [o.offer_id for o in matched] == ["b" * 32, "c" * 32]
+
+
+def test_filter_date_range():
+    service = MatchingService(
+        users_repo=MagicMock(),
+        offers_repo=MagicMock(),
+        user_offers_repo=MagicMock(),
+        feed_repo=MagicMock(),
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+    prefs = UserPreferences(
+        countries=["GR"],
+        min_rating=4,
+        date_from=date(2026, 7, 1),
+        date_to=date(2026, 7, 31),
+    )
+    offers = [
+        make_offer(
+            offer_id="a" * 32,
+            departure_date=date(2026, 6, 28),
+            return_date=date(2026, 7, 5),
+        ),
+        make_offer(
+            offer_id="b" * 32,
+            departure_date=date(2026, 7, 5),
+            return_date=date(2026, 7, 12),
+        ),
+        make_offer(
+            offer_id="c" * 32,
+            departure_date=date(2026, 7, 20),
+            return_date=date(2026, 8, 5),
+        ),
+    ]
+
+    matched = service._filter_offers_vectorized(offers, prefs)
+
+    assert [o.offer_id for o in matched] == ["b" * 32]
+
+
+@pytest.mark.asyncio
+async def test_match_user_offers_disables_expired_push(test_user, mock_offers):
+    users_repo = MagicMock()
+    users_repo.get = AsyncMock(return_value=test_user)
+    users_repo.update_push = AsyncMock()
+
+    offers_repo = MagicMock()
+    offers_repo.query_by_cell = AsyncMock(return_value=mock_offers)
+
+    user_offers_repo = MagicMock()
+    user_offers_repo.query_by_user = AsyncMock(return_value=[])
+    user_offers_repo.delete_batch = AsyncMock()
+    user_offers_repo.put_batch = AsyncMock()
+
+    feed_repo = MagicMock()
+    feed_repo.increment_feed_version = AsyncMock()
+
+    notifications_service = MagicMock()
+    notifications_service.send_random_notification = AsyncMock(
+        return_value=PushSendResult.EXPIRED
+    )
+
+    service = MatchingService(
+        users_repo=users_repo,
+        offers_repo=offers_repo,
+        user_offers_repo=user_offers_repo,
+        feed_repo=feed_repo,
+        notifications_service=notifications_service,
+        activation_service=MagicMock(),
+    )
+
+    await service.match_user_offers("usr_123", date(2026, 6, 18))
+
+    users_repo.update_push.assert_called_once_with(
+        "usr_123", enabled=False, subscription=None
+    )

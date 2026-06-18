@@ -1,7 +1,5 @@
-import asyncio
 from datetime import date
 
-from core.exceptions.repository import ItemNotFoundException
 from core.models.cell import MarketCell
 from core.models.user import UserPreferences
 from core.repositories.base import CellsRepository
@@ -120,15 +118,7 @@ class ActivationService:
         if to_deactivate_ids:
             await self.cells_repo.decrement_activations(list(to_deactivate_ids))
 
-        # 2. Increment new cells (or create if missing)
-        async def _activate_cell(cell_id: str) -> None:
-            try:
-                await self.cells_repo.increment_activations([cell_id])
-            except ItemNotFoundException:
-                # Cell not registered yet. Create it.
-                cell = new_cells[cell_id]
-                # Default: last_scraped_at = None, activation_count = 1
-                await self.cells_repo.put(cell)
-
+        # 2. Atomically create or increment new cells
         if to_activate_ids:
-            await asyncio.gather(*[_activate_cell(cid) for cid in to_activate_ids])
+            cells_to_activate = [new_cells[cell_id] for cell_id in to_activate_ids]
+            await self.cells_repo.activate_cells(cells_to_activate)

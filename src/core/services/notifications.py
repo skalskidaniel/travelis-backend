@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import random
+from enum import Enum
 
 from pywebpush import webpush, WebPushException
 
@@ -24,6 +25,15 @@ NOTIFICATION_TEMPLATES = [
     },
 ]
 
+EXPIRED_SUBSCRIPTION_STATUS_CODES = frozenset({404, 410})
+
+
+class PushSendResult(str, Enum):
+    SENT = "sent"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+    EXPIRED = "expired"
+
 
 class NotificationsService:
     """Handles generating and sending Web Push notifications to users."""
@@ -36,11 +46,11 @@ class NotificationsService:
 
     async def send_notification(
         self, subscription: PushSubscription, title: str, body: str
-    ) -> None:
+    ) -> PushSendResult:
         """Sign and send a Web Push notification asynchronously using a thread pool."""
         if not self.private_key or not self.public_key:
             logger.warning("VAPID keys are not configured. Skipping push notification.")
-            return
+            return PushSendResult.SKIPPED
 
         payload = {
             "title": title,
@@ -68,14 +78,33 @@ class NotificationsService:
             logger.info(
                 f"Successfully sent push notification to endpoint: {subscription.endpoint}"
             )
+            return PushSendResult.SENT
         except WebPushException as exc:
-            logger.error(f"Failed to send Web Push notification: {exc}")
+            if _is_expired_subscription(exc):
+                logger.warning(
+                    "Push subscription expired or invalid for endpoint %s: %s",
+                    subscription.endpoint,
+                    exc,
+                )
+                return PushSendResult.EXPIRED
 
-    async def send_random_notification(self, subscription: PushSubscription) -> None:
+            logger.error(f"Failed to send Web Push notification: {exc}")
+            return PushSendResult.FAILED
+
+    async def send_random_notification(
+        self, subscription: PushSubscription
+    ) -> PushSendResult:
         """Select a random template from NOTIFICATION_TEMPLATES and send it."""
         template = random.choice(NOTIFICATION_TEMPLATES)
-        await self.send_notification(
+        return await self.send_notification(
             subscription=subscription,
             title=template["title"],
             body=template["body"],
         )
+
+
+def _is_expired_subscription(exc: WebPushException) -> bool:
+    response = getattr(exc, "response", None)
+    if response is None:
+        return False
+    return response.status_code in EXPIRED_SUBSCRIPTION_STATUS_CODES

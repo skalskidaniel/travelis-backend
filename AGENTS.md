@@ -14,8 +14,8 @@
 | `src/core/exceptions/` | Built (`CoreException` → `ProviderException`/`RepositoryException` + specific types) |
 | `src/core/services/` | Built (ingest, scoring pipeline with `StatisticalOfferScorer`) |
 | `src/core/repositories/` | Built (DynamoDB adapters for cells, offers, users, user_offers; Redis feed repo) |
-| `src/core/config.py` | **Not yet built** |
-| `src/core/container.py` | **Not yet built** |
+| `src/core/config.py` | Built |
+| `src/core/container.py` | Built |
 | `src/app/{auth,offers,user}/` | Stub controllers (`router = APIRouter()`), empty `models.py` |
 | `src/app/health/` | Empty directory |
 | `src/app/jobs/` | **Not yet built** |
