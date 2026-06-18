@@ -348,6 +348,25 @@ To ensure that package tours departing near the end of a month (e.g., June 28th)
    - Because the extended `arrivalDate` allows the API to return tours that both depart and return in the following month (e.g. departing July 3rd), the adapter's mapping code enforces cell month limits on the departure date.
    - Any raw offer where `offer.departure_date` does not fall strictly within `[departure_from, departure_to]` is discarded.
 
+### Referral URL (Deep Link) Construction
+
+To allow the user to view the offer on wakacje.pl, the adapter constructs a `referral_url` (deep link) containing the specific parameters of the matched offer:
+
+1. **Offer Page Path**: Built using geographic and hotel slugs from the search results:
+   `/oferty/{country_slug}/{region_slug}/{city_slug}/{url_name}-{offer_id}.html`
+2. **Offer Selector Query**: Built using specific parameters of the offer to highlight and filter the correct variant on the destination page:
+   `od-{departure_date},{duration}-dni,{board_value},{departure_slug},{adults}dorosle` (with kids appended if present, e.g. `-1dziecko-20180101`).
+3. **UTM Referral Parameters**: Appended at model validation time:
+   `utm_source=travellead&utm_medium=cps&utm_campaign=2933-t-HolidayPicker&a_cid=11111111&a_aid=2933`.
+
+Combined format:
+`https://www.wakacje.pl/oferty/{country_slug}/{region_slug}/{city_slug}/{url_name}-{offer_id}.html?od-{departure_date},{duration}-dni,{board_value},{departure_slug},{occupancy}&utm_source=travellead&...`
+
+### Image URL Extraction
+
+- The search API returns a `"photos"` dictionary containing keys mapping to sizes (e.g. `"570,428"`).
+- The adapter selects the first available photo array from the dictionary, extracts the first image path, normalizes relative paths by prepending `https://www.wakacje.pl`, and stores it under the `image_url` field.
+
 ### Aggregation & Deduplication
 
 - wakacje.pl often returns offers with the same parameters differing only in price or tour operator — per application requirements, these are treated as "the same offer". Deduplication is performed in the integration service layer (`core/services/ingest.py`).
