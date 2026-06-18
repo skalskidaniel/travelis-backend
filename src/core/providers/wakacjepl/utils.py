@@ -33,11 +33,14 @@ def build_wakacje_occupancy_selector(
     *,
     today: date | None = None,
 ) -> str:
+    if adults == 1 and children == 0:
+        return "dla-singli"
     occupancy = f"{adults}dorosle"
     if children > 0:
+        suffix = "dziecko" if children == 1 else "dzieci"
         birthday = representative_child_birthday(today)
         birthdays = "-".join([birthday] * children)
-        occupancy = f"{occupancy}-{children}dziecko-{birthdays}"
+        occupancy = f"{occupancy}-{children}{suffix}-{birthdays}"
     return occupancy
 
 

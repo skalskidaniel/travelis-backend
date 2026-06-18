@@ -28,13 +28,28 @@ def test_build_wakacje_occupancy_selector_adults_only():
     assert build_wakacje_occupancy_selector(2, 0) == "2dorosle"
 
 
-def test_build_wakacje_occupancy_selector_with_children():
+def test_build_wakacje_occupancy_selector_single_adult():
+    assert build_wakacje_occupancy_selector(1, 0) == "dla-singli"
+
+
+def test_build_wakacje_occupancy_selector_with_one_child():
     today = date(2026, 6, 18)
     assert (
         build_wakacje_occupancy_selector(2, 1, today=today)
         == "2dorosle-1dziecko-20180101"
     )
 
+@pytest.mark.parametrize(
+    "children_count",
+    [2, 3, 4, 5]
+)
+def test_build_wakacje_occupancy_selector_with_multiple_children(children_count):
+    today = date(2026, 6, 18)
+    expected_birthdays = "-".join(["20180101"] * children_count)
+    assert (
+        build_wakacje_occupancy_selector(2, children_count, today=today)
+        == f"2dorosle-{children_count}dzieci-{expected_birthdays}"
+    )
 
 def test_build_wakacje_offer_selector():
     today = date(2026, 6, 18)
