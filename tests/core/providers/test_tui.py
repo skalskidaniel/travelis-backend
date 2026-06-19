@@ -242,7 +242,7 @@ def sample_offer():
         rating=Decimal("4.5"),
         review_count=100,
         price_total=Decimal("5000.00"),
-        price_per_day_one_person=Decimal("2500.00"),
+        price_per_day=Decimal("2500.00"),
         referral_url="https://www.tui.pl/details-eg-1",
         available=True,
         room_type="Family Room Standard",

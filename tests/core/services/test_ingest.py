@@ -72,7 +72,7 @@ def create_test_raw_offer(
         rating=Decimal(str(rating)),
         review_count=review_count,
         price_total=Decimal(str(price_total)),
-        price_per_day_one_person=(
+        price_per_day=(
             Decimal(str(price_total)) / duration / (adults + children)
         ).quantize(Decimal("0.01")),
         referral_url=AnyHttpUrl("https://example.com/ref"),

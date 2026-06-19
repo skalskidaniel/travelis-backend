@@ -210,7 +210,7 @@ def sample_wakacje_offer():
         rating=Decimal("3.8"),  # 7.5 / 2
         review_count=40,
         price_total=Decimal("6148.00"),
-        price_per_day_one_person=Decimal("439.14"),
+        price_per_day=Decimal("439.14"),
         referral_url=(
             "https://www.wakacje.pl/oferty/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html"
             "?od-2026-08-26,7-dni,all-inclusive,z-rzeszowa,2dorosle"

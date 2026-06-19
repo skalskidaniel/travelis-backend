@@ -28,7 +28,7 @@ def valid_offer_kwargs():
         "rating": Decimal("4.8"),
         "review_count": 150,
         "price_total": Decimal("4500.00"),
-        "price_per_day_one_person": Decimal("642.86"),
+        "price_per_day": Decimal("642.86"),
         "referral_url": "https://www.tui.pl/details-gre-123",
         "available": True,
         "room_type": "Superior Double Room",

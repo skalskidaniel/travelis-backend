@@ -4,14 +4,17 @@ import json
 
 # noinspection PyUnresolvedReferences
 from aws_lambda_powertools import Logger, Metrics, Tracer
+
 # noinspection PyUnresolvedReferences
 from aws_lambda_powertools.metrics import MetricUnit
+
 # noinspection PyUnresolvedReferences
 from aws_lambda_powertools.utilities.idempotency import (
     DynamoDBPersistenceLayer,
     IdempotencyConfig,
     idempotent,
 )
+
 # noinspection PyUnresolvedReferences
 from aws_lambda_powertools.utilities.typing import LambdaContext
 

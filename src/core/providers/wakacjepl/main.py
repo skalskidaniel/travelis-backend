@@ -694,7 +694,7 @@ class WakacjePlProvider:
             rating=rating,
             review_count=int(review_count),
             price_total=price_total,
-            price_per_day_one_person=price_per_day_one_person,
+            price_per_day=price_per_day_one_person,
             referral_url=referral_url,
             image_url=image_url,
             available=True,

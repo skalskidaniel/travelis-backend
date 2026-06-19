@@ -20,9 +20,10 @@ async def test_container_lifecycle():
     mock_resource_cm.__aenter__.return_value = mock_dynamo_resource
     mock_session.resource.return_value = mock_resource_cm
 
-    with patch("core.container.aioboto3.Session", return_value=mock_session), \
-         patch("core.container.Redis.from_url", return_value=mock_redis):
-
+    with (
+        patch("core.container.aioboto3.Session", return_value=mock_session),
+        patch("core.container.Redis.from_url", return_value=mock_redis),
+    ):
         # Initial state
         assert container.exit_stack is None
 

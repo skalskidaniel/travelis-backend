@@ -28,6 +28,9 @@ markers = [
     "provider_integration: marks test as a provider integration test",
     "repo_integration: marks test as a repo integration test",
 ]
+filterwarnings = [
+    "ignore",
+]
 
 [dependency-groups]
 dev = [

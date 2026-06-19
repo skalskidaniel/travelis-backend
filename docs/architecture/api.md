@@ -120,12 +120,12 @@ Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB
 
 ```json
 {
-  "items": [
+  "offers": [
     {
       "offer_id": "a1b2c3...",
       "hotel_name": "Kakkos Terra Blue",
-      "country": "GR",
-      "region": "Crete",
+      "country": "Greece",
+      "location": "Greece/Crete/Ierapetra",
       "departure_airport": "WAW",
       "departure_date": "2026-04-26",
       "return_date": "2026-05-03",
@@ -135,15 +135,12 @@ Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB
       "rating": 4.2,
       "review_count": 544,
       "price_total": 6148,
-      "price_per_day": 878,
-      "attractiveness_score": 0.92,
-      "provider": "wakacje",
       "referral_url": "https://...",
       "image_url": "https://www.wakacje.pl/no-index/hotel/...",
       "share_url": "https://wakacje-travelis.pl/offer/a1b2c3.../a1b2c3..."
     }
   ],
-  "cursor": "eyJzY29yZSI6...",
+  "next_cursor": "eyJzY29yZSI6...",
   "feed_version": 42
 }
 ```
@@ -164,7 +161,7 @@ Single offer detail for an offer in the user's feed.
   "provider": "wakacje_pl",
   "external_offer_id": "916232",
   "hotel_name": "Kakkos Terra Blue",
-  "country": "GR",
+  "country": "Greece",
   "region": "Crete",
   "location": "Greece/Crete/Ierapetra",
   "departure_airport": "WAW",

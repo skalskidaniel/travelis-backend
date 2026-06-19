@@ -34,9 +34,7 @@ def create_mock_offer(
         rating=rating,
         review_count=review_count,
         price_total=Decimal(price_total),
-        price_per_day_one_person=round(
-            Decimal(price_total) / duration / (adults + children), 2
-        ),
+        price_per_day=round(Decimal(price_total) / duration / (adults + children), 2),
         referral_url=AnyHttpUrl("https://example.com"),
         available=True,
         room_type="Standard",

@@ -32,7 +32,7 @@ class NumpyOfferScorer:
         log_reviews = np.zeros(n, dtype=np.float64)
 
         for i, offer in enumerate(offers):
-            prices[i] = float(offer.price_per_day_one_person)
+            prices[i] = float(offer.price_per_day)
             ratings[i] = float(offer.rating)
             log_reviews[i] = math.log1p(offer.review_count)
 
@@ -121,7 +121,7 @@ class PandasOfferScorer:
         # O(N) extraction loop - unavoidable with Pydantic models
         df = pd.DataFrame(
             {
-                "price": [float(o.price_per_day_one_person) for o in offers],
+                "price": [float(o.price_per_day) for o in offers],
                 "rating": [float(o.rating) for o in offers],
                 "reviews": [o.review_count for o in offers],
             }
@@ -216,9 +216,7 @@ def create_mock_offer(
         rating=rating,
         review_count=review_count,
         price_total=Decimal(price_total),
-        price_per_day_one_person=round(
-            Decimal(price_total) / duration / (adults + children), 2
-        ),
+        price_per_day=round(Decimal(price_total) / duration / (adults + children), 2),
         referral_url="https://example.com",
         available=True,
         room_type="Standard",

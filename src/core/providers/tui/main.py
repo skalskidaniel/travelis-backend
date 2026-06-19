@@ -390,7 +390,7 @@ class TuiProvider:
             rating=Decimal(str(rating_raw)),
             review_count=int(review_count),
             price_total=price_total,
-            price_per_day_one_person=price_per_day_one_person,
+            price_per_day=price_per_day_one_person,
             referral_url=f"{TUI_ORIGIN}{offer_url}",
             image_url=image_url,
             available=True,

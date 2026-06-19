@@ -22,7 +22,7 @@ class StatisticalOfferScorer(OfferScorer):
         log_reviews = np.zeros(n, dtype=np.float64)
 
         for i, offer in enumerate(offers):
-            prices[i] = float(offer.price_per_day_one_person)
+            prices[i] = float(offer.price_per_day)
             ratings[i] = float(offer.rating)
             log_reviews[i] = math.log1p(offer.review_count)
 

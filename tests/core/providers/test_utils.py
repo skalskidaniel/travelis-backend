@@ -28,7 +28,7 @@ def _sample_raw_offer(**overrides) -> RawOffer:
         "rating": Decimal("4.0"),
         "review_count": 10,
         "price_total": Decimal("5000.00"),
-        "price_per_day_one_person": Decimal("833.33"),
+        "price_per_day": Decimal("833.33"),
         "referral_url": "https://www.wakacje.pl/oferty/example.html?selector",
         "available": True,
         "room_type": "Standard",

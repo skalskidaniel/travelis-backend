@@ -262,7 +262,7 @@ async def test_check_availability_returns_unavailable(live_provider):
         rating=Decimal("4.0"),
         review_count=10,
         price_total=Decimal("3000.00"),
-        price_per_day_one_person=Decimal("1500.00"),
+        price_per_day=Decimal("1500.00"),
         referral_url="https://www.tui.pl/wypoczynek/wlochy/dolny-adriatyk/hotel-kent-rmi17050/OfferCodeWS/KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
         available=True,
         room_type="Standard Room",
