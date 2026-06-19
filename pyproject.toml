@@ -8,6 +8,7 @@ dependencies = [
     "aioboto3>=15.5.0",
     "fastapi[standard]>=0.137.0",
     "httpx>=0.28.1",
+    "httpx2>=2.4.0",
     "mangum>=0.21.0",
     "pandas>=3.0.3",
     "pydantic>=2.13.4",
@@ -29,7 +30,7 @@ markers = [
     "repo_integration: marks test as a repo integration test",
 ]
 filterwarnings = [
-    "ignore",
+    "ignore:There is no current event loop:DeprecationWarning:mangum.adapter",
 ]
 
 [dependency-groups]

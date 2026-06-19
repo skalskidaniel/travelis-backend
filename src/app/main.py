@@ -10,6 +10,7 @@ from app.user.controller import router as user_router
 
 app = FastAPI(title="TraveLis Backend API", version="2.0.0")
 
+#TODO
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
