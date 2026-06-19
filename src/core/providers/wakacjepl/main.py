@@ -120,6 +120,7 @@ class WakacjePlProvider:
                 self._raise_request_exception("search", e)
 
             try:
+                # noinspection PyUnboundLocalVariable
                 body = response.json()
             except (json.JSONDecodeError, ValueError) as e:
                 raise ProviderAPIException(
@@ -363,6 +364,7 @@ class WakacjePlProvider:
             self._raise_request_exception("calculator", e)
 
         try:
+            # noinspection PyUnboundLocalVariable
             data = response.json()
         except (json.JSONDecodeError, ValueError) as e:
             raise ProviderAPIException(
@@ -438,6 +440,7 @@ class WakacjePlProvider:
             self._raise_request_exception("availability", e)
 
         try:
+            # noinspection PyUnboundLocalVariable
             data = response.json()
         except (json.JSONDecodeError, ValueError) as e:
             raise ProviderAPIException(

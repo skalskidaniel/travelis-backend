@@ -74,6 +74,7 @@ def _next_month_bucket() -> str:
 
 
 async def _run_with_transient_retry(call: Callable[[], Awaitable[T]]) -> T:
+    # noinspection DuplicatedCode
     for attempt in range(1, MAX_RETRY_ATTEMPTS + 1):
         try:
             return await call()
@@ -386,6 +387,7 @@ async def test_referral_url_matches_offer_page(
         failures = await verify_tui_offer_urls(page_client, offers)
 
     sample_size = offer_url_check_sample_size()
+    # noinspection DuplicatedCode
     for offer in offers[:sample_size]:
         try:
             price = await live_provider.check_price(offer)

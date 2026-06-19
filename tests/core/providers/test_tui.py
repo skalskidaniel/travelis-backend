@@ -225,6 +225,7 @@ def test_map_search_offer_missing_or_invalid_image_url(
     assert offer.image_url is None
 
 
+# noinspection DuplicatedCode
 @pytest.fixture
 def sample_offer():
     return Offer(

@@ -66,6 +66,7 @@ class DynamoUserOffersRepository(UserOffersRepository):
         client = self.table.meta.client
         table_name = self.table.name
 
+        # noinspection DuplicatedCode
         for chunk in chunked(keys, BATCH_WRITE_LIMIT):
             request_items = {
                 table_name: [
@@ -99,6 +100,7 @@ class DynamoUserOffersRepository(UserOffersRepository):
         client = self.table.meta.client
         table_name = self.table.name
 
+        # noinspection DuplicatedCode
         for chunk in chunked(items, BATCH_WRITE_LIMIT):
             request_items = {
                 table_name: [

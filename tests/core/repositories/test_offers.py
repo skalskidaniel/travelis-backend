@@ -9,6 +9,7 @@ from core.repositories.offers import DynamoOffersRepository
 pytestmark = pytest.mark.asyncio
 
 
+# noinspection DuplicatedCode
 @pytest.fixture
 def test_offer():
     return Offer(

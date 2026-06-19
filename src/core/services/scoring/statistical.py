@@ -34,6 +34,7 @@ class StatisticalOfferScorer(OfferScorer):
         max_log_reviews = np.max(log_reviews)
 
         # Stage 1
+        # noinspection DuplicatedCode
         if n < self.config.small_sample_threshold:
             keep_count = max(1, math.ceil(n * self.config.small_sample_keep_ratio))
             sorted_indices = np.argsort(prices)

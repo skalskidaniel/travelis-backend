@@ -289,6 +289,7 @@ def verify_wakacje_rendered_page(
 async def dismiss_cookie_banner(page: Page) -> None:
     for selector in COOKIE_BANNER_SELECTORS:
         locator = page.locator(selector).first
+        # noinspection PyBroadException
         try:
             if await locator.count() and await locator.is_visible():
                 await locator.click(timeout=3_000)

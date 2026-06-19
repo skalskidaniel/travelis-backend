@@ -112,6 +112,7 @@ class TuiProvider:
                 self._raise_request_exception("search", e)
 
             try:
+                # noinspection PyUnboundLocalVariable
                 data = response.json()
             except (json.JSONDecodeError, ValueError) as e:
                 raise ProviderAPIException(
@@ -256,6 +257,7 @@ class TuiProvider:
             self._raise_request_exception("availability", e)
 
         try:
+            # noinspection PyUnboundLocalVariable
             payload = response.json()
         except (json.JSONDecodeError, ValueError) as e:
             raise ProviderAPIException(

@@ -29,6 +29,7 @@ class DynamoCellsRepository(CellsRepository):
     async def scan(self) -> list[MarketCell]:
         items = []
         exclusive_start_key = None
+        # noinspection DuplicatedCode
         while True:
             kwargs = {}
             if exclusive_start_key:

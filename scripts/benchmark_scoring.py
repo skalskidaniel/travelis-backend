@@ -13,6 +13,7 @@ from core.services.scoring.config import StatisticalScorerConfig
 from core.services.scoring.statistical import StatisticalOfferScorer
 
 
+# noinspection DuplicatedCode
 class NumpyOfferScorer:
     """Numpy-vectorized version of the StatisticalOfferScorer."""
 
@@ -101,8 +102,6 @@ class NumpyOfferScorer:
                 **offer.model_dump(), attractiveness_score=float(composite)
             )
             results.append(scored_offer)
-
-        return results
 
         return results
 

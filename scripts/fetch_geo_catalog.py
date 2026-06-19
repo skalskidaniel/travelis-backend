@@ -208,6 +208,7 @@ def build_wakacje_catalog(client: httpx.Client) -> dict[str, Any]:
                 "name": country.get("label"),
             }
 
+        # noinspection PyBroadException
         try:
             regions = _fetch_wakacje(client, f"geoCatalogRegionsAndCities/{country_id}")
         except Exception:
