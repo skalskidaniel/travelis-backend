@@ -35,10 +35,12 @@ Python 3.13 required (`.python-version`). No type checker configured.
 
 ## Tests
 
+Note: Always use `uv run pytest` to run tests.
+
 ```bash
-pytest                           # runs all; pyproject.toml sets pythonpath = ["src"]
-pytest -xvs tests/path/to/test   # single test file, verbose
-pytest -k "test_name"            # filtered run
+uv run pytest                           # runs all; pyproject.toml sets pythonpath = ["src"]
+uv run pytest -xvs tests/path/to/test   # single test file, verbose
+uv run pytest -k "test_name"            # filtered run
 ```
 
 - Framework: `pytest` + `pytest-asyncio` (all async tests need `@pytest.mark.asyncio`).
@@ -49,7 +51,7 @@ pytest -k "test_name"            # filtered run
 
 ```bash
 uv run playwright install chromium
-RUN_PROVIDER_INTEGRATION=1 pytest -xvs tests/core/providers/test_wakacjepl_integration.py -k referral_url
+RUN_PROVIDER_INTEGRATION=1 uv run pytest -xvs tests/core/providers/test_wakacjepl_integration.py -k referral_url
 ```
 
 ## Architecture rules (not in agent-guidelines.md)

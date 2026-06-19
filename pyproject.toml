@@ -12,6 +12,7 @@ dependencies = [
     "pandas>=3.0.3",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
+    "pyjwt>=2.8.0",
     "pywebpush>=2.3.0",
     "redis[hiredis]>=8.0.0",
     "types-aioboto3[dynamodb]>=15.5.0",
