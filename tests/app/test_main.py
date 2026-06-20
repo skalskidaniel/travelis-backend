@@ -19,6 +19,14 @@ def test_cors_headers(client):
 
 
 def test_lambda_handler_api_gateway():
+    import asyncio
+
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
     event = {
         "version": "2.0",
         "routeKey": "GET /api/v2/health",
@@ -107,3 +115,39 @@ def test_lambda_handler_unhandled_event():
         response = handler(event, None)
         assert response["status"] == "success"
         assert "stub" in response["message"]
+
+
+def test_lambda_handler_scrape_offers():
+    event = {"type": "scrape_offers"}
+
+    with (
+        patch("app.main.container") as mock_container,
+        patch("app.main.run_scrape_job") as mock_run_scrape,
+    ):
+        mock_container.exit_stack = MagicMock()
+        mock_run_scrape.return_value = {"scraped_cells": ["cell-1"]}
+
+        response = handler(event, None)
+
+        assert response["status"] == "success"
+        assert "completed" in response["message"]
+        assert response["results"]["scraped_cells"] == ["cell-1"]
+        mock_run_scrape.assert_called_once()
+
+
+def test_lambda_handler_check_availability():
+    event = {"type": "check_availability"}
+
+    with (
+        patch("app.main.container") as mock_container,
+        patch("app.main.run_availability_job") as mock_run_availability,
+    ):
+        mock_container.exit_stack = MagicMock()
+        mock_run_availability.return_value = {"checked_offers_count": 5}
+
+        response = handler(event, None)
+
+        assert response["status"] == "success"
+        assert "completed" in response["message"]
+        assert response["results"]["checked_offers_count"] == 5
+        mock_run_availability.assert_called_once()

@@ -1,7 +1,7 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Annotated
 from enum import StrEnum
-from pydantic import Field, PlainValidator
+from pydantic import Field, BeforeValidator
 
 HEX_CELL_ID = r"^[a-f0-9]{16}$"
 HEX_OFFER_ID = r"^[a-f0-9]{32}$"
@@ -13,7 +13,10 @@ LOCATION_PATH = r"^[^/]+/[^/]+/[^/]+$"
 def _to_decimal(value: object) -> Decimal:
     if isinstance(value, Decimal):
         return value
-    return Decimal(str(value))
+    try:
+        return Decimal(str(value))
+    except (ValueError, InvalidOperation) as e:
+        raise ValueError(f"Invalid decimal value: {value}") from e
 
 
 CellId = Annotated[
@@ -50,7 +53,7 @@ LocationPath = Annotated[
 
 PricePLN = Annotated[
     Decimal,
-    PlainValidator(_to_decimal),
+    BeforeValidator(_to_decimal),
     Field(
         ge=Decimal(0),
         decimal_places=2,
@@ -60,7 +63,7 @@ PricePLN = Annotated[
 
 Rating = Annotated[
     Decimal,
-    PlainValidator(_to_decimal),
+    BeforeValidator(_to_decimal),
     Field(
         ge=Decimal(0),
         le=Decimal(5),

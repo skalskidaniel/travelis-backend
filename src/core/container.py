@@ -23,6 +23,7 @@ class Container:
         self.redis_client: Redis | None = None
         self.scheduler_client: Any = None
         self.cognito_client: Any = None
+        self.lambda_client: Any = None
 
         # Repositories
         self.users_repo: DynamoUsersRepository | None = None
@@ -54,6 +55,9 @@ class Container:
         )
         self.cognito_client = await self.exit_stack.enter_async_context(
             session.client("cognito-idp", region_name=self.settings.aws_region)
+        )
+        self.lambda_client = await self.exit_stack.enter_async_context(
+            session.client("lambda", region_name=self.settings.aws_region)
         )
 
         # 2. Get DynamoDB tables
@@ -112,6 +116,7 @@ class Container:
             self.redis_client = None
             self.scheduler_client = None
             self.cognito_client = None
+            self.lambda_client = None
             self.users_repo = None
             self.cells_repo = None
             self.offers_repo = None

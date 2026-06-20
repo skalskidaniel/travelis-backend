@@ -9,6 +9,8 @@ from app.auth.controller import router as auth_router
 from app.health.controller import router as health_router
 from app.offers.controller import router as offers_router
 from app.user.controller import router as user_router
+from app.jobs.coordinator import run_scrape_job
+from app.jobs.availability import run_availability_job
 from core.container import container
 
 
@@ -34,7 +36,7 @@ app.include_router(health_router, prefix="/api/v2/health")
 app.include_router(offers_router, prefix="/api/v2/offers")
 app.include_router(user_router, prefix="/api/v2/user")
 
-mangum_handler = Mangum(app, lifespan="off") # must remain "off" to work with mangum
+mangum_handler = Mangum(app, lifespan="off")  # must remain "off" to work with mangum
 
 
 async def handle_non_http(event: dict, context) -> dict:
@@ -71,7 +73,29 @@ async def handle_non_http(event: dict, context) -> dict:
         else:
             raise ValueError("Missing user_id for match_user event")
 
-    # C. Other non-HTTP events (stubs)
+    # C. EventBridge 3x daily scrape coordinator job
+    elif event_type == "scrape_offers":
+        print("EventBridge: Starting scrape_offers job")
+
+        results = await run_scrape_job(container, context, payload=event)
+        return {
+            "status": "success",
+            "message": "Scraper coordinator job completed",
+            "results": results,
+        }
+
+    # D. EventBridge 1x daily availability check job
+    elif event_type == "check_availability":
+        print("EventBridge: Starting check_availability job")
+
+        results = await run_availability_job(container, context)
+        return {
+            "status": "success",
+            "message": "Availability check job completed",
+            "results": results,
+        }
+
+    # E. Other non-HTTP events (stubs)
     else:
         print(
             f"Non-HTTP event received: triggerSource={trigger_source}, type={event_type}"
