@@ -21,3 +21,29 @@ variable "aws_profile" {
   type        = string
   default     = "travelis-terraform"
 }
+
+variable "redis_url" {
+  description = "Redis Cloud connection URL."
+  type        = string
+  sensitive   = true
+}
+
+variable "frontend_url" {
+  description = "URL of the frontend PWA application."
+  type        = string
+  default     = "https://wakacje-travelis.pl"
+}
+
+variable "vapid_public_key" {
+  description = "Web Push VAPID public key."
+  type        = string
+  default     = ""
+}
+
+variable "vapid_private_key" {
+  description = "Web Push VAPID private key."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
