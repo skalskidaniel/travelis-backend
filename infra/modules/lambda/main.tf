@@ -1,9 +1,42 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
+    }
+  }
+}
+
 data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
+resource "null_resource" "lambda_build" {
+  triggers = {
+    pyproject_hash = filemd5("${path.module}/../../../pyproject.toml")
+    uv_lock_hash   = filemd5("${path.module}/../../../uv.lock")
+    build_script   = filemd5("${path.module}/../../../scripts/build_lambda_package.sh")
+    src_hash       = sha256(join("", [for f in fileset("${path.module}/../../../src", "**") : filesha256("${path.module}/../../../src/${f}")]))
+  }
+
+  provisioner "local-exec" {
+    command     = "bash ${path.module}/../../../scripts/build_lambda_package.sh"
+    working_dir = abspath("${path.module}/../../..")
+  }
+}
+
 data "archive_file" "lambda_zip" {
+  depends_on = [null_resource.lambda_build]
+
   type        = "zip"
-  source_dir  = "${path.module}/../../../src"
+  source_dir  = "${path.module}/../../../dist/lambda-build"
   output_path = "${path.module}/../../../dist/lambda_function.zip"
 }
 
@@ -141,6 +174,7 @@ resource "aws_lambda_function" "lambdalith" {
     variables = {
       REDIS_URL                  = var.redis_url
       COGNITO_USER_POOL_ID       = var.cognito_user_pool_id
+      COGNITO_APP_CLIENT_ID      = var.cognito_app_client_id
       DYNAMODB_USERS_TABLE       = var.users_table_name
       DYNAMODB_CELLS_TABLE       = var.cells_table_name
       DYNAMODB_OFFERS_TABLE      = var.offers_table_name
@@ -165,4 +199,3 @@ resource "aws_lambda_permission" "cognito_trigger" {
   principal     = "cognito-idp.amazonaws.com"
   source_arn    = var.cognito_user_pool_arn
 }
-

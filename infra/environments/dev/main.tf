@@ -68,6 +68,7 @@ module "lambda" {
   geo_catalog_bucket_arn  = module.geo_catalog.bucket_arn
   cognito_user_pool_id    = module.cognito.user_pool_id
   cognito_user_pool_arn   = module.cognito.user_pool_arn
+  cognito_app_client_id   = module.cognito.app_client_id
   vapid_public_key        = var.vapid_public_key
   vapid_private_key       = var.vapid_private_key
   scheduler_role_arn      = module.eventbridge.scheduler_role_arn

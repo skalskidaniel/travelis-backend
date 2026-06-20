@@ -66,6 +66,10 @@ variable "cognito_user_pool_arn" {
   type = string
 }
 
+variable "cognito_app_client_id" {
+  type = string
+}
+
 variable "vapid_public_key" {
   type    = string
   default = ""
