@@ -44,10 +44,13 @@ src/
 │   │   ├── matching.py    # cell resolution + user filter + feed rebuild
 │   │   ├── activation.py  # market-cell ref-counting
 │   │   └── notifications.py
+│   ├── exceptions/        # custom exceptions (CoreException, ProviderException, etc.)
 │   ├── config.py          # pydantic-settings Settings
 │   └── container.py       # composition root (see below)
 └── app/
     ├── main.py            # FastAPI app + dual-entry Lambda handler
+    ├── dependencies.py    # common API dependencies (auth validation, db session getters)
+    ├── exceptions.py      # HTTP-facing custom exceptions (AppException, etc.)
     ├── auth/              # controller (def handlers) + request/response schemas
     ├── user/
     ├── offers/
@@ -122,4 +125,17 @@ Adding a third source later is one new adapter + one registry line. See [provide
 
 The fan-out concurrency strategy lives in the orchestration layer (`app/jobs/coordinator`), not in `core`. `core` exposes `async`, single-unit functions with no shared mutable state; the coordinator schedules them on the event loop with a bounded `asyncio.Semaphore`. CPU-bound scoring is offloaded with `asyncio.to_thread` so it never blocks the loop. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
 
+## Exception handling
 
+The application uses custom, typed exception hierarchies to decouple layers, prevent raw client/dependency exceptions from leaking, and provide clean catch points.
+
+- **`core/exceptions/`**:
+  - `CoreException` (defined in `common.py`) is the base exception class for all errors arising in the domain or integration adapters.
+  - Custom category-specific subclasses inherit from `CoreException` (e.g. `ProviderException` in `provider.py`, `RepositoryException` in `repository.py`, and `SchedulerException` in `scheduler.py`).
+  - Implementation adapters (e.g., DynamoDB repository adapters or TUI/wakacje.pl providers) must wrap third-party/SDK client errors (such as `botocore.exceptions.ClientError` or `httpx.HTTPError`) in corresponding custom exceptions (like `ItemNotFoundException` or `ProviderAPIException`) before throwing them.
+- **`app/exceptions.py`**:
+  - `AppException` is the base for entrypoint-specific errors, particularly HTTP-facing API errors.
+  - Subclasses represent specific failure scenarios (like `AuthenticationException` for JWT validation issues or `RetryableServiceException` for transient system errors).
+- **Propagation & Translation**:
+  - FastAPI controllers catch `core` exceptions (or custom `app` exceptions) either locally or via global `@app.exception_handler` decorators registered in `app/main.py`.
+  - The handler translates the custom exception into a semantic HTTP response (e.g. mapping `AuthenticationException` to HTTP 401, or `RetryableServiceException` / `SchedulerException` to HTTP 503).

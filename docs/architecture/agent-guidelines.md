@@ -70,3 +70,12 @@ There is no continuous "sweeper" cron job polling for preference updates.
 - **Rule**: wakacje.pl normalization uses the numeric `service` field from the response (not the `serviceDesc` string). Inverse mapping: `1` → `all-inclusive`, `2` → `half-board`, `3` → `bed-and-breakfast`, `4` → `none`, `6` → `full-board`.
 - **Rule**: TUI normalization uses `boardCode` from the response: `GT06-AI`/`GT06-XX` → `all-inclusive`, `GT06-FB`/`GT06-FBP` → `full-board`, `GT06-HB`/`GT06-HBP` → `half-board`, `GT06-BB` → `bed-and-breakfast`, `GT06-AO` → `none`.
 - **Why**: Hardcoded string matching on localized labels (e.g. `"Śniadanie"`, `"All Inclusive Plus"`) is fragile and locale-dependent. Numeric/code-based mapping is deterministic.
+
+## 10. Exception Handling & Custom Exceptions
+
+- **Rule**: Both the `core` and `app` layers must define and use custom exceptions (e.g. following the patterns in `src/core/exceptions` and `src/app/exceptions.py`) instead of using generic built-in Python exceptions (`ValueError`, `KeyError`, `RuntimeError`, etc.) or raw third-party client/provider exceptions.
+- **Rule**: Exceptions raised inside the `core` layer must inherit from `CoreException` (defined in `core/exceptions/common.py`). Specific adapters or services should define their own subtree (e.g. `ProviderException` or `RepositoryException`) to provide distinct semantic meaning.
+- **Rule**: The `app` layer must catch `core` exceptions and translate/map them to appropriate HTTP exceptions (FastAPI exception handlers) or handle them gracefully in jobs, rather than letting raw database or external API exceptions leak to clients.
+- **Rule**: If the `app` layer raises validation or handler-specific errors, it should also use custom exception types (inheriting from `AppException` in `app/exceptions.py`).
+- **Why**: Custom exceptions provide distinct semantic meaning, enable robust and clean error-catching, decouple layers from concrete database/API clients, and ensure unified error response formatting.
+
