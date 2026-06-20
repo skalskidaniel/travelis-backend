@@ -67,6 +67,18 @@ class Settings(BaseSettings):
         default=-1.0,
         validation_alias=AliasChoices("ATTRACTIVENESS_Z_THRESHOLD"),
     )
+    lambda_function_arn: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("LAMBDA_FUNCTION_ARN"),
+    )
+    scheduler_role_arn: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SCHEDULER_ROLE_ARN"),
+    )
+    cognito_user_pool_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("COGNITO_USER_POOL_ID"),
+    )
 
     db: DatabaseSettings | None = None
     push: PushSettings | None = None

@@ -21,6 +21,8 @@ class Container:
         # Clients / Resources
         self.dynamodb_resource: Any = None
         self.redis_client: Redis | None = None
+        self.scheduler_client: Any = None
+        self.cognito_client: Any = None
 
         # Repositories
         self.users_repo: DynamoUsersRepository | None = None
@@ -33,6 +35,7 @@ class Container:
         self.activation_service: Any = None
         self.matching_service: Any = None
         self.notifications_service: Any = None
+        self.scheduler_service: Any = None
 
     async def initialize(self) -> None:
         """Initialize all shared resources once per cold start."""
@@ -45,6 +48,12 @@ class Container:
         session = aioboto3.Session()
         self.dynamodb_resource = await self.exit_stack.enter_async_context(
             session.resource("dynamodb", region_name=self.settings.aws_region)
+        )
+        self.scheduler_client = await self.exit_stack.enter_async_context(
+            session.client("scheduler", region_name=self.settings.aws_region)
+        )
+        self.cognito_client = await self.exit_stack.enter_async_context(
+            session.client("cognito-idp", region_name=self.settings.aws_region)
         )
 
         # 2. Get DynamoDB tables
@@ -72,6 +81,7 @@ class Container:
         from core.services.activation import ActivationService
         from core.services.notifications import NotificationsService
         from core.services.matching import MatchingService
+        from core.services.scheduler import SchedulerService
 
         self.activation_service = ActivationService(
             cells_repo=self.cells_repo,
@@ -88,6 +98,10 @@ class Container:
             notifications_service=self.notifications_service,
             activation_service=self.activation_service,
         )
+        self.scheduler_service = SchedulerService(
+            scheduler_client=self.scheduler_client,
+            settings=self.settings,
+        )
 
     async def cleanup(self) -> None:
         """Close and release all resources cleanly."""
@@ -96,6 +110,8 @@ class Container:
             self.exit_stack = None
             self.dynamodb_resource = None
             self.redis_client = None
+            self.scheduler_client = None
+            self.cognito_client = None
             self.users_repo = None
             self.cells_repo = None
             self.offers_repo = None
@@ -104,6 +120,7 @@ class Container:
             self.activation_service = None
             self.matching_service = None
             self.notifications_service = None
+            self.scheduler_service = None
 
 
 container = Container()

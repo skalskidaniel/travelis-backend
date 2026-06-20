@@ -1,4 +1,6 @@
+import asyncio
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -7,10 +9,18 @@ from app.auth.controller import router as auth_router
 from app.health.controller import router as health_router
 from app.offers.controller import router as offers_router
 from app.user.controller import router as user_router
+from core.container import container
 
-app = FastAPI(title="TraveLis Backend API", version="2.0.0")
 
-#TODO
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await container.initialize()
+    yield
+    await container.cleanup()
+
+
+app = FastAPI(title="TraveLis Backend API", version="2.0.0", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,7 +34,53 @@ app.include_router(health_router, prefix="/api/v2/health")
 app.include_router(offers_router, prefix="/api/v2/offers")
 app.include_router(user_router, prefix="/api/v2/user")
 
-mangum_handler = Mangum(app, lifespan="off")  # TODO what is lifespan and why is it off?
+mangum_handler = Mangum(app, lifespan="off") # must remain "off" to work with mangum
+
+
+async def handle_non_http(event: dict, context) -> dict:
+    """Async router for EventBridge, Cognito, and Scheduler events."""
+    if container.exit_stack is None:
+        await container.initialize()
+
+    trigger_source = event.get("triggerSource")
+    event_type = event.get("type")
+
+    # A. Cognito post-confirmation trigger
+    if trigger_source and trigger_source.startswith("PostConfirmation"):
+        user_id = event.get("userName") or event.get("request", {}).get(
+            "userAttributes", {}
+        ).get("sub")
+        if user_id:
+            from app.user.controller import get_or_create_user
+
+            await get_or_create_user(user_id, container)
+            print(f"Cognito PostConfirmation: successfully provisioned user {user_id}")
+        return event  # Cognito triggers must echo the event
+
+    # B. EventBridge Scheduler debounced match job
+    elif event_type == "match_user":
+        user_id = event.get("user_id")
+        if user_id:
+            print(f"EventBridge Scheduler: matching user {user_id}")
+            feed_changed = await container.matching_service.match_user_offers(user_id)
+            return {
+                "status": "success",
+                "message": f"Matching completed for user {user_id}",
+                "feed_changed": feed_changed,
+            }
+        else:
+            raise ValueError("Missing user_id for match_user event")
+
+    # C. Other non-HTTP events (stubs)
+    else:
+        print(
+            f"Non-HTTP event received: triggerSource={trigger_source}, type={event_type}"
+        )
+        return {
+            "status": "success",
+            "message": "Event received and logged (stub)",
+            "event": event,
+        }
 
 
 def handler(event: dict, context) -> dict:
@@ -38,18 +94,7 @@ def handler(event: dict, context) -> dict:
     if is_http:
         return mangum_handler(event, context)
 
-    # Non-HTTP events (EventBridge, Cognito, Scheduler)
-    trigger_source = event.get("triggerSource")
-    detail_type = event.get("detail-type")
-
-    print(
-        f"Received non-HTTP event: triggerSource={trigger_source}, detail_type={detail_type}"
-    )
-    return {
-        "status": "success",
-        "message": "Event received and logged (stub)",
-        "event": event,
-    }
+    return asyncio.run(handle_non_http(event, context))
 
 
 if __name__ == "__main__":

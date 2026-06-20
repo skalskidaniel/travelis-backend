@@ -1,3 +1,104 @@
-from fastapi import APIRouter
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, status
+
+from app.auth.dependencies import get_current_user
+from app.dependencies import get_container
+from app.user.schemas import UserPreferencesUpdate, PushEnableRequest
+from core.container import Container
+from core.models.user import (
+    User,
+    UserPreferences,
+    PushSubscription,
+    PushSubscriptionKeys,
+)
 
 router = APIRouter()
+
+
+async def get_or_create_user(user_id: str, container: Container) -> User:
+    """Gets the user from the database, or provisions a new user with default preferences if not found."""
+    user = await container.users_repo.get(user_id)
+    if user is None:
+        user = User(user_id=user_id)
+        # 1. Save user to the database
+        await container.users_repo.put(user)
+        # 2. Activate default cells
+        await container.activation_service.update_cell_activations(
+            new_prefs=user.preferences, old_prefs=None
+        )
+        # 3. Schedule the first match
+        await container.scheduler_service.schedule_match(user_id)
+    return user
+
+
+@router.get("/preferences", response_model=UserPreferences)
+async def get_preferences(
+    user_id: str = Depends(get_current_user),
+    container: Container = Depends(get_container),
+):
+    """Retrieve the current user preferences (lazy provisioning if not exists)."""
+    user = await get_or_create_user(user_id, container)
+    return user.preferences
+
+
+@router.patch("/preferences", response_model=UserPreferences)
+async def update_preferences(
+    updates: UserPreferencesUpdate,
+    user_id: str = Depends(get_current_user),
+    container: Container = Depends(get_container),
+):
+    """Partially update user preferences, sync cell activations, and schedule matching."""
+    user = await get_or_create_user(user_id, container)
+    old_prefs = user.preferences
+
+    # Merge non-None fields into user preferences
+    updated_dict = user.preferences.model_dump()
+    for field, val in updates.model_dump(exclude_unset=True).items():
+        updated_dict[field] = val
+
+    new_prefs = UserPreferences(**updated_dict)
+    user.preferences = new_prefs
+    user.updated_at = datetime.now(timezone.utc)
+
+    # 1. Save the updated user preferences
+    await container.users_repo.put(user)
+
+    # 2. Sync cell activations
+    await container.activation_service.update_cell_activations(
+        new_prefs=new_prefs, old_prefs=old_prefs
+    )
+
+    # 3. Schedule a debounced match in 30s
+    await container.scheduler_service.schedule_match(user_id)
+
+    return user.preferences
+
+
+@router.post("/push/enable", status_code=status.HTTP_204_NO_CONTENT)
+async def enable_push(
+    req: PushEnableRequest,
+    user_id: str = Depends(get_current_user),
+    container: Container = Depends(get_container),
+):
+    """Register or update a Web Push subscription details for the user."""
+    await get_or_create_user(user_id, container)
+
+    sub = PushSubscription(
+        endpoint=req.subscription.endpoint,
+        keys=PushSubscriptionKeys(
+            p256dh=req.subscription.keys.p256dh,
+            auth=req.subscription.keys.auth,
+        ),
+    )
+
+    await container.users_repo.update_push(user_id, enabled=True, subscription=sub)
+
+
+@router.post("/push/disable", status_code=status.HTTP_204_NO_CONTENT)
+async def disable_push(
+    user_id: str = Depends(get_current_user),
+    container: Container = Depends(get_container),
+):
+    """Disable Web Push notifications for the user."""
+    await get_or_create_user(user_id, container)
+    await container.users_repo.update_push(user_id, enabled=False, subscription=None)

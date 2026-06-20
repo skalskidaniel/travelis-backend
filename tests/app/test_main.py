@@ -1,3 +1,4 @@
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.main import handler
 
 
@@ -55,7 +56,7 @@ def test_lambda_handler_api_gateway():
     assert "body" in response
 
 
-def test_lambda_handler_unhandled_event():
+def test_lambda_handler_cognito_post_confirmation():
     event = {
         "version": "1",
         "region": "eu-central-1",
@@ -72,5 +73,37 @@ def test_lambda_handler_unhandled_event():
         "response": {},
     }
 
-    response = handler(event, None)
-    assert response is not None
+    with (
+        patch("app.user.controller.get_or_create_user") as mock_get_or_create,
+        patch("app.main.container") as mock_container,
+    ):
+        mock_container.exit_stack = MagicMock()
+        response = handler(event, None)
+        assert response == event
+        mock_get_or_create.assert_called_once_with("test-user-id", mock_container)
+
+
+def test_lambda_handler_scheduler_match_user():
+    event = {"type": "match_user", "user_id": "user-123"}
+
+    with patch("app.main.container") as mock_container:
+        mock_container.exit_stack = MagicMock()
+        mock_container.matching_service.match_user_offers = AsyncMock(return_value=True)
+
+        response = handler(event, None)
+
+        assert response["status"] == "success"
+        assert response["feed_changed"] is True
+        mock_container.matching_service.match_user_offers.assert_called_once_with(
+            "user-123"
+        )
+
+
+def test_lambda_handler_unhandled_event():
+    event = {"type": "unknown_event_type"}
+
+    with patch("app.main.container") as mock_container:
+        mock_container.exit_stack = MagicMock()
+        response = handler(event, None)
+        assert response["status"] == "success"
+        assert "stub" in response["message"]
