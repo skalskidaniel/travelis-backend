@@ -39,6 +39,8 @@ class StatisticalOfferScorer(OfferScorer):
             keep_count = max(1, math.ceil(n * self.config.small_sample_keep_ratio))
             sorted_indices = np.argsort(prices)
             passing_indices = sorted_indices[:keep_count]
+            for i in range(n):
+                offers[i].metadata.price_z_score = None
         else:
             mean_price = np.mean(prices)
             stddev = np.std(prices)

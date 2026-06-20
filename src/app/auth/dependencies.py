@@ -13,6 +13,7 @@ async def get_current_user(
     For this iteration, we build the dependency structure and decode the token
     without signature verification (mocking/stubbing Cognito validation).
     """
+    #TODO add signature verification
     token = credentials.credentials
     try:
         payload = jwt.decode(token, options={"verify_signature": False})

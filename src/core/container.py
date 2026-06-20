@@ -1,6 +1,7 @@
 from contextlib import AsyncExitStack
 from typing import Any
 import aioboto3
+import httpx
 from redis.asyncio import Redis
 
 from core.config import Settings
@@ -24,6 +25,11 @@ class Container:
         self.scheduler_client: Any = None
         self.cognito_client: Any = None
         self.lambda_client: Any = None
+        self.http_client: httpx.AsyncClient | None = None  # pyright: ignore[reportUndefinedVariable]
+
+        # Providers
+        self.tui_provider: Any = None
+        self.wakacje_provider: Any = None
 
         # Repositories
         self.users_repo: DynamoUsersRepository | None = None
@@ -43,9 +49,18 @@ class Container:
         if self.exit_stack is not None:
             return
 
+        import httpx
+        from core.providers.tui.main import TuiProvider
+        from core.providers.wakacjepl.main import WakacjePlProvider
+
         self.exit_stack = AsyncExitStack()
 
-        # 1. AWS Services
+        self.http_client = await self.exit_stack.enter_async_context(
+            httpx.AsyncClient(timeout=15.0)
+        )
+        self.tui_provider = TuiProvider(self.http_client)
+        self.wakacje_provider = WakacjePlProvider(self.http_client)
+
         session = aioboto3.Session()
         self.dynamodb_resource = await self.exit_stack.enter_async_context(
             session.resource("dynamodb", region_name=self.settings.aws_region)
@@ -60,7 +75,6 @@ class Container:
             session.client("lambda", region_name=self.settings.aws_region)
         )
 
-        # 2. Get DynamoDB tables
         users_table = await self.dynamodb_resource.Table(self.settings.db.users_table)
         cells_table = await self.dynamodb_resource.Table(self.settings.db.cells_table)
         offers_table = await self.dynamodb_resource.Table(self.settings.db.offers_table)
@@ -68,20 +82,17 @@ class Container:
             self.settings.db.user_offers_table
         )
 
-        # 3. Instantiate DynamoDB repositories
         self.users_repo = DynamoUsersRepository(users_table)
         self.cells_repo = DynamoCellsRepository(cells_table)
         self.offers_repo = DynamoOffersRepository(offers_table)
         self.user_offers_repo = DynamoUserOffersRepository(user_offers_table)
 
-        # 4. Redis connection
         self.redis_client = Redis.from_url(
             self.settings.redis_url, decode_responses=True
         )
         self.exit_stack.push_async_callback(self.redis_client.aclose)
         self.feed_repo = RedisFeedRepository(self.redis_client)
 
-        # 5. Services
         from core.services.activation import ActivationService
         from core.services.notifications import NotificationsService
         from core.services.matching import MatchingService
@@ -117,6 +128,9 @@ class Container:
             self.scheduler_client = None
             self.cognito_client = None
             self.lambda_client = None
+            self.http_client = None
+            self.tui_provider = None
+            self.wakacje_provider = None
             self.users_repo = None
             self.cells_repo = None
             self.offers_repo = None

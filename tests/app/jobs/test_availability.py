@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -16,6 +16,8 @@ def mock_container():
     c = MagicMock(spec=Container)
     c.cells_repo = AsyncMock()
     c.offers_repo = AsyncMock()
+    c.tui_provider = MagicMock()
+    c.wakacje_provider = MagicMock()
     return c
 
 
@@ -128,18 +130,18 @@ async def test_run_availability_job_becomes_unavailable(mock_container):
     )
     mock_container.offers_repo.query_by_cell.return_value = [offer]
 
-    with patch("app.jobs.availability.TuiProvider") as mock_tui_cls:
-        mock_tui = mock_tui_cls.return_value
-        mock_tui.check_availability = AsyncMock(return_value=False)  # unavailable
+    mock_container.tui_provider.check_availability = AsyncMock(
+        return_value=False
+    )  # unavailable
 
-        result = await run_availability_job(mock_container)
+    result = await run_availability_job(mock_container)
 
-        assert result["checked_offers_count"] == 1
-        assert result["updated_offers_count"] == 1
+    assert result["checked_offers_count"] == 1
+    assert result["updated_offers_count"] == 1
 
-        mock_container.offers_repo.put.assert_called_once()
-        saved_offer = mock_container.offers_repo.put.call_args[0][0]
-        assert saved_offer.available is False
+    mock_container.offers_repo.put.assert_called_once()
+    saved_offer = mock_container.offers_repo.put.call_args[0][0]
+    assert saved_offer.available is False
 
 
 @pytest.mark.asyncio
@@ -189,18 +191,20 @@ async def test_run_availability_job_price_updates(mock_container):
     )
     mock_container.offers_repo.query_by_cell.return_value = [offer]
 
-    with patch("app.jobs.availability.TuiProvider") as mock_tui_cls:
-        mock_tui = mock_tui_cls.return_value
-        mock_tui.check_availability = AsyncMock(return_value=True)  # still available
-        mock_tui.check_price = AsyncMock(return_value=Decimal("1200"))  # price changed
+    mock_container.tui_provider.check_availability = AsyncMock(
+        return_value=True
+    )  # still available
+    mock_container.tui_provider.check_price = AsyncMock(
+        return_value=Decimal("1200")
+    )  # price changed
 
-        result = await run_availability_job(mock_container)
+    result = await run_availability_job(mock_container)
 
-        assert result["checked_offers_count"] == 1
-        assert result["updated_offers_count"] == 1
+    assert result["checked_offers_count"] == 1
+    assert result["updated_offers_count"] == 1
 
-        mock_container.offers_repo.put.assert_called_once()
-        saved_offer = mock_container.offers_repo.put.call_args[0][0]
-        assert saved_offer.available is True
-        assert saved_offer.price_total == Decimal("1200")
-        assert saved_offer.price_per_day == Decimal("85.71")
+    mock_container.offers_repo.put.assert_called_once()
+    saved_offer = mock_container.offers_repo.put.call_args[0][0]
+    assert saved_offer.available is True
+    assert saved_offer.price_total == Decimal("1200")
+    assert saved_offer.price_per_day == Decimal("85.71")

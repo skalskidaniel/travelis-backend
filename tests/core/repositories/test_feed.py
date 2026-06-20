@@ -29,23 +29,31 @@ async def test_feed_repo_zset(redis_client):
     assert await repo.get_or_build_sort_zset(user_id, field, "desc", 1) is False
 
     members = [
-        ("offer_1", 1000.5),
-        ("offer_2", 500.2),
-        ("offer_3", 1500.7),
+        ("offer_1:cell_1", 1000.5),
+        ("offer_2:cell_1", 500.2),
+        ("offer_3:cell_1", 1500.7),
     ]
     await repo.add_to_sort_zset(user_id, field, "desc", 1, members)
 
     assert await repo.get_or_build_sort_zset(user_id, field, "desc", 1) is True
 
     page_desc = await repo.get_page(user_id, field, "desc", 1, offset=0, limit=10)
-    assert page_desc == ["offer_3", "offer_1", "offer_2"]
+    assert page_desc == [
+        ("offer_3", "cell_1"),
+        ("offer_1", "cell_1"),
+        ("offer_2", "cell_1"),
+    ]
 
     page_desc_offset = await repo.get_page(user_id, field, "desc", 1, offset=1, limit=1)
-    assert page_desc_offset == ["offer_1"]
+    assert page_desc_offset == [("offer_1", "cell_1")]
 
     await repo.add_to_sort_zset(user_id, field, "asc", 1, members)
     page_asc = await repo.get_page(user_id, field, "asc", 1, offset=0, limit=10)
-    assert page_asc == ["offer_2", "offer_1", "offer_3"]
+    assert page_asc == [
+        ("offer_2", "cell_1"),
+        ("offer_1", "cell_1"),
+        ("offer_3", "cell_1"),
+    ]
 
 
 async def test_feed_repo_clear_user(redis_client):

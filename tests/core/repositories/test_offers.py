@@ -49,7 +49,7 @@ async def test_offers_repo_lifecycle(offers_table, test_offer):
     repo = DynamoOffersRepository(offers_table)
 
     await repo.put(test_offer)
-    fetched = await repo.get(test_offer.offer_id, cell_id=test_offer.cell_id)
+    fetched = await repo.get(test_offer.cell_id, test_offer.offer_id)
     assert fetched is not None
     assert fetched.offer_id == test_offer.offer_id
     assert fetched.cell_id == test_offer.cell_id
@@ -61,7 +61,7 @@ async def test_offers_repo_lifecycle(offers_table, test_offer):
     assert cell_offers[0].offer_id == test_offer.offer_id
 
     await repo.delete(test_offer.cell_id, test_offer.offer_id)
-    assert await repo.get(test_offer.offer_id, cell_id=test_offer.cell_id) is None
+    assert await repo.get(test_offer.cell_id, test_offer.offer_id) is None
 
 
 async def test_offers_repo_batch_operations(offers_table, test_offer):
@@ -73,8 +73,8 @@ async def test_offers_repo_batch_operations(offers_table, test_offer):
 
     await repo.put_batch([test_offer, offer2])
 
-    fetched1 = await repo.get(test_offer.offer_id, cell_id=test_offer.cell_id)
-    fetched2 = await repo.get(offer2.offer_id, cell_id=offer2.cell_id)
+    fetched1 = await repo.get(test_offer.cell_id, test_offer.offer_id)
+    fetched2 = await repo.get(offer2.cell_id, offer2.offer_id)
     assert fetched1 is not None
     assert fetched2 is not None
 
@@ -88,5 +88,5 @@ async def test_offers_repo_batch_operations(offers_table, test_offer):
         ]
     )
 
-    assert await repo.get(test_offer.offer_id, cell_id=test_offer.cell_id) is None
-    assert await repo.get(offer2.offer_id, cell_id=offer2.cell_id) is None
+    assert await repo.get(test_offer.cell_id, test_offer.offer_id) is None
+    assert await repo.get(offer2.cell_id, offer2.offer_id) is None

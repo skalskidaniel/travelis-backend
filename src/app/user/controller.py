@@ -20,13 +20,10 @@ async def get_or_create_user(user_id: str, container: Container) -> User:
     user = await container.users_repo.get(user_id)
     if user is None:
         user = User(user_id=user_id)
-        # 1. Save user to the database
         await container.users_repo.put(user)
-        # 2. Activate default cells
         await container.activation_service.update_cell_activations(
             new_prefs=user.preferences, old_prefs=None
         )
-        # 3. Schedule the first match
         await container.scheduler_service.schedule_match(user_id)
     return user
 
@@ -51,7 +48,6 @@ async def update_preferences(
     user = await get_or_create_user(user_id, container)
     old_prefs = user.preferences
 
-    # Merge non-None fields into user preferences
     updated_dict = user.preferences.model_dump()
     for field, val in updates.model_dump(exclude_unset=True).items():
         updated_dict[field] = val
@@ -60,15 +56,12 @@ async def update_preferences(
     user.preferences = new_prefs
     user.updated_at = datetime.now(timezone.utc)
 
-    # 1. Save the updated user preferences
     await container.users_repo.put(user)
 
-    # 2. Sync cell activations
     await container.activation_service.update_cell_activations(
         new_prefs=new_prefs, old_prefs=old_prefs
     )
 
-    # 3. Schedule a debounced match in 30s
     await container.scheduler_service.schedule_match(user_id)
 
     return user.preferences

@@ -82,17 +82,14 @@ async def get_offers_feed(
                 detail="Invalid pagination cursor",
             )
 
-    # 1. Fetch current feed version
     current_version = await container.feed_repo.get_feed_version(user_id)
 
-    # 2. Reset pagination if version has changed
     if cursor_feed_version is not None and cursor_feed_version != current_version:
         logger.info(
             f"Feed version mismatch (client: {cursor_feed_version}, server: {current_version}). Resetting pagination."
         )
         offset = 0
 
-    # 3. Check if ZSET key exists in Redis
     zset_exists = await container.feed_repo.get_or_build_sort_zset(
         user_id=user_id,
         field=sort,
@@ -100,7 +97,6 @@ async def get_offers_feed(
         version=current_version,
     )
 
-    # 4. Rebuild ZSET if it doesn't exist
     if not zset_exists:
         logger.info(
             f"ZSET not cached for user {user_id}, sort {sort}, order {order}, v{current_version}. Building..."
@@ -111,22 +107,22 @@ async def get_offers_feed(
                 offers=[], next_cursor=None, feed_version=current_version
             )
 
-        # Batch-fetch corresponding offers from DynamoDB
         tasks = [
-            container.offers_repo.get(item["offer_id"], item["cell_id"])
+            container.offers_repo.get(item["cell_id"], item["offer_id"])
             for item in user_offers
         ]
         offers = await asyncio.gather(*tasks)
         valid_offers = [o for o in offers if o is not None]
 
-        # Calculate scores and write to Redis ZSET
-        members = [(o.offer_id, calculate_zset_score(o, sort)) for o in valid_offers]
+        members = [
+            (f"{o.offer_id}:{o.cell_id}", calculate_zset_score(o, sort))
+            for o in valid_offers
+        ]
         await container.feed_repo.add_to_sort_zset(
             user_id, sort, order, current_version, members
         )
 
-    # 5. Fetch page of offer IDs from ZSET
-    offer_ids = await container.feed_repo.get_page(
+    offer_keys = await container.feed_repo.get_page(
         user_id=user_id,
         field=sort,
         order=order,
@@ -135,32 +131,24 @@ async def get_offers_feed(
         limit=limit,
     )
 
-    if not offer_ids:
+    if not offer_keys:
         return PaginatedOffersResponse(
             offers=[], next_cursor=None, feed_version=current_version
         )
 
-    # 6. Hydrate/fetch the page of offers from DynamoDB (GSI-free approach)
-    uo_tasks = [container.user_offers_repo.get(user_id, oid) for oid in offer_ids]
-    uo_items = await asyncio.gather(*uo_tasks)
-    uo_map = {
-        item["offer_id"]: item["cell_id"] for item in uo_items if item is not None
-    }
-
     offer_tasks = [
-        container.offers_repo.get(oid, uo_map[oid])
-        for oid in offer_ids
-        if oid in uo_map
+        container.offers_repo.get(cell_id, offer_id)
+        for offer_id, cell_id in offer_keys
+        if offer_id and cell_id
     ]
     hydrated_offers = await asyncio.gather(*offer_tasks)
 
-    # Maintain original ZSET ordering
+    offer_ids = [oid for oid, _ in offer_keys]
     offer_map = {o.offer_id: o for o in hydrated_offers if o is not None}
     sorted_offers = [offer_map[oid] for oid in offer_ids if oid in offer_map]
 
-    # 7. Construct next cursor
     next_cursor = None
-    if len(offer_ids) == limit:
+    if len(offer_keys) == limit:
         next_cursor_data = {
             "offset": offset + limit,
             "feed_version": current_version,
@@ -183,7 +171,6 @@ async def get_offer_detail(
     container: Container = Depends(get_container),
 ):
     """Retrieve full offer details for an offer present in the user's matched feed."""
-    # Look up the GSI-free denormalized cell_id
     uo_item = await container.user_offers_repo.get(user_id, offer_id)
     if not uo_item:
         raise HTTPException(
@@ -192,7 +179,7 @@ async def get_offer_detail(
         )
 
     cell_id = uo_item["cell_id"]
-    offer = await container.offers_repo.get(offer_id, cell_id)
+    offer = await container.offers_repo.get(cell_id, offer_id)
     if not offer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -209,7 +196,7 @@ async def get_shared_offer_detail(
     container: Container = Depends(get_container),
 ):
     """Retrieve shared public offer details directly by cell ID and offer ID (requires no auth)."""
-    offer = await container.offers_repo.get(offer_id, cell_id)
+    offer = await container.offers_repo.get(cell_id, offer_id)
     if not offer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

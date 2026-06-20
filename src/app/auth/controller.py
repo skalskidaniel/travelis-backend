@@ -20,7 +20,6 @@ async def delete_account(
     user = await container.users_repo.get(user_id)
 
     if user is not None:
-        # 1. Decrement cell activations
         try:
             cells = generate_required_cells(user.preferences)
             if cells:
@@ -32,7 +31,6 @@ async def delete_account(
                 f"Error decrementing cell activations for deleted user {user_id}: {exc}"
             )
 
-        # 2. Delete all UserOffers matching user_id
         try:
             user_offers = await container.user_offers_repo.query_by_user(user_id)
             if user_offers:
@@ -41,7 +39,6 @@ async def delete_account(
         except Exception as exc:
             logger.error(f"Error deleting UserOffers for deleted user {user_id}: {exc}")
 
-        # 3. Clear user feed cache from Redis
         try:
             await container.feed_repo.clear_user(user_id)
         except Exception as exc:
@@ -49,13 +46,11 @@ async def delete_account(
                 f"Error clearing Redis cache for deleted user {user_id}: {exc}"
             )
 
-        # 4. Delete user record from Users table
         try:
             await container.users_repo.delete(user_id)
         except Exception as exc:
             logger.error(f"Error deleting user record for {user_id}: {exc}")
 
-    # 5. Delete Cognito user
     if container.settings.cognito_user_pool_id:
         try:
             await container.cognito_client.admin_delete_user(

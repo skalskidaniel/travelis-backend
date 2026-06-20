@@ -6,6 +6,7 @@ from app.auth.dependencies import get_current_user
 
 auth_test_app = FastAPI()
 
+#TODO shouldn't there be true instance of app from src/app/ instead of mocking the endpoint
 
 @auth_test_app.get("/test-auth")
 def mock_auth_endpoint(user_id: str = Depends(get_current_user)):

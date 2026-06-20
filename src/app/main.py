@@ -73,7 +73,7 @@ async def handle_non_http(event: dict, context) -> dict:
         else:
             raise ValueError("Missing user_id for match_user event")
 
-    # C. EventBridge 3x daily scrape coordinator job
+    # C. EventBridge scrape coordinator job
     elif event_type == "scrape_offers":
         print("EventBridge: Starting scrape_offers job")
 
@@ -84,7 +84,7 @@ async def handle_non_http(event: dict, context) -> dict:
             "results": results,
         }
 
-    # D. EventBridge 1x daily availability check job
+    # D. EventBridge availability check job
     elif event_type == "check_availability":
         print("EventBridge: Starting check_availability job")
 

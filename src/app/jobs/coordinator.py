@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 from datetime import datetime, time, timezone
-import httpx
 
 from core.container import Container
 from core.models.cell import MarketCell
@@ -13,8 +12,6 @@ from core.services.ingest import (
     compute_offer_id,
 )
 from core.services.scoring import get_scorer
-from core.providers.tui.main import TuiProvider
-from core.providers.wakacjepl.main import WakacjePlProvider
 
 logger = logging.getLogger(__name__)
 
@@ -78,112 +75,111 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
     scraped_cell_ids = []
     timeout_triggered = False
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        tui = TuiProvider(client)
-        wakacje = WakacjePlProvider(client)
+    tui = container.tui_provider
+    wakacje = container.wakacje_provider
 
-        async def worker():
-            nonlocal timeout_triggered
-            while not queue.empty():
-                if is_timeout_approaching(context):
-                    logger.warning("Lambda timeout approaching! Worker stopping.")
-                    timeout_triggered = True
-                    break
+    async def worker():
+        nonlocal timeout_triggered
+        while not queue.empty():
+            if is_timeout_approaching(context):
+                logger.warning("Lambda timeout approaching! Worker stopping.")
+                timeout_triggered = True
+                break
 
-                cell = await queue.get()
-                try:
-                    tui_task = search_with_retry(tui.search, cell, "TUI")
-                    wakacje_task = search_with_retry(wakacje.search, cell, "WakacjePl")
+            cell = await queue.get()
+            try:
+                tui_task = search_with_retry(tui.search, cell, "TUI")
+                wakacje_task = search_with_retry(wakacje.search, cell, "WakacjePl")
 
-                    tui_raw, wakacje_raw = await asyncio.gather(
-                        tui_task, wakacje_task, return_exceptions=True
+                tui_raw, wakacje_raw = await asyncio.gather(
+                    tui_task, wakacje_task, return_exceptions=True
+                )
+
+                raw_offers = []
+                if isinstance(tui_raw, list):
+                    raw_offers.extend(tui_raw)
+                else:
+                    logger.error(
+                        f"TUI search failed for cell {cell.cell_id}: {tui_raw}"
                     )
 
-                    raw_offers = []
-                    if isinstance(tui_raw, list):
-                        raw_offers.extend(tui_raw)
-                    else:
-                        logger.error(
-                            f"TUI search failed for cell {cell.cell_id}: {tui_raw}"
-                        )
-
-                    if isinstance(wakacje_raw, list):
-                        raw_offers.extend(wakacje_raw)
-                    else:
-                        logger.error(
-                            f"WakacjePl search failed for cell {cell.cell_id}: {wakacje_raw}"
-                        )
-
-                    if not raw_offers:
-                        logger.info(f"No raw offers scraped for cell {cell.cell_id}")
-                        continue
-
-                    collapsed_raw = ingest_raw_offers(raw_offers)
-                    if not collapsed_raw:
-                        continue
-
-                    scorer = get_scorer()
-                    scored_offers = scorer.score(collapsed_raw)
-                    if not scored_offers:
-                        continue
-
-                    now = datetime.now(timezone.utc)
-                    new_offers_map = {}
-                    for scored in scored_offers:
-                        oid = compute_offer_id(scored)
-                        expected_ttl = int(
-                            datetime.combine(
-                                scored.departure_date,
-                                time.min,
-                                tzinfo=timezone.utc,
-                            ).timestamp()
-                        )
-                        offer = Offer(
-                            **scored.model_dump(),
-                            cell_id=cell.cell_id,
-                            offer_id=oid,
-                            share_url="https://wakacje-travelis.pl/offer/dummy/dummy",
-                            scraped_at=now,
-                            updated_at=now,
-                            ttl=expected_ttl,
-                        )
-                        new_offers_map[oid] = offer
-
-                    existing_offers = await container.offers_repo.query_by_cell(
-                        cell.cell_id
+                if isinstance(wakacje_raw, list):
+                    raw_offers.extend(wakacje_raw)
+                else:
+                    logger.error(
+                        f"WakacjePl search failed for cell {cell.cell_id}: {wakacje_raw}"
                     )
-                    existing_map = {o.offer_id: o for o in existing_offers}
 
-                    offers_to_save = []
+                if not raw_offers:
+                    logger.info(f"No raw offers scraped for cell {cell.cell_id}")
+                    continue
 
-                    for oid, new_offer in new_offers_map.items():
-                        if oid in existing_map:
-                            merged = merge_existing_and_new_offer(
-                                existing_map[oid], new_offer
-                            )
-                            offers_to_save.append(merged)
-                        else:
-                            offers_to_save.append(new_offer)
+                collapsed_raw = ingest_raw_offers(raw_offers)
+                if not collapsed_raw:
+                    continue
 
-                    # Availability-by-absence logic
-                    for oid, existing_offer in existing_map.items():
-                        if oid not in new_offers_map and existing_offer.available:
-                            existing_offer.available = False
-                            existing_offer.updated_at = now
-                            offers_to_save.append(existing_offer)
+                scorer = get_scorer()
+                scored_offers = await asyncio.to_thread(scorer.score, collapsed_raw)
+                if not scored_offers:
+                    continue
 
-                    await container.offers_repo.put_batch(offers_to_save)
-                    await container.cells_repo.update_last_scraped([cell.cell_id], now)
+                now = datetime.now(timezone.utc)
+                new_offers_map = {}
+                for scored in scored_offers:
+                    oid = compute_offer_id(scored)
+                    expected_ttl = int(
+                        datetime.combine(
+                            scored.departure_date,
+                            time.min,
+                            tzinfo=timezone.utc,
+                        ).timestamp()
+                    )
+                    offer = Offer(
+                        **scored.model_dump(),
+                        cell_id=cell.cell_id,
+                        offer_id=oid,
+                        share_url="https://wakacje-travelis.pl/offer/dummy/dummy",
+                        scraped_at=now,
+                        updated_at=now,
+                        ttl=expected_ttl,
+                    )
+                    new_offers_map[oid] = offer
 
-                    scraped_cell_ids.append(cell.cell_id)
+                existing_offers = await container.offers_repo.query_by_cell(
+                    cell.cell_id
+                )
+                existing_map = {o.offer_id: o for o in existing_offers}
 
-                except Exception as e:
-                    logger.error(f"Unhandled error scraping cell {cell.cell_id}: {e}")
-                finally:
-                    queue.task_done()
+                offers_to_save = []
 
-        workers = [asyncio.create_task(worker()) for _ in range(min(10, len(cells)))]
-        await asyncio.gather(*workers)
+                for oid, new_offer in new_offers_map.items():
+                    if oid in existing_map:
+                        merged = merge_existing_and_new_offer(
+                            existing_map[oid], new_offer
+                        )
+                        offers_to_save.append(merged)
+                    else:
+                        offers_to_save.append(new_offer)
+
+                # Availability-by-absence logic
+                for oid, existing_offer in existing_map.items():
+                    if oid not in new_offers_map and existing_offer.available:
+                        existing_offer.available = False
+                        existing_offer.updated_at = now
+                        offers_to_save.append(existing_offer)
+
+                await container.offers_repo.put_batch(offers_to_save)
+                await container.cells_repo.update_last_scraped([cell.cell_id], now)
+
+                scraped_cell_ids.append(cell.cell_id)
+
+            except Exception as e:
+                logger.error(f"Unhandled error scraping cell {cell.cell_id}: {e}")
+            finally:
+                queue.task_done()
+
+    workers = [asyncio.create_task(worker()) for _ in range(min(10, len(cells)))]
+    await asyncio.gather(*workers)
 
     # 3. Handle timeout approaching self-triggering continuation
     continued = False

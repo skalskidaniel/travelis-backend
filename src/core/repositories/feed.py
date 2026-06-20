@@ -51,14 +51,22 @@ class RedisFeedRepository(FeedRepository):
         version: int,
         offset: int,
         limit: int,
-    ) -> list[str]:
+    ) -> list[tuple[str, str]]:
         key = f"user:{user_id}:sort:{field}:{order}:v{version}"
         start = offset
         end = offset + limit - 1
         desc = order == "desc"
 
         result = await self.redis.zrange(key, start, end, desc=desc)
-        return [r.decode("utf-8") if isinstance(r, bytes) else r for r in result]
+        parsed = []
+        for r in result:
+            val = r.decode("utf-8") if isinstance(r, bytes) else r
+            if ":" in val:
+                parts = val.split(":", 1)
+                parsed.append((parts[0], parts[1]))
+            else:
+                parsed.append((val, ""))
+        return parsed
 
     async def clear_user(self, user_id: str) -> None:
         pattern = f"user:{user_id}:*"

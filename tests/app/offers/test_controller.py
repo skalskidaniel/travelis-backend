@@ -104,12 +104,7 @@ def test_get_offers_cached_feed(
     mock_container.feed_repo.get_or_build_sort_zset.return_value = True
 
     offer_id = sample_domain_offer.offer_id
-    mock_container.feed_repo.get_page.return_value = [offer_id]
-    mock_container.user_offers_repo.get.return_value = {
-        "user_id": "user-123",
-        "offer_id": offer_id,
-        "cell_id": "cell-1",
-    }
+    mock_container.feed_repo.get_page.return_value = [(offer_id, "cell-1")]
     mock_container.offers_repo.get.return_value = sample_domain_offer
 
     response = client.get("/api/v2/offers", headers=auth_headers)
@@ -133,11 +128,7 @@ def test_get_offers_build_zset(
     ]
     mock_container.offers_repo.get.return_value = sample_domain_offer
 
-    mock_container.feed_repo.get_page.return_value = [offer_id]
-    mock_container.user_offers_repo.get.return_value = {
-        "offer_id": offer_id,
-        "cell_id": "cell-1",
-    }
+    mock_container.feed_repo.get_page.return_value = [(offer_id, "cell-1")]
 
     response = client.get("/api/v2/offers", headers=auth_headers)
     assert response.status_code == 200
@@ -154,11 +145,9 @@ def test_get_offers_outdated_cursor_resets(
 ):
     mock_container.feed_repo.get_feed_version.return_value = 50
     mock_container.feed_repo.get_or_build_sort_zset.return_value = True
-    mock_container.feed_repo.get_page.return_value = [sample_domain_offer.offer_id]
-    mock_container.user_offers_repo.get.return_value = {
-        "offer_id": sample_domain_offer.offer_id,
-        "cell_id": "cell-1",
-    }
+    mock_container.feed_repo.get_page.return_value = [
+        (sample_domain_offer.offer_id, "cell-1")
+    ]
     mock_container.offers_repo.get.return_value = sample_domain_offer
 
     # Cursor with version 49

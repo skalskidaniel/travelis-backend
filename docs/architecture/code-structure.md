@@ -25,9 +25,12 @@ src/
 │   ├── models/            # domain models (Cell, Offer, RawOffer, Preferences, UserOffer)
 │   ├── providers/
 │   │   ├── base.py        # Provider port (Protocol): async search(cell), check_availability(id)
-│   │   ├── wakacje.py     # adapter + field mapping + dedup key
-│   │   ├── tui.py         # adapter + field mapping + boardCode map
-│   │   └── registry.py    # name -> Provider
+│   │   ├── wakacjepl/     # wakacje.pl adapter directory
+│   │   │   ├── main.py    # adapter + field mapping + API contracts
+│   │   │   └── utils.py
+│   │   └── tui/           # tui.pl adapter directory
+│   │       ├── main.py    # adapter + field mapping + API contracts
+│   │       └── utils.py
 │   ├── repositories/
 │   │   ├── base.py        # repository ports (Protocol)
 │   │   ├── users.py
@@ -119,10 +122,4 @@ Adding a third source later is one new adapter + one registry line. See [provide
 
 The fan-out concurrency strategy lives in the orchestration layer (`app/jobs/coordinator`), not in `core`. `core` exposes `async`, single-unit functions with no shared mutable state; the coordinator schedules them on the event loop with a bounded `asyncio.Semaphore`. CPU-bound scoring is offloaded with `asyncio.to_thread` so it never blocks the loop. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
 
-### Scaffolding status
 
-- `src/core/` is partially built:
-  - `models/`, `providers/`, `exceptions/`, `services/`, `repositories/`, `config.py` and `container.py` are built.
-- `src/app/` controllers (`auth`, `user`, `offers`) are currently stubs with empty models.
-- `src/app/health/` directory exists but is **empty** (no handler or router yet).
-- `src/app/jobs/` is **not yet built**.
