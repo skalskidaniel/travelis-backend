@@ -4,10 +4,10 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
-import jwt
 import pytest
 from fastapi.testclient import TestClient
 
+from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
 from app.main import app
 from core.models.common import BoardType, ProviderName
@@ -27,6 +27,7 @@ def mock_container():
 @pytest.fixture
 def client(mock_container):
     app.dependency_overrides[get_container] = lambda: mock_container
+    app.dependency_overrides[get_current_user] = lambda: "user-123"
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -34,9 +35,7 @@ def client(mock_container):
 
 @pytest.fixture
 def auth_headers():
-    payload = {"sub": "user-123"}
-    token = jwt.encode(payload, "a" * 32, algorithm="HS256")
-    return {"Authorization": f"Bearer {token}"}
+    return {}
 
 
 @pytest.fixture

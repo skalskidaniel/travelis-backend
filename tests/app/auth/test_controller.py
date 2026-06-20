@@ -1,10 +1,10 @@
-import jwt
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock
 
-from app.main import app
+from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
+from app.main import app
 from core.models.user import User, UserPreferences
 
 
@@ -24,19 +24,13 @@ def mock_container():
 @pytest.fixture
 def client(mock_container):
     app.dependency_overrides[get_container] = lambda: mock_container
+    app.dependency_overrides[get_current_user] = lambda: "user-123"
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
 
 
-@pytest.fixture
-def auth_headers():
-    payload = {"sub": "user-123"}
-    token = jwt.encode(payload, "a" * 32, algorithm="HS256")
-    return {"Authorization": f"Bearer {token}"}
-
-
-def test_delete_account_cascade_success(client, mock_container, auth_headers):
+def test_delete_account_cascade_success(client, mock_container):
     existing_user = User(
         user_id="user-123", preferences=UserPreferences(countries=["IT"])
     )
@@ -46,7 +40,7 @@ def test_delete_account_cascade_success(client, mock_container, auth_headers):
         {"user_id": "user-123", "offer_id": "offer-abc"}
     ]
 
-    response = client.delete("/api/v2/auth/account", headers=auth_headers)
+    response = client.delete("/api/v2/auth/account")
 
     assert response.status_code == 204
 
@@ -65,12 +59,10 @@ def test_delete_account_cascade_success(client, mock_container, auth_headers):
     )
 
 
-def test_delete_account_user_not_found_cleans_cognito(
-    client, mock_container, auth_headers
-):
+def test_delete_account_user_not_found_cleans_cognito(client, mock_container):
     mock_container.users_repo.get.return_value = None
 
-    response = client.delete("/api/v2/auth/account", headers=auth_headers)
+    response = client.delete("/api/v2/auth/account")
 
     assert response.status_code == 204
 
@@ -84,19 +76,45 @@ def test_delete_account_user_not_found_cleans_cognito(
     )
 
 
-def test_delete_account_no_cognito_pool_skips_cognito(
-    client, mock_container, auth_headers
-):
+def test_delete_account_no_cognito_pool_skips_cognito(client, mock_container):
     mock_container.settings.cognito_user_pool_id = None
 
     existing_user = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
     mock_container.user_offers_repo.query_by_user.return_value = []
 
-    response = client.delete("/api/v2/auth/account", headers=auth_headers)
+    response = client.delete("/api/v2/auth/account")
 
     assert response.status_code == 204
 
     mock_container.users_repo.delete.assert_called_once_with("user-123")
 
     mock_container.cognito_client.admin_delete_user.assert_not_called()
+
+
+def test_delete_account_fails_when_user_delete_fails(client, mock_container):
+    existing_user = User(user_id="user-123")
+    mock_container.users_repo.get.return_value = existing_user
+    mock_container.user_offers_repo.query_by_user.return_value = []
+    mock_container.users_repo.delete.side_effect = RuntimeError("dynamodb error")
+
+    response = client.delete("/api/v2/auth/account")
+
+    assert response.status_code == 503
+    assert response.json()["retryable"] is True
+    mock_container.cognito_client.admin_delete_user.assert_not_called()
+
+
+def test_delete_account_fails_when_cognito_delete_fails(client, mock_container):
+    existing_user = User(user_id="user-123")
+    mock_container.users_repo.get.return_value = existing_user
+    mock_container.user_offers_repo.query_by_user.return_value = []
+    mock_container.cognito_client.admin_delete_user.side_effect = RuntimeError(
+        "cognito error"
+    )
+
+    response = client.delete("/api/v2/auth/account")
+
+    assert response.status_code == 503
+    assert response.json()["retryable"] is True
+    mock_container.users_repo.delete.assert_called_once_with("user-123")

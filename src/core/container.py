@@ -43,6 +43,7 @@ class Container:
         self.matching_service: Any = None
         self.notifications_service: Any = None
         self.scheduler_service: Any = None
+        self.cognito_jwt_verifier: Any = None
 
     async def initialize(self) -> None:
         """Initialize all shared resources once per cold start."""
@@ -97,6 +98,7 @@ class Container:
         from core.services.notifications import NotificationsService
         from core.services.matching import MatchingService
         from core.services.scheduler import SchedulerService
+        from core.services.cognito_jwt import CognitoJwtVerifier
 
         self.activation_service = ActivationService(
             cells_repo=self.cells_repo,
@@ -116,6 +118,10 @@ class Container:
         self.scheduler_service = SchedulerService(
             scheduler_client=self.scheduler_client,
             settings=self.settings,
+        )
+        self.cognito_jwt_verifier = CognitoJwtVerifier(
+            settings=self.settings,
+            http_client=self.http_client,
         )
 
     async def cleanup(self) -> None:
@@ -140,6 +146,7 @@ class Container:
             self.matching_service = None
             self.notifications_service = None
             self.scheduler_service = None
+            self.cognito_jwt_verifier = None
 
 
 container = Container()
