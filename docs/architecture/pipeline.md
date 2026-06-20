@@ -9,9 +9,9 @@ flowchart TD
     EB1[EventBridge 3x daily] --> COORD[jobs.coordinator]
     COORD --> SCRAPE[Async scrape per active cell]
     SCRAPE --> NORM[Normalize + deduplicate]
-    NORM --> SCORE[jobs.score_offers]
+    NORM --> SCORE[scoring service]
     SCORE --> DDB[(Offers table)]
-    COORD -->|on completion| MATCH[jobs.match_users]
+    COORD -->|on completion| MATCH[matching service]
     MATCH --> UO[(UserOffers table)]
     MATCH --> REDIS[(Redis feed rebuild)]
     MATCH --> PUSH[Web Push notification]
@@ -19,13 +19,13 @@ flowchart TD
     AVAIL --> DDB
     PATCH[PATCH /user/preferences] --> PREFS[(Users table)]
     PATCH --> CELLS[Update cell activation]
-    PATCH --> SCHED[Upsert one-time Scheduler at now+30s]
+    PATCH --> SCHED[Upsert one-time Scheduler at now+15s]
     SIGNUP[Cognito post-confirmation] --> PROV[Create Users row + activate cells]
     PROV --> SCHED
     SCHED -->|fires once| MATCH
 ```
 
-Matching is **event-driven** — there is no constant poll. Two independent triggers feed `jobs.match_users` (see [Trigger sources](#trigger-sources)).
+Matching is **event-driven** — there is no constant poll. Two independent triggers run the user matching logic (see [Trigger sources](#trigger-sources)).
 
 ## Market cells
 
@@ -59,11 +59,11 @@ To keep cell scraping decoupled from user-specific details (and avoid expensive 
 Triggered 3× daily by EventBridge.
 
 1. Scan the `MarketCells` table (all rows are active by definition — a cell exists only when `activation_count > 0`).
-2. Schedule one async scrape task per cell with bounded concurrency (`asyncio.Semaphore` ~10).
+2. Schedule one async scrape task per cell with bounded concurrency (using an `asyncio` worker pool of ~10 workers).
 3. Each task calls wakacje.pl and tui.pl APIs (see [providers/](../providers/index.md)).
 4. Pass raw results to normalization → scoring → `Offers` table.
 
-The semaphore/fan-out lives in the orchestrator; per-cell work calls `async` `core` functions, and CPU-bound scoring is offloaded via `asyncio.to_thread`. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
+The worker pool fan-out lives in the orchestrator; per-cell work calls `async` `core` functions, and CPU-bound scoring is offloaded via `asyncio.to_thread`. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
 
 ## Scrape → normalize
 
@@ -74,13 +74,13 @@ The semaphore/fan-out lives in the orchestrator; per-cell work calls `async` `co
 5. Attach `cell_id` from the scrape context.
 6. Forward to scoring.
 
-## Scoring (`jobs.score_offers`)
+## Scoring (scoring service)
 
 See [attractiveness.md](attractiveness.md).
 
 Only offers passing stage 2 are written to `Offers`. If an offer already exists in DynamoDB for the same `(cell_id, offer_id)`, the ingestion process retrieves the existing item, merges the new and old variant sources, updates the primary offer details with the lowest-priced variant, and saves it back (preventing overwrite of other provider data).
 
-## User matching (`jobs.match_users`)
+## User matching (matching service)
 
 ### Trigger sources
 
@@ -88,7 +88,7 @@ There is **no 2-minute sweeper**. Two distinct events drive matching:
 
 | Trigger           | Cause               | Mechanism                                                                        |
 | ----------------- | ------------------- | -------------------------------------------------------------------------------- |
-| Per-user re-match | preferences changed | EventBridge Scheduler one-time schedule `at(now + 30s)`, debounced by overwrite  |
+| Per-user re-match | preferences changed | EventBridge Scheduler one-time schedule `at(now + 15s)`, debounced by overwrite  |
 | Bulk re-match     | new offers scraped  | `jobs.coordinator`, on completion, matches users of the affected (updated) cells |
 
 ### Preference debouncing (EventBridge Scheduler)
@@ -97,13 +97,13 @@ On `PATCH /api/v2/user/preferences`:
 
 1. Save latest preferences to `Users`.
 2. Update market cell activation (increment/decrement).
-3. **Upsert** a one-time schedule named `match-{user_id}` with `ScheduleExpression = at(now + 30s)` and `ActionAfterCompletion: DELETE`.
+3. **Upsert** a one-time schedule named `match-{user_id}` with `ScheduleExpression = at(now + 15s)` and `ActionAfterCompletion: DELETE`.
 
-**Coalescing:** the schedule name is deterministic (`match-{user_id}`), so each edit simply overwrites the fire time — repeated edits collapse into **one** match run 30s after the last edit. No polling, no `refresh_after` field, no GSI.
+**Coalescing:** the schedule name is deterministic (`match-{user_id}`), so each edit simply overwrites the fire time — repeated edits collapse into **one** match run 15s after the last edit. No polling, no `refresh_after` field, no GSI.
 
 **Target:** the schedule invokes the lambdalith with payload `{ "type": "match_user", "user_id": "..." }` (handled by the dual-entry handler).
 
-**Race handling:** if a PATCH lands while a match is mid-run, the run used near-current preferences and the new PATCH has already scheduled another run in 30s — eventual consistency without an explicit compare-and-swap.
+**Race handling:** if a PATCH lands while a match is mid-run, the run used near-current preferences and the new PATCH has already scheduled another run in 15s — eventual consistency without an explicit compare-and-swap.
 
 ### Match logic
 

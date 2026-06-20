@@ -1,5 +1,4 @@
 import asyncio
-import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -166,4 +165,5 @@ def handler(event: dict, context) -> dict:
 
 if __name__ == "__main__":
     # Used for debugging purposes
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

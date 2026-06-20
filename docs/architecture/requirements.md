@@ -11,7 +11,7 @@ Users configure trip preferences and receive notifications when new matching dea
 | Layer              | Choice                                                                                                                                                                                                                      |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API runtime        | AWS Lambda + Mangum + FastAPI (`async def` handlers)                                                                                                                                                                        |
-| Concurrency        | Async end-to-end; `asyncio` semaphore for scrape fan-out                                                                                                                                                                    |
+| Concurrency        | Async end-to-end; `asyncio` worker pool for scrape fan-out                                                                                                                                                                    |
 | Rate limiting      | FastAPI Limiter (async Redis)                                                                                                                                                                                               |
 | Infrastructure     | Terraform (+ Vault provider for secrets)                                                                                                                                                                                    |
 | Primary database   | DynamoDB (provisioned capacity for cost control)                                                                                                                                                                            |
@@ -79,9 +79,9 @@ Use **frontend debounce + EventBridge Scheduler coalescing**:
 
 1. User changes preferences.
 2. Backend saves the latest preferences immediately.
-3. Backend upserts a one-time schedule named `match-{user_id}` for `at(now + 30s)` (not a new job per request).
+3. Backend upserts a one-time schedule named `match-{user_id}` for `at(now + 15s)` (not a new job per request).
 4. Each subsequent change overwrites the schedule's fire time — multiple edits collapse into **one** match run.
-5. After input stabilizes (~30s), the schedule fires once and matching runs with the latest saved preferences, then the schedule auto-deletes.
+5. After input stabilizes (~15s), the schedule fires once and matching runs with the latest saved preferences, then the schedule auto-deletes.
 
 No polled `refresh_after` field and no sweeper job.
 
@@ -141,7 +141,7 @@ Server does **not** track per-offer seen state.
 
 Offers are grouped for scoring by:
 
-`(country, travel_month, hotel_standard, board_type, adults, children)`
+`(country, month, min_stars, board, adults, children)`
 
 Only offers passing the attractiveness gate are written to DynamoDB. See [attractiveness.md](attractiveness.md).
 

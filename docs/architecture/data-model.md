@@ -82,7 +82,7 @@ Canonical attractive offers (post-scoring, deduplicated).
 | `ttl`                  | Number  | Epoch seconds derived from `departure_date` (DynamoDB TTL)                                                                                                                                                                                                                                  |
 | `metadata`             | Map     | Internal/debug fields not surfaced in the feed (see [Offer metadata](#offer-metadata))                                                                                                                                                                                                      |
 
-**Primary key (No GSIs):** `PK = cell_id`, `SK = offer_id`. The hot path (`jobs.match_users` reading all attractive offers for a set of cells) becomes a single `Query` per cell instead of a GSI lookup, and scrape upserts are `PutItem` on the composite key.
+**Primary key (No GSIs):** `PK = cell_id`, `SK = offer_id`. The hot path (the matching service reading all attractive offers for a set of cells) becomes a single `Query` per cell instead of a GSI lookup, and scrape upserts are `PutItem` on the composite key.
 
 Because there are **no GSIs** on this table, searching for an offer by `offer_id` alone is not supported for unauthenticated or direct share lookups. To view details, the consumer must provide both the `cell_id` and the `offer_id` (reflected in the `share_url` format and the direct look-up API). For standard user feed hydration, the single-offer detail path uses the `cell_id` denormalized onto `UserOffers` (below) to issue a direct `GetItem(cell_id, offer_id)`.
 
@@ -223,7 +223,7 @@ One ZSET per `(user, sort_field, sort_order, feed_version)`:
 
 ```
 user:{user_id}:sort:{field}:{order}:v{version}  →  ZSET
-  member: offer_id
+  member: offer_id:cell_id
   score:  normalized sort key (with tie-breaker)
 ```
 
@@ -234,7 +234,7 @@ Built lazily on first request for that sort. TTL: 24 hours.
 - **Formula**: `score = primary_sort_value + (tie_breaker_fraction)`
 - **Price Sort (`price_total` or `price_per_day`)**: `score = price + (hash_fraction)`
 - **Attractiveness / Rating (`attractiveness_score`, `rating`)**: Since these are normalized values between `[0, 1]`, scale them: `score = (value * 1e8) + (hash_fraction)`.
-- **Hash Fraction**: Calculated by taking the first 6 hexadecimal digits of `offer_id`, converting to an integer, and dividing by `1e7` (ensuring it is a small fractional addition `0.0000000` to `0.0016777`). This guarantees distinct scores and stable, deterministic sorting within Redis without relying on client-side sorting.
+- **Hash Fraction**: Calculated by taking the first 6 hexadecimal digits of `offer_id`, converting to an integer, and dividing by `1e10` (ensuring it is a small fractional addition `0.0000000` to `0.0016777`). This guarantees distinct scores and stable, deterministic sorting within Redis without relying on client-side sorting.
 
 ### Supported sort fields (v1)
 

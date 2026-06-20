@@ -32,13 +32,13 @@ External API contracts live separately (reverse-engineered, versioned in git):
 | Code layering        | Hexagonal: `src/core` domain + adapters, `src/app` entrypoints       |
 | Concurrency          | Async end-to-end (`aioboto3`); `asyncio` fan-out for scraping        |
 | Scheduled jobs       | Dual entry handler; EventBridge invokes jobs in-process              |
-| Cell scraping        | `asyncio` semaphore fan-out inside one invocation (bounded)          |
+| Cell scraping        | `asyncio` worker pool fan-out inside one invocation (bounded)          |
 | Persistence          | DynamoDB (4 tables) + Redis Cloud (user offer feed)                  |
 | Market cells         | Global cells with activation tracking                                |
 | Offer identity       | Semantic fingerprint hash; `external_offer_id` stored separately     |
 | Auth                 | Cognito in PWA; backend validates JWT; delete account via API        |
 | Account provisioning | Cognito post-confirmation trigger creates `Users` + default cells    |
-| Preference updates   | EventBridge Scheduler one-time `at(now+30s)`, debounced by overwrite |
+| Preference updates   | EventBridge Scheduler one-time `at(now+15s)`, debounced by overwrite |
 | Matching             | Event-driven (Scheduler + post-scrape); no polling sweeper           |
 
 ## Repository layout
@@ -77,4 +77,4 @@ See [code-structure.md](architecture/code-structure.md) for the full layering, d
 | ----------------------------- | --------------------------------------- | ------------------------------------------ |
 | Scrape active market cells    | 3× daily                                | `jobs.coordinator` → async scrape per cell |
 | Availability / price check    | 1× daily                                | `jobs.availability`                        |
-| Match users (debounced prefs) | On preferences change or after scraping | `jobs.match_users`                         |
+| Match users (debounced prefs) | On preferences change or after scraping | `matching service`                         |

@@ -57,9 +57,7 @@ src/
     └── jobs/
         ├── __init__.py
         ├── coordinator.py    # scrape orchestrator (asyncio fan-out)
-        ├── match_users.py    # user matching (per-user + bulk)
-        ├── availability.py   # daily availability check
-        └── score_offers.py   # two-stage attractiveness scoring
+        └── availability.py   # daily availability check
 ```
 
 `src/` is the source root. The Lambda deployment artifact places the **contents** of `src/` at the artifact root, so `app` and `core` are importable as top-level packages and the handler is `app.main.handler`. Locally, run with `--app-dir src` (or `PYTHONPATH=src`).
@@ -98,7 +96,7 @@ Rationale: a single shared model forces `Optional` everywhere and leaks storage 
 
 Repositories are centralized (not per-feature) because tables are shared:
 
-- `app/offers` and `app/jobs/match_users` both touch `Offers` / `UserOffers`.
+- `app/offers` and the non-HTTP jobs handler both touch `Offers` / `UserOffers`.
 - The auth delete cascade touches all four tables plus Redis.
 
 Centralizing keeps each table's access in one place, lets both the API and jobs depend on `core` only (never on each other), and keeps `app/` feature modules free of boto3.
@@ -123,7 +121,7 @@ Adding a third source later is one new adapter + one registry line. See [provide
 
 ## Concurrency
 
-The fan-out concurrency strategy lives in the orchestration layer (`app/jobs/coordinator`), not in `core`. `core` exposes `async`, single-unit functions with no shared mutable state; the coordinator schedules them on the event loop with a bounded `asyncio.Semaphore`. CPU-bound scoring is offloaded with `asyncio.to_thread` so it never blocks the loop. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
+The fan-out concurrency strategy lives in the orchestration layer (`app/jobs/coordinator`), not in `core`. `core` exposes `async`, single-unit functions with no shared mutable state; the coordinator schedules them on the event loop with a bounded worker pool (via `asyncio.Queue` and concurrent workers). CPU-bound scoring is offloaded with `asyncio.to_thread` so it never blocks the loop. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
 
 ## Exception handling
 

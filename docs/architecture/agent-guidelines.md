@@ -28,7 +28,7 @@ The stack is `async` end-to-end to prevent blocking the event loop.
 
 - **Rule**: API handlers (`FastAPI`) and Repositories (`aioboto3` / `redis.asyncio`) must use `async`/`await`.
 - **Rule**: CPU-bound operations (e.g., NumPy array processing in the scoring service) must be wrapped in `asyncio.to_thread()`.
-- **Rule**: Bounded concurrency. The orchestration logic in `app/jobs/coordinator` must use an `asyncio.Semaphore` to bound the fan-out of external scraping calls, preventing Lambda timeouts. The `core` layer must expose single-unit async functions and must not handle fan-out concurrency itself.
+- **Rule**: Bounded concurrency. The orchestration logic in `app/jobs/coordinator` must use an `asyncio` worker pool (or queue-based concurrency) to bound the fan-out of external scraping calls, preventing Lambda timeouts. The `core` layer must expose single-unit async functions and must not handle fan-out concurrency itself.
 
 ## 4. DynamoDB Data Model Constraints
 
@@ -44,7 +44,7 @@ There is no continuous "sweeper" cron job polling for preference updates.
 
 - **Rule**: Matching is strictly event-driven. It occurs only when triggered by:
   1. **Post-Scrape bulk match**: Initiated by `jobs.coordinator` after completing a scrape.
-  2. **Debounced preference updates**: Changing user preferences sets a one-time EventBridge Scheduler task for `at(now + 30s)`.
+  2. **Debounced preference updates**: Changing user preferences sets a one-time EventBridge Scheduler task for `at(now + 15s)`.
 - **Rule**: Do not add polled timestamps like `refresh_after` to the `Users` table.
 
 ## 6. Coding Standards
@@ -73,7 +73,7 @@ There is no continuous "sweeper" cron job polling for preference updates.
 
 ## 10. Exception Handling & Custom Exceptions
 
-- **Rule**: Both the `core` and `app` layers must define and use custom exceptions (e.g. following the patterns in `src/core/exceptions` and `src/app/exceptions.py`) instead of using generic built-in Python exceptions (`ValueError`, `KeyError`, `RuntimeError`, etc.) or raw third-party client/provider exceptions.
+- **Rule**: Both the `core` and `app` layers must define and use custom exceptions (e.g. following the patterns in `src/core/exceptions` and `src/app/exceptions.py`) instead of using generic built-in Python exceptions (`ValueError`, `KeyError`, `RuntimeError`, etc.) or raw third-party client/provider exceptions. *Exception: raising standard built-in exceptions (like ValueError, RuntimeError) is permitted for simple internal code assertions, factory input checks, and Pydantic validator checks.*
 - **Rule**: Exceptions raised inside the `core` layer must inherit from `CoreException` (defined in `core/exceptions/common.py`). Specific adapters or services should define their own subtree (e.g. `ProviderException` or `RepositoryException`) to provide distinct semantic meaning.
 - **Rule**: The `app` layer must catch `core` exceptions and translate/map them to appropriate HTTP exceptions (FastAPI exception handlers) or handle them gracefully in jobs, rather than letting raw database or external API exceptions leak to clients.
 - **Rule**: If the `app` layer raises validation or handler-specific errors, it should also use custom exception types (inheriting from `AppException` in `app/exceptions.py`).

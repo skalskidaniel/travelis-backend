@@ -7,7 +7,7 @@ Two-stage algorithm: gate on price, then rank survivors by composite score.
 Offers are statistically compared within a group defined by:
 
 ```
-(country, travel_month, min_stars, board_type, adults, children)
+(country, month, min_stars, board, adults, children)
 ```
 
 This matches the global market cell dimensions. All offers scraped for a cell form the comparison pool for that run.
@@ -114,4 +114,4 @@ Offers A and C are stored. A ranks higher in the user's feed (default sort: `att
 ## Dependencies
 
 - NumPy or pandas for mean, stddev, and normalization within groups.
-- Runs inside `jobs.score_offers` in the lambdalith (same Lambda as API).
+- Runs inside the scrape coordinator job (`jobs.coordinator`) in the lambdalith (same Lambda as API).

@@ -1,77 +1,39 @@
 # AGENTS.md — TraveLis Backend
 
-## First read
+## Mandatory Reading
+- **`docs/architecture/agent-guidelines.md`**: Non-negotiable rules (layering, imports, normalization).
+- **`docs/architecture/`**: System overview, data model, pipeline, scoring, API, infra.
 
-- **`docs/architecture/agent-guidelines.md`** — mandatory. Non-negotiable rules (layering, imports, rating/board normalization, etc).
-- **`docs/architecture/`** — 9 docs covering requirements, system overview, code structure, data model, pipeline, scoring, API, infra.
+## Rules & Conventions
+- **Layering**: `app` (entrypoints) depends on `core` (domain). `core` NEVER imports `app`.
+- **Imports**: Absolute imports from `src/` root only (e.g., `from core.models.offer import Offer`).
+- **Async**: End-to-end `async`/`await`. Use `asyncio.to_thread()` for CPU-bound tasks.
+- **DynamoDB**: No GSIs. Composite key: `PK=cell_id`, `SK=offer_id`.
+- **Normalization**: 
+  - Ratings: 0–5 scale (wakacje.pl / 2).
+  - Boards: Canonical types only (map numeric/code-based).
+- **Exceptions**: Use custom exceptions inheriting from `CoreException` or `AppException`.
 
-## Project state
-
-| Area | Status |
-|---|---|
-| `src/core/models/` | Built (Cell, Offer, RawOffer, ScoredOffer, User, Preferences, common types) |
-| `src/core/providers/` | Built (TUI + wakacje.pl adapters, `OfferProvider` Protocol, resource JSON files) |
-| `src/core/exceptions/` | Built (`CoreException` → `ProviderException`/`RepositoryException` + specific types) |
-| `src/core/services/` | Built (ingest, scoring pipeline with `StatisticalOfferScorer`) |
-| `src/core/repositories/` | Built (DynamoDB adapters for cells, offers, users, user_offers; Redis feed repo) |
-| `src/core/config.py` | Built |
-| `src/core/container.py` | Built |
-| `src/app/{auth,offers,user}/` | Stub controllers (`router = APIRouter()`), empty `models.py` |
-| `src/app/health/` | Empty directory |
-| `src/app/jobs/` | **Not yet built** |
-| `tests/` | Unit tests for models, providers, services (ingest + scoring), repositories (DynamoDB + Redis via moto + fakeredis) |
-| `.github/workflows/` | None |
-
-## Key commands
-
+## Key Commands
 ```bash
-uv sync                          # install deps (uv only; no pip/poetry)
-uvicorn app.main:app --reload --port 8000 --app-dir src   # dev server
-ruff check src/ tests/           # lint (no pyproject.toml [tool.ruff] section yet; uses defaults)
-ruff format src/ tests/          # format
+uv sync                          # Install dependencies
+uvicorn app.main:app --reload    # Dev server (run from src/)
+ruff check src/ tests/           # Lint
+ruff format src/ tests/          # Format
 ```
-
-Python 3.13 required (`.python-version`). No type checker configured.
 
 ## Tests
+- **Run**: `uv run pytest` (uses `src/` as pythonpath).
+- **Async**: All tests must be `@pytest.mark.asyncio`.
+- **Integration**: Gated by `RUN_INTEGRATION_TESTS=1` or `RUN_PROVIDER_INTEGRATION=1`.
+- **Mocks**: `respx` (HTTP), `moto` (DynamoDB), `fakeredis`.
 
-Note: Always use `uv run pytest` to run tests.
+## Architecture Gotchas
+- **Identity**: `CellId` (16 hex chars), `OfferId` (32 hex chars) of SHA-256.
+- **Referral URLs**: Append `utm_source=travellead` + params at `Offer` validation.
+- **Container**: `core/container.py` is the composition root. Use `AsyncExitStack` for clients.
+- **Matching**: Event-driven only (post-scrape or debounced preference updates).
 
-```bash
-uv run pytest                           # runs all; pyproject.toml sets pythonpath = ["src"]
-uv run pytest -xvs tests/path/to/test   # single test file, verbose
-uv run pytest -k "test_name"            # filtered run
-```
-
-- Framework: `pytest` + `pytest-asyncio` (all async tests need `@pytest.mark.asyncio`).
-- HTTP mocking: `respx` (used in provider tests to mock `httpx`).
-- Repository tests: use `moto` (DynamoDB) + `fakeredis` in `tests/core/repositories/conftest.py`.
-- Integration tests: gated behind `RUN_INTEGRATION_TESTS=1` env var. Live provider tests hit real TUI/wakacje.pl APIs.
-- Provider URL consistency integration tests (`RUN_PROVIDER_INTEGRATION=1`) require Playwright Chromium:
-
-```bash
-uv run playwright install chromium
-RUN_PROVIDER_INTEGRATION=1 uv run pytest -xvs tests/core/providers/test_wakacjepl_integration.py -k referral_url
-```
-
-## Architecture rules (not in agent-guidelines.md)
-
-- **Dual-entry handler**: `app.main` will dispatch HTTP (Mangum), EventBridge cron, Cognito triggers, and Scheduler one-time jobs.
-- **Container**: `core/container.py` (not yet built) enters `aioboto3`/`redis.asyncio` clients once per cold start via `AsyncExitStack`.
-- **Offer identity**: `CellId` = first 16 hex chars of SHA-256. `OfferId` = first 32 hex chars of SHA-256.
-- **Referral URLs**: All offer URLs get `utm_source=travellead` + referral params appended at `Offer` model validation time.
-- **Share URLs**: Must start with `https://wakacje-travelis.pl/` (validated by `Offer` model).
-- **Feed**: Redis sorted sets built per-user; `FeedRepository` handles pagination with versioned ZSETs.
-
-## Exceptions
-
-`CoreException` → `ProviderException` (→ `ProviderAPIException`/`ProviderTimeoutException`/`TooManyRequestsException`, etc) + `RepositoryException` (→ `ItemNotFoundException`/`ConditionalCheckFailedException`/`WriteException`).
-
-## Infra
-
-- Terraform (AWS provider ~> 5.0, `>= 1.5`) in `infra/environments/dev/`.
-- Currently only `geo_catalog` module deployed. AWS profile: `travelis-terraform`.
-
-## Scripts
-
-`scripts/` contains one-off provider contract probes (`probe_wakacjepl_api_contract.py`, `generate_tui_filters.py`, etc). Not part of the app.
+## Infra & Scripts
+- **Terraform**: `infra/environments/dev/`.
+- **Scripts**: `scripts/` contains one-off contract probes (not part of app).

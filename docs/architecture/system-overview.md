@@ -11,28 +11,26 @@ The codebase is split into two top-level packages under `src/`: `core/` (domain 
 ### Dual entry handler
 
 ```python
-def handler(event, context):
-    if event.get("triggerSource", "").startswith("PostConfirmation"):
-        asyncio.run(provision_user(event))   # Cognito post-confirmation
-        return event                          # Cognito triggers must echo the event
-    if is_http_event(event):
-        return Mangum(app)(event, context)    # Mangum drives the async app
-    if event.get("source") == "aws.events" or "type" in event:
-        return asyncio.run(run_scheduled_job(event))  # cron + Scheduler match jobs
-    raise ValueError(f"Unknown event type: {event}")
+def handler(event: dict, context) -> dict:
+    is_http = "requestContext" in event or "httpMethod" in event or "rawPath" in event
+
+    if is_http:
+        return mangum_handler(event, context)
+
+    return asyncio.run(handle_non_http(event, context))
 ```
 
 ### Event Payload Routing
 
-The scheduled job router (`run_scheduled_job(event)`) dispatches tasks based on the following input payloads:
+The scheduled job router (`handle_non_http(event, context)`) dispatches tasks based on the following input payloads:
 
 | Event Source | Payload / Structure | Handler Path | Description |
 | :--- | :--- | :--- | :--- |
 | **API Gateway** | HTTP request | Mangum → FastAPI routers (async) | All `/api/v2/*` HTTP traffic |
-| **EventBridge Cron (Scrape)** | `{ "type": "scrape_offers" }` | `asyncio.run` → `app.jobs.coordinator` | Orchestrates cell scraping (3× daily) |
-| **EventBridge Cron (Avail)** | `{ "type": "check_availability" }` | `asyncio.run` → `app.jobs.availability` | Checks active offer availability (1× daily) |
-| **EventBridge Scheduler** | `{ "type": "match_user", "user_id": "usr_123" }` | `asyncio.run` → `app.jobs.match_users(user_id)` | Debounced per-user re-match (one-time schedule) |
-| **Cognito Post-Confirm** | Cognito `PostConfirmation` event payload | `asyncio.run` → `provision_user(event)` | Creates `Users` row + default cells + first match |
+| **EventBridge Cron (Scrape)** | `{ "type": "scrape_offers" }` | `handle_non_http` → `app.jobs.coordinator` | Orchestrates cell scraping (3× daily) |
+| **EventBridge Cron (Avail)** | `{ "type": "check_availability" }` | `handle_non_http` → `app.jobs.availability` | Checks active offer availability (1× daily) |
+| **EventBridge Scheduler** | `{ "type": "match_user", "user_id": "usr_123" }` | `handle_non_http` → `matching_service.match_user_offers` | Debounced per-user re-match (one-time schedule) |
+| **Cognito Post-Confirm** | Cognito `PostConfirmation` event payload | `handle_non_http` → `provision_user` | Creates `Users` row + default cells + first match |
 
 ## Application modules
 
@@ -87,7 +85,7 @@ Protected routes: `/api/v2/user/*`, `/api/v2/offers/*`.
 
 The stack is **asynchronous end-to-end**: FastAPI route handlers are `async def`, repositories use `aioboto3` (async DynamoDB), provider clients use `httpx.AsyncClient`, and the feed cache uses `redis.asyncio`. Mangum drives the FastAPI app on the event loop.
 
-The scrape work is I/O-bound (HTTP + DynamoDB), so within a single cron invocation the coordinator scrapes active market cells **concurrently** on the event loop with bounded concurrency (an `asyncio.Semaphore` of ~10, or `asyncio.TaskGroup` + semaphore). This avoids the 15-minute Lambda timeout as cell count grows, without spawning child Lambdas.
+The scrape work is I/O-bound (HTTP + DynamoDB), so within a single cron invocation the coordinator scrapes active market cells **concurrently** on the event loop with bounded concurrency (using an `asyncio` worker pool of ~10 workers). This avoids the 15-minute Lambda timeout as cell count grows, without spawning child Lambdas.
 
 Async rules:
 

@@ -115,7 +115,7 @@ Preference changes and new-account provisioning create **one-time** schedules in
 | Setting                 | Value                                                                 |
 | ----------------------- | --------------------------------------------------------------------- |
 | Name                    | `match-{user_id}` (deterministic → upsert debounces)                  |
-| Expression              | `at(now + 30s)`                                                       |
+| Expression              | `at(now + 15s)`                                                       |
 | `ActionAfterCompletion` | `DELETE` (self-cleaning)                                              |
 | Target                  | Lambda (direct), payload `{ "type": "match_user", "user_id": "..." }` |
 

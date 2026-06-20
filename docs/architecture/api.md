@@ -72,7 +72,7 @@ Update preferences. Saves immediately; triggers a debounced match via EventBridg
 
 **Response `200`:** full preferences object.
 
-**Side effects:** market cell activation updated; one-time schedule `match-{user_id}` upserted for `at(now + 30s)` (see [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler)).
+**Side effects:** market cell activation updated; one-time schedule `match-{user_id}` upserted for `at(now + 15s)` (see [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler)).
 
 ### `POST /api/v2/user/push/enable`
 
