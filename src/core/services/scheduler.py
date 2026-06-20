@@ -23,7 +23,7 @@ class SchedulerService:
         self.settings = settings
 
     async def schedule_match(self, user_id: str) -> None:
-        """Upsert a one-time schedule named `match-{user_id}` for 30 seconds from now.
+        """Upsert a one-time schedule named `match-{user_id}` for 15 seconds from now.
 
         Coalescing: Overwrites the schedule fire time if it already exists, debouncing matching.
         """

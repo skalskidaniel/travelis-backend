@@ -6,15 +6,12 @@ import jwt
 from jwt import PyJWK
 
 from core.config import Settings
-from core.exceptions.common import CoreException
+from core.exceptions.cognito import (
+    CognitoJwtConfigurationException,
+    CognitoJwtValidationException,
+)
 
 logger = logging.getLogger(__name__)
-
-
-class CognitoJwtValidationException(CoreException):
-    """Raised when a Cognito JWT fails validation."""
-
-    pass
 
 
 class CognitoJwtVerifier:
@@ -29,7 +26,7 @@ class CognitoJwtVerifier:
     def issuer(self) -> str:
         pool_id = self.settings.cognito_user_pool_id
         if not pool_id:
-            raise CognitoJwtValidationException(
+            raise CognitoJwtConfigurationException(
                 "COGNITO_USER_POOL_ID is not configured"
             )
         return f"https://cognito-idp.{self.settings.aws_region}.amazonaws.com/{pool_id}"
@@ -53,7 +50,7 @@ class CognitoJwtVerifier:
         """Validate a Cognito JWT and return the authenticated user id (`sub`)."""
         app_client_id = self.settings.cognito_app_client_id
         if not app_client_id:
-            raise CognitoJwtValidationException(
+            raise CognitoJwtConfigurationException(
                 "COGNITO_APP_CLIENT_ID is not configured"
             )
 

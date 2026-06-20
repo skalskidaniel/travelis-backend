@@ -10,9 +10,13 @@ from fastapi.testclient import TestClient
 
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
-from app.exceptions import AuthenticationException
+from app.exceptions import AuthenticationException, ServiceConfigurationException
 from core.config import Settings
-from core.services.cognito_jwt import CognitoJwtValidationException, CognitoJwtVerifier
+from core.exceptions.cognito import (
+    CognitoJwtConfigurationException,
+    CognitoJwtValidationException,
+)
+from core.services.cognito_jwt import CognitoJwtVerifier
 
 auth_test_app = FastAPI()
 
@@ -22,6 +26,15 @@ async def authentication_exception_handler(request, exc: AuthenticationException
     from fastapi.responses import JSONResponse
 
     return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+
+@auth_test_app.exception_handler(ServiceConfigurationException)
+async def service_configuration_exception_handler(
+    request, exc: ServiceConfigurationException
+):
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 @auth_test_app.get("/test-auth")
@@ -135,6 +148,27 @@ def test_get_current_user_invalid_token(test_client):
     )
     assert response.status_code == 401
     assert "Invalid token" in response.json()["detail"]
+
+
+def test_get_current_user_configuration_error_returns_500():
+    verifier = AsyncMock()
+    verifier.verify_token = AsyncMock(
+        side_effect=CognitoJwtConfigurationException(
+            "COGNITO_APP_CLIENT_ID is not configured"
+        )
+    )
+    container = MagicMock()
+    container.cognito_jwt_verifier = verifier
+
+    auth_test_app.dependency_overrides[get_container] = lambda: container
+    with TestClient(auth_test_app) as client:
+        response = client.get(
+            "/test-auth", headers={"Authorization": "Bearer test-token"}
+        )
+    auth_test_app.dependency_overrides.clear()
+
+    assert response.status_code == 500
+    assert "COGNITO_APP_CLIENT_ID is not configured" in response.json()["detail"]
 
 
 def test_get_current_user_rejects_forged_signature(verifier):

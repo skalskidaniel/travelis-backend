@@ -1,4 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from app.exceptions import MatchSchedulingException
 from app.main import handler
 
 
@@ -105,6 +109,18 @@ def test_lambda_handler_scheduler_match_user():
         mock_container.matching_service.match_user_offers.assert_called_once_with(
             "user-123"
         )
+
+
+def test_lambda_handler_scheduler_match_user_missing_id():
+    event = {"type": "match_user"}
+
+    with patch("app.main.container") as mock_container:
+        mock_container.exit_stack = MagicMock()
+
+        with pytest.raises(
+            MatchSchedulingException, match="Missing user_id for match_user event"
+        ):
+            handler(event, None)
 
 
 def test_lambda_handler_unhandled_event():

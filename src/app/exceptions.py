@@ -26,3 +26,9 @@ class MatchSchedulingException(RetryableServiceException):
     """Raised when debounced match scheduling fails."""
 
     pass
+
+
+class ServiceConfigurationException(AppException):
+    """Raised when required application configuration is missing or invalid."""
+
+    pass

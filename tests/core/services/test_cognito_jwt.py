@@ -8,7 +8,11 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from core.config import Settings
-from core.services.cognito_jwt import CognitoJwtValidationException, CognitoJwtVerifier
+from core.exceptions.cognito import (
+    CognitoJwtConfigurationException,
+    CognitoJwtValidationException,
+)
+from core.services.cognito_jwt import CognitoJwtVerifier
 
 
 @pytest.fixture
@@ -60,7 +64,13 @@ def cognito_settings(monkeypatch):
     return Settings()
 
 
-def _encode_token(private_pem: bytes, **claims) -> str:
+def _encode_token(
+    private_pem: bytes,
+    *,
+    kid: str | None = "test-key-id",
+    drop_claims: tuple[str, ...] = (),
+    **claims,
+) -> str:
     now = int(time.time())
     payload = {
         "sub": "user-123",
@@ -71,11 +81,14 @@ def _encode_token(private_pem: bytes, **claims) -> str:
         "iat": now,
         **claims,
     }
+    for claim in drop_claims:
+        payload.pop(claim, None)
+    headers = {"kid": kid} if kid is not None else {}
     return jwt.encode(
         payload,
         private_pem,
         algorithm="RS256",
-        headers={"kid": "test-key-id"},
+        headers=headers,
     )
 
 
@@ -134,4 +147,192 @@ async def test_verify_token_rejects_wrong_client_id(
         token = _encode_token(rsa_keys["private_pem"], client_id="wrong-client")
 
         with pytest.raises(CognitoJwtValidationException, match="client_id"):
+            await verifier.verify_token(token)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_verify_token_rejects_expired_token(
+    cognito_settings, rsa_keys, jwks_payload
+):
+    respx.get(
+        "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TestPool/.well-known/jwks.json"
+    ).respond(json=jwks_payload)
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"], exp=int(time.time()) - 1)
+
+        with pytest.raises(CognitoJwtValidationException, match="Invalid token"):
+            await verifier.verify_token(token)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_verify_token_rejects_wrong_issuer(
+    cognito_settings, rsa_keys, jwks_payload
+):
+    respx.get(
+        "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TestPool/.well-known/jwks.json"
+    ).respond(json=jwks_payload)
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"], iss="https://example.com/wrong")
+
+        with pytest.raises(CognitoJwtValidationException, match="Invalid token"):
+            await verifier.verify_token(token)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_verify_token_rejects_missing_issuer(
+    cognito_settings, rsa_keys, jwks_payload
+):
+    respx.get(
+        "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TestPool/.well-known/jwks.json"
+    ).respond(json=jwks_payload)
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"], drop_claims=("iss",))
+
+        with pytest.raises(CognitoJwtValidationException, match="Invalid token"):
+            await verifier.verify_token(token)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_verify_token_rejects_missing_kid_header(
+    cognito_settings, rsa_keys, jwks_payload
+):
+    respx.get(
+        "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TestPool/.well-known/jwks.json"
+    ).respond(json=jwks_payload)
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"], kid=None)
+
+        with pytest.raises(CognitoJwtValidationException, match="missing kid header"):
+            await verifier.verify_token(token)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_verify_token_rejects_missing_token_use(
+    cognito_settings, rsa_keys, jwks_payload
+):
+    respx.get(
+        "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TestPool/.well-known/jwks.json"
+    ).respond(json=jwks_payload)
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"], drop_claims=("token_use",))
+
+        with pytest.raises(
+            CognitoJwtValidationException, match='missing the "token_use" claim'
+        ):
+            await verifier.verify_token(token)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_verify_token_rejects_invalid_token_use(
+    cognito_settings, rsa_keys, jwks_payload
+):
+    respx.get(
+        "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TestPool/.well-known/jwks.json"
+    ).respond(json=jwks_payload)
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"], token_use="refresh")
+
+        with pytest.raises(
+            CognitoJwtValidationException, match="Invalid token_use claim"
+        ):
+            await verifier.verify_token(token)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_verify_token_refreshes_jwks_on_unknown_kid(
+    cognito_settings, rsa_keys, jwks_payload
+):
+    jwks_without_key = {"keys": []}
+    jwks_route = respx.get(
+        "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TestPool/.well-known/jwks.json"
+    ).mock(
+        side_effect=[
+            httpx.Response(200, json=jwks_without_key),
+            httpx.Response(200, json=jwks_payload),
+        ]
+    )
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"], kid="test-key-id")
+        user_id = await verifier.verify_token(token)
+
+    assert user_id == "user-123"
+    assert jwks_route.call_count == 2
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_verify_token_rejects_when_key_not_found_after_refresh(
+    cognito_settings, rsa_keys
+):
+    jwks_route = respx.get(
+        "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TestPool/.well-known/jwks.json"
+    ).mock(
+        side_effect=[
+            httpx.Response(200, json={"keys": []}),
+            httpx.Response(200, json={"keys": []}),
+        ]
+    )
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"], kid="missing-key")
+
+        with pytest.raises(
+            CognitoJwtValidationException, match="signing key not found"
+        ):
+            await verifier.verify_token(token)
+
+    assert jwks_route.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_verify_token_raises_configuration_error_when_app_client_missing(
+    cognito_settings, rsa_keys
+):
+    object.__setattr__(cognito_settings, "cognito_app_client_id", None)
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"])
+
+        with pytest.raises(
+            CognitoJwtConfigurationException, match="COGNITO_APP_CLIENT_ID"
+        ):
+            await verifier.verify_token(token)
+
+
+@pytest.mark.asyncio
+async def test_verify_token_raises_configuration_error_when_pool_id_missing(
+    cognito_settings, rsa_keys
+):
+    object.__setattr__(cognito_settings, "cognito_user_pool_id", None)
+
+    async with httpx.AsyncClient() as client:
+        verifier = CognitoJwtVerifier(cognito_settings, client)
+        token = _encode_token(rsa_keys["private_pem"])
+
+        with pytest.raises(
+            CognitoJwtConfigurationException, match="COGNITO_USER_POOL_ID"
+        ):
             await verifier.verify_token(token)

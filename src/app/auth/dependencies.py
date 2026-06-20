@@ -2,9 +2,12 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.dependencies import get_container
-from app.exceptions import AuthenticationException
+from app.exceptions import AuthenticationException, ServiceConfigurationException
 from core.container import Container
-from core.services.cognito_jwt import CognitoJwtValidationException
+from core.exceptions.cognito import (
+    CognitoJwtConfigurationException,
+    CognitoJwtValidationException,
+)
 
 security = HTTPBearer()
 
@@ -17,5 +20,7 @@ async def get_current_user(
     token = credentials.credentials
     try:
         return await container.cognito_jwt_verifier.verify_token(token)
+    except CognitoJwtConfigurationException as exc:
+        raise ServiceConfigurationException(str(exc)) from exc
     except CognitoJwtValidationException as exc:
         raise AuthenticationException(str(exc)) from exc

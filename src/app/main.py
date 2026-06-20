@@ -7,7 +7,12 @@ from fastapi.responses import JSONResponse
 from mangum import Mangum
 
 from app.auth.controller import router as auth_router
-from app.exceptions import AuthenticationException, RetryableServiceException
+from app.exceptions import (
+    AuthenticationException,
+    MatchSchedulingException,
+    RetryableServiceException,
+    ServiceConfigurationException,
+)
 from app.health.controller import router as health_router
 from app.offers.controller import router as offers_router
 from app.user.controller import router as user_router
@@ -52,6 +57,13 @@ async def scheduler_exception_handler(
         status_code=503,
         content={"detail": str(exc), "retryable": True},
     )
+
+
+@app.exception_handler(ServiceConfigurationException)
+async def service_configuration_exception_handler(
+    request: Request, exc: ServiceConfigurationException
+) -> JSONResponse:
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 app.add_middleware(
@@ -102,7 +114,7 @@ async def handle_non_http(event: dict, context) -> dict:
                 "feed_changed": feed_changed,
             }
         else:
-            raise ValueError("Missing user_id for match_user event")
+            raise MatchSchedulingException("Missing user_id for match_user event")
 
     # C. EventBridge scrape coordinator job
     elif event_type == "scrape_offers":
