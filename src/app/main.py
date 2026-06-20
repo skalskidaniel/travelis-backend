@@ -1,17 +1,20 @@
 import asyncio
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from mangum import Mangum
 
 from app.auth.controller import router as auth_router
+from app.exceptions import AuthenticationException, RetryableServiceException
 from app.health.controller import router as health_router
 from app.offers.controller import router as offers_router
 from app.user.controller import router as user_router
 from app.jobs.coordinator import run_scrape_job
 from app.jobs.availability import run_availability_job
 from core.container import container
+from core.exceptions.scheduler import SchedulerException
 
 
 @asynccontextmanager
@@ -22,6 +25,34 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="TraveLis Backend API", version="2.0.0", lifespan=lifespan)
+
+
+@app.exception_handler(AuthenticationException)
+async def authentication_exception_handler(
+    request: Request, exc: AuthenticationException
+) -> JSONResponse:
+    return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+
+@app.exception_handler(RetryableServiceException)
+async def retryable_service_exception_handler(
+    request: Request, exc: RetryableServiceException
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"detail": str(exc), "retryable": True},
+    )
+
+
+@app.exception_handler(SchedulerException)
+async def scheduler_exception_handler(
+    request: Request, exc: SchedulerException
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"detail": str(exc), "retryable": True},
+    )
+
 
 app.add_middleware(
     CORSMiddleware,

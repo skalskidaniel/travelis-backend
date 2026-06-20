@@ -50,7 +50,7 @@ class OfferFeedItem(BaseModel):
         )
 
 
-class OfferDetailResponse(BaseModel):  # TODO will it be used?
+class OfferDetailResponse(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     offer_id: str

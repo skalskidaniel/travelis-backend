@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
+from app.exceptions import AccountDeletionException
 from core.container import Container
 from core.services.activation import generate_required_cells
 
@@ -30,6 +31,9 @@ async def delete_account(
             logger.error(
                 f"Error decrementing cell activations for deleted user {user_id}: {exc}"
             )
+            raise AccountDeletionException(
+                "Failed to decrement cell activations during account deletion"
+            ) from exc
 
         try:
             user_offers = await container.user_offers_repo.query_by_user(user_id)
@@ -38,6 +42,9 @@ async def delete_account(
                 await container.user_offers_repo.delete_batch(keys)
         except Exception as exc:
             logger.error(f"Error deleting UserOffers for deleted user {user_id}: {exc}")
+            raise AccountDeletionException(
+                "Failed to delete user offers during account deletion"
+            ) from exc
 
         try:
             await container.feed_repo.clear_user(user_id)
@@ -45,11 +52,17 @@ async def delete_account(
             logger.error(
                 f"Error clearing Redis cache for deleted user {user_id}: {exc}"
             )
+            raise AccountDeletionException(
+                "Failed to clear user feed cache during account deletion"
+            ) from exc
 
         try:
             await container.users_repo.delete(user_id)
         except Exception as exc:
             logger.error(f"Error deleting user record for {user_id}: {exc}")
+            raise AccountDeletionException(
+                "Failed to delete user record during account deletion"
+            ) from exc
 
     if container.settings.cognito_user_pool_id:
         try:
@@ -60,6 +73,9 @@ async def delete_account(
             logger.info(f"Successfully deleted Cognito user {user_id}")
         except Exception as exc:
             logger.error(f"Failed to delete Cognito user {user_id}: {exc}")
+            raise AccountDeletionException(
+                "Failed to delete Cognito user during account deletion"
+            ) from exc
     else:
         logger.warning(
             "COGNITO_USER_POOL_ID not configured. Skipping Cognito user deletion."

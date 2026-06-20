@@ -79,6 +79,10 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("COGNITO_USER_POOL_ID"),
     )
+    cognito_app_client_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("COGNITO_APP_CLIENT_ID"),
+    )
 
     db: DatabaseSettings | None = None
     push: PushSettings | None = None
