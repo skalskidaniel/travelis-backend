@@ -8,22 +8,75 @@ from core.models.offer import Offer, OfferSource
 class OfferFeedItem(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    offer_id: str
-    hotel_name: str
-    location: str
-    country: str
-    departure_airport: str
-    departure_date: date
-    return_date: date
-    duration: int
-    board: BoardType
-    stars: int
-    rating: float
-    review_count: int
-    price_total: Decimal
-    referral_url: str
-    image_url: str | None
-    share_url: str
+    offer_id: str = Field(
+        description="The 32-character hexadecimal SHA-256 fingerprint identifying the offer.",
+        examples=["4a8b9c1d2e3f4051627384950a1b2c3d"],
+    )
+    hotel_name: str = Field(
+        description="The display name of the hotel.",
+        examples=["Seaside Resort & Spa"],
+    )
+    location: str = Field(
+        description="Normalized location path formatted as Country/Region/City.",
+        examples=["Greece/Crete/Chania"],
+    )
+    country: str = Field(
+        description="Country derived from the location path.",
+        examples=["Greece"],
+    )
+    departure_airport: str = Field(
+        description="IATA airport code of departure.",
+        examples=["WAW"],
+    )
+    departure_date: date = Field(
+        description="Trip departure date.",
+        examples=["2026-07-15"],
+    )
+    return_date: date = Field(
+        description="Trip return date.",
+        examples=["2026-07-22"],
+    )
+    duration: int = Field(
+        description="Number of nights for the trip.",
+        examples=[7],
+    )
+    board: BoardType = Field(
+        description="The board/catering type offered."
+    )
+    stars: int = Field(
+        description="Hotel star rating (from 1 to 5).",
+        ge=1,
+        le=5,
+        examples=[4],
+    )
+    rating: float = Field(
+        description="Average guest rating normalized on a 0–5 scale.",
+        ge=0.0,
+        le=5.0,
+        examples=[4.5],
+    )
+    review_count: int = Field(
+        description="Total number of reviews backing the rating.",
+        ge=0,
+        examples=[342],
+    )
+    price_total: Decimal = Field(
+        description="Total cost of the trip for all travelers in PLN.",
+        examples=[Decimal("2450.00")],
+    )
+    referral_url: str = Field(
+        description="Affiliate/referral deep link to the provider page.",
+        examples=["https://www.wakacje.pl/oferty/grecja/kreta/hotel-seaside-resort-123456.html?utm_source=travellead"],
+    )
+    image_url: str | None = Field(
+        default=None,
+        description="Direct URL to the main preview image of the hotel.",
+        examples=["https://images.travelis.pl/hotels/123456_main.jpg"],
+    )
+    share_url: str = Field(
+        description="Public URL used for sharing this offer with other users.",
+        examples=["https://wakacje-travelis.pl/offer/1f2e3d4c5b6a7f8e/4a8b9c1d2e3f4051627384950a1b2c3d"],
+    )
 
     @classmethod
     def from_domain(cls, offer: Offer) -> "OfferFeedItem":
@@ -53,31 +106,111 @@ class OfferFeedItem(BaseModel):
 class OfferDetailResponse(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    offer_id: str
-    provider: ProviderName
-    external_offer_id: str
-    hotel_name: str
-    location: str
-    country: str
-    region: str
-    departure_airport: str
-    departure_date: date
-    return_date: date
-    duration: int
-    board: BoardType
-    stars: int
-    rating: float
-    review_count: int
-    price_total: Decimal
-    price_per_day: Decimal
-    attractiveness_score: float
-    available: bool
-    referral_url: str
-    image_url: str | None
-    share_url: str
-    sources: list[OfferSource]
-    scraped_at: datetime
-    updated_at: datetime
+    offer_id: str = Field(
+        description="The 32-character hexadecimal SHA-256 fingerprint identifying the offer.",
+        examples=["4a8b9c1d2e3f4051627384950a1b2c3d"],
+    )
+    provider: ProviderName = Field(
+        description="Name of the provider who supplied the offer."
+    )
+    external_offer_id: str = Field(
+        description="Provider-native unique identifier for the offer.",
+        examples=["wakacje-99887766"],
+    )
+    hotel_name: str = Field(
+        description="The display name of the hotel.",
+        examples=["Seaside Resort & Spa"],
+    )
+    location: str = Field(
+        description="Normalized location path formatted as Country/Region/City.",
+        examples=["Greece/Crete/Chania"],
+    )
+    country: str = Field(
+        description="Country derived from the location path.",
+        examples=["Greece"],
+    )
+    region: str = Field(
+        description="Region derived from the location path.",
+        examples=["Crete"],
+    )
+    departure_airport: str = Field(
+        description="IATA airport code of departure.",
+        examples=["WAW"],
+    )
+    departure_date: date = Field(
+        description="Trip departure date.",
+        examples=["2026-07-15"],
+    )
+    return_date: date = Field(
+        description="Trip return date.",
+        examples=["2026-07-22"],
+    )
+    duration: int = Field(
+        description="Number of nights for the trip.",
+        examples=[7],
+    )
+    board: BoardType = Field(
+        description="The board/catering type offered."
+    )
+    stars: int = Field(
+        description="Hotel star rating (from 1 to 5).",
+        ge=1,
+        le=5,
+        examples=[4],
+    )
+    rating: float = Field(
+        description="Average guest rating normalized on a 0–5 scale.",
+        ge=0.0,
+        le=5.0,
+        examples=[4.5],
+    )
+    review_count: int = Field(
+        description="Total number of reviews backing the rating.",
+        ge=0,
+        examples=[342],
+    )
+    price_total: Decimal = Field(
+        description="Total cost of the trip for all travelers in PLN.",
+        examples=[Decimal("2450.00")],
+    )
+    price_per_day: Decimal = Field(
+        description="Average price per person per day in PLN.",
+        examples=[Decimal("350.00")],
+    )
+    attractiveness_score: float = Field(
+        description="Calculated composite attractiveness score between 0.0 and 1.0.",
+        ge=0.0,
+        le=1.0,
+        examples=[0.87],
+    )
+    available: bool = Field(
+        description="Flag indicating if the offer is currently bookable/available.",
+        examples=[True],
+    )
+    referral_url: str = Field(
+        description="Affiliate/referral deep link to the provider page.",
+        examples=["https://www.wakacje.pl/oferty/grecja/kreta/hotel-seaside-resort-123456.html?utm_source=travellead"],
+    )
+    image_url: str | None = Field(
+        default=None,
+        description="Direct URL to the main preview image of the hotel.",
+        examples=["https://images.travelis.pl/hotels/123456_main.jpg"],
+    )
+    share_url: str = Field(
+        description="Public URL used for sharing this offer with other users.",
+        examples=["https://wakacje-travelis.pl/offer/1f2e3d4c5b6a7f8e/4a8b9c1d2e3f4051627384950a1b2c3d"],
+    )
+    sources: list[OfferSource] = Field(
+        description="List of raw source offers that were merged to form this offer."
+    )
+    scraped_at: datetime = Field(
+        description="The timestamp when the offer was originally scraped.",
+        examples=[datetime(2026, 6, 21, 12, 0, 0)],
+    )
+    updated_at: datetime = Field(
+        description="The timestamp when the offer record was last updated.",
+        examples=[datetime(2026, 6, 21, 14, 30, 0)],
+    )
 
     @classmethod
     def from_domain(cls, offer: Offer) -> "OfferDetailResponse":

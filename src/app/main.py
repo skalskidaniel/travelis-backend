@@ -28,7 +28,48 @@ async def lifespan(app: FastAPI):
     await container.cleanup()
 
 
-app = FastAPI(title="TraveLis Backend API", version="2.0.0", lifespan=lifespan)
+API_DESCRIPTION = """
+This API powers the TraveLis holiday search assistant, providing personalized travel offer matching feeds, push notification preferences, and search synchronization.
+
+### Key Features
+* **Offers Feed**: Access a personalized, ranked feed of travel packages tailored to your holiday preferences.
+* **User Preferences**: Save and modify target destinations, departure airports, dates, occupants, and hotel requirements.
+* **Web Push Notifications**: Subscribe/unsubscribe to receive push alerts when new highly-attractive matched offers are compiled.
+* **Health & Auth**: Built-in OAuth2/JWT security backed by AWS Cognito and lightweight health telemetry.
+
+### Authentication
+Most endpoints require a valid AWS Cognito ID Token transmitted in the `Authorization` header as a Bearer token:
+```
+Authorization: Bearer <cognito_jwt_token>
+```
+"""
+
+TAGS_METADATA = [
+    {
+        "name": "Authentication",
+        "description": "Operations related to authentication and user account deletion.",
+    },
+    {
+        "name": "Health Check",
+        "description": "Telemetry and system health checks.",
+    },
+    {
+        "name": "Offers Feed",
+        "description": "Endpoints for retrieving personal matched offers feed and shared offer details.",
+    },
+    {
+        "name": "User Preferences & Notifications",
+        "description": "Endpoints to manage search criteria, occupant counts, and configure Web Push alerts.",
+    },
+]
+
+app = FastAPI(
+    title="TraveLis Backend API",
+    version="2.0.0",
+    description=API_DESCRIPTION,
+    openapi_tags=TAGS_METADATA,
+    lifespan=lifespan,
+)
 
 
 @app.exception_handler(AuthenticationException)

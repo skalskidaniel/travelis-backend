@@ -9,10 +9,19 @@ from core.services.activation import generate_required_cells
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["Authentication"])
 
 
-@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/account",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete user account",
+    responses={
+        204: {"description": "Account and all associated preferences, matched feed, and web push subscriptions were successfully deleted."},
+        401: {"description": "Unauthorized - Invalid or missing Cognito JWT token."},
+        500: {"description": "Internal Server Error - Failed to delete account resources."},
+    },
+)
 async def delete_account(
     user_id: str = Depends(get_current_user),
     container: Container = Depends(get_container),

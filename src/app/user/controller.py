@@ -12,7 +12,7 @@ from core.models.user import (
     PushSubscriptionKeys,
 )
 
-router = APIRouter()
+router = APIRouter(tags=["User Preferences & Notifications"])
 
 
 async def get_or_create_user(user_id: str, container: Container) -> User:
@@ -28,7 +28,15 @@ async def get_or_create_user(user_id: str, container: Container) -> User:
     return user
 
 
-@router.get("/preferences", response_model=UserPreferences)
+@router.get(
+    "/preferences",
+    response_model=UserPreferences,
+    summary="Get user preferences",
+    responses={
+        200: {"description": "Successfully retrieved user preferences (creates default preferences if the user is new)."},
+        401: {"description": "Unauthorized - Invalid or missing credentials."},
+    },
+)
 async def get_preferences(
     user_id: str = Depends(get_current_user),
     container: Container = Depends(get_container),
@@ -38,7 +46,15 @@ async def get_preferences(
     return user.preferences
 
 
-@router.patch("/preferences", response_model=UserPreferences)
+@router.patch(
+    "/preferences",
+    response_model=UserPreferences,
+    summary="Update user preferences",
+    responses={
+        200: {"description": "Successfully updated preferences, synchronized cells, and scheduled matching."},
+        401: {"description": "Unauthorized - Invalid or missing credentials."},
+    },
+)
 async def update_preferences(
     updates: UserPreferencesUpdate,
     user_id: str = Depends(get_current_user),
@@ -67,7 +83,15 @@ async def update_preferences(
     return user.preferences
 
 
-@router.post("/push/enable", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/push/enable",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Enable web push notifications",
+    responses={
+        204: {"description": "Successfully registered or updated Web Push subscription details."},
+        401: {"description": "Unauthorized - Invalid or missing credentials."},
+    },
+)
 async def enable_push(
     req: PushEnableRequest,
     user_id: str = Depends(get_current_user),
@@ -87,7 +111,15 @@ async def enable_push(
     await container.users_repo.update_push(user_id, enabled=True, subscription=sub)
 
 
-@router.post("/push/disable", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/push/disable",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Disable web push notifications",
+    responses={
+        204: {"description": "Successfully unregistered or disabled Web Push notifications."},
+        401: {"description": "Unauthorized - Invalid or missing credentials."},
+    },
+)
 async def disable_push(
     user_id: str = Depends(get_current_user),
     container: Container = Depends(get_container),

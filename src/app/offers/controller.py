@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime, time, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Path
 
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
@@ -18,7 +18,7 @@ from core.models.offer import Offer
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["Offers Feed"])
 
 
 def calculate_zset_score(offer: Offer, field: str) -> float:
@@ -46,10 +46,20 @@ def calculate_zset_score(offer: Offer, field: str) -> float:
         return hash_fraction
 
 
-@router.get("", response_model=PaginatedOffersResponse)
+@router.get(
+    "",
+    response_model=PaginatedOffersResponse,
+    summary="Retrieve matched offers feed",
+    responses={
+        200: {"description": "Successfully retrieved user's personalized matched feed."},
+        400: {"description": "Invalid pagination cursor provided."},
+        401: {"description": "Unauthorized - Invalid or missing credentials."},
+    },
+)
 async def get_offers_feed(
     sort: str = Query(
         default="attractiveness",
+        description="The field by which to sort matched offers.",
         enum=[
             "attractiveness",
             "departure_date",
@@ -59,9 +69,21 @@ async def get_offers_feed(
             "duration",
         ],
     ),
-    order: str = Query(default="desc", enum=["asc", "desc"]),
-    limit: int = Query(default=20, ge=1, le=50),
-    cursor: str | None = Query(default=None),
+    order: str = Query(
+        default="desc",
+        description="Sort direction (ascending or descending).",
+        enum=["asc", "desc"],
+    ),
+    limit: int = Query(
+        default=20,
+        description="Number of offers to retrieve per page.",
+        ge=1,
+        le=50,
+    ),
+    cursor: str | None = Query(
+        default=None,
+        description="Base64 encoded pagination cursor containing offset and feed version.",
+    ),
     user_id: str = Depends(get_current_user),
     container: Container = Depends(get_container),
 ):
@@ -164,9 +186,21 @@ async def get_offers_feed(
     )
 
 
-@router.get("/{offer_id}", response_model=OfferDetailResponse)
+@router.get(
+    "/{offer_id}",
+    response_model=OfferDetailResponse,
+    summary="Get offer details",
+    responses={
+        200: {"description": "Successfully retrieved offer details."},
+        401: {"description": "Unauthorized - Invalid or missing credentials."},
+        404: {"description": "Offer not found in user's matched feed, or details missing."},
+    },
+)
 async def get_offer_detail(
-    offer_id: str,
+    offer_id: str = Path(
+        description="The 32-character hexadecimal SHA-256 fingerprint identifying the offer.",
+        examples=["4a8b9c1d2e3f4051627384950a1b2c3d"],
+    ),
     user_id: str = Depends(get_current_user),
     container: Container = Depends(get_container),
 ):
@@ -189,10 +223,24 @@ async def get_offer_detail(
     return OfferDetailResponse.from_domain(offer)
 
 
-@router.get("/{cell_id}/{offer_id}", response_model=OfferDetailResponse)
+@router.get(
+    "/{cell_id}/{offer_id}",
+    response_model=OfferDetailResponse,
+    summary="Get shared offer details",
+    responses={
+        200: {"description": "Successfully retrieved shared offer details without authentication."},
+        404: {"description": "Shared offer not found with the provided cell_id and offer_id."},
+    },
+)
 async def get_shared_offer_detail(
-    cell_id: str,
-    offer_id: str,
+    cell_id: str = Path(
+        description="The 16-character hexadecimal SHA-256 hash identifying the market cell.",
+        examples=["1f2e3d4c5b6a7f8e"],
+    ),
+    offer_id: str = Path(
+        description="The 32-character hexadecimal SHA-256 fingerprint identifying the offer.",
+        examples=["4a8b9c1d2e3f4051627384950a1b2c3d"],
+    ),
     container: Container = Depends(get_container),
 ):
     """Retrieve shared public offer details directly by cell ID and offer ID (requires no auth)."""
