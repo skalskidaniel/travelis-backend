@@ -48,9 +48,11 @@ class MarketCell(BaseModel):
         ge=2, le=5, description="Minimum hotel star rating for this cell."
     )
     board: BoardType = Field(description="Normalized board type scraped for this cell.")
-    adults: int = Field(ge=1, description="Number of adults in the scrape occupancy.")
+    adults: int = Field(
+        ge=1, le=6, description="Number of adults in the scrape occupancy."
+    )
     children: int = Field(
-        ge=0, description="Number of children in the scrape occupancy."
+        ge=0, le=5, description="Number of children in the scrape occupancy."
     )
     activation_count: int = Field(
         ge=1, description="Number of users requiring this cell."
@@ -80,4 +82,15 @@ class MarketCell(BaseModel):
             raise ValueError(msg)
 
         self.cell_id = expected_cell_id
+        return self
+
+    @model_validator(mode="after")
+    def validate_occupancy(self) -> "MarketCell":
+        if self.adults > 6:
+            raise ValueError("Number of adults cannot exceed 6.")
+        total_occupants = self.adults + self.children
+        if total_occupants > 8:
+            raise ValueError(
+                f"Total occupants (adults + children) cannot exceed 8. Current: {total_occupants}"
+            )
         return self

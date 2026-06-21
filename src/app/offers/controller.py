@@ -51,7 +51,9 @@ def calculate_zset_score(offer: Offer, field: str) -> float:
     response_model=PaginatedOffersResponse,
     summary="Retrieve matched offers feed",
     responses={
-        200: {"description": "Successfully retrieved user's personalized matched feed."},
+        200: {
+            "description": "Successfully retrieved user's personalized matched feed."
+        },
         400: {"description": "Invalid pagination cursor provided."},
         401: {"description": "Unauthorized - Invalid or missing credentials."},
     },
@@ -193,7 +195,9 @@ async def get_offers_feed(
     responses={
         200: {"description": "Successfully retrieved offer details."},
         401: {"description": "Unauthorized - Invalid or missing credentials."},
-        404: {"description": "Offer not found in user's matched feed, or details missing."},
+        404: {
+            "description": "Offer not found in user's matched feed, or details missing."
+        },
     },
 )
 async def get_offer_detail(
@@ -228,8 +232,12 @@ async def get_offer_detail(
     response_model=OfferDetailResponse,
     summary="Get shared offer details",
     responses={
-        200: {"description": "Successfully retrieved shared offer details without authentication."},
-        404: {"description": "Shared offer not found with the provided cell_id and offer_id."},
+        200: {
+            "description": "Successfully retrieved shared offer details without authentication."
+        },
+        404: {
+            "description": "Shared offer not found with the provided cell_id and offer_id."
+        },
     },
 )
 async def get_shared_offer_detail(

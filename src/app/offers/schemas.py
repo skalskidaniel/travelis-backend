@@ -40,9 +40,7 @@ class OfferFeedItem(BaseModel):
         description="Number of nights for the trip.",
         examples=[7],
     )
-    board: BoardType = Field(
-        description="The board/catering type offered."
-    )
+    board: BoardType = Field(description="The board/catering type offered.")
     stars: int = Field(
         description="Hotel star rating (from 1 to 5).",
         ge=1,
@@ -66,7 +64,9 @@ class OfferFeedItem(BaseModel):
     )
     referral_url: str = Field(
         description="Affiliate/referral deep link to the provider page.",
-        examples=["https://www.wakacje.pl/oferty/grecja/kreta/hotel-seaside-resort-123456.html?utm_source=travellead"],
+        examples=[
+            "https://www.wakacje.pl/oferty/grecja/kreta/hotel-seaside-resort-123456.html?utm_source=travellead"
+        ],
     )
     image_url: str | None = Field(
         default=None,
@@ -75,7 +75,9 @@ class OfferFeedItem(BaseModel):
     )
     share_url: str = Field(
         description="Public URL used for sharing this offer with other users.",
-        examples=["https://wakacje-travelis.pl/offer/1f2e3d4c5b6a7f8e/4a8b9c1d2e3f4051627384950a1b2c3d"],
+        examples=[
+            "https://wakacje-travelis.pl/offer/1f2e3d4c5b6a7f8e/4a8b9c1d2e3f4051627384950a1b2c3d"
+        ],
     )
 
     @classmethod
@@ -149,9 +151,7 @@ class OfferDetailResponse(BaseModel):
         description="Number of nights for the trip.",
         examples=[7],
     )
-    board: BoardType = Field(
-        description="The board/catering type offered."
-    )
+    board: BoardType = Field(description="The board/catering type offered.")
     stars: int = Field(
         description="Hotel star rating (from 1 to 5).",
         ge=1,
@@ -189,7 +189,9 @@ class OfferDetailResponse(BaseModel):
     )
     referral_url: str = Field(
         description="Affiliate/referral deep link to the provider page.",
-        examples=["https://www.wakacje.pl/oferty/grecja/kreta/hotel-seaside-resort-123456.html?utm_source=travellead"],
+        examples=[
+            "https://www.wakacje.pl/oferty/grecja/kreta/hotel-seaside-resort-123456.html?utm_source=travellead"
+        ],
     )
     image_url: str | None = Field(
         default=None,
@@ -198,7 +200,9 @@ class OfferDetailResponse(BaseModel):
     )
     share_url: str = Field(
         description="Public URL used for sharing this offer with other users.",
-        examples=["https://wakacje-travelis.pl/offer/1f2e3d4c5b6a7f8e/4a8b9c1d2e3f4051627384950a1b2c3d"],
+        examples=[
+            "https://wakacje-travelis.pl/offer/1f2e3d4c5b6a7f8e/4a8b9c1d2e3f4051627384950a1b2c3d"
+        ],
     )
     sources: list[OfferSource] = Field(
         description="List of raw source offers that were merged to form this offer."

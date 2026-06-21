@@ -61,7 +61,7 @@ def test_user_preferences_airport_validation():
         UserPreferencesUpdate(departure_airports=["waw"])
     with pytest.raises(ValidationError):
         UserPreferences(departure_airports=["WAXX"])
-    
+
     # list length limit (max 17)
     with pytest.raises(ValidationError):
         UserPreferences(departure_airports=["WAW"] * 18)
@@ -72,15 +72,9 @@ def test_user_preferences_airport_validation():
 def test_user_preferences_date_range_validation():
     # invalid date range
     with pytest.raises(ValidationError):
-        UserPreferences(
-            date_from=date(2026, 8, 10),
-            date_to=date(2026, 8, 5)
-        )
+        UserPreferences(date_from=date(2026, 8, 10), date_to=date(2026, 8, 5))
     with pytest.raises(ValidationError):
-        UserPreferencesUpdate(
-            date_from=date(2026, 8, 10),
-            date_to=date(2026, 8, 5)
-        )
+        UserPreferencesUpdate(date_from=date(2026, 8, 10), date_to=date(2026, 8, 5))
 
 
 def test_user_preferences_duration_range_validation():

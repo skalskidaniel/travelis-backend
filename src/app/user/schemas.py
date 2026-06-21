@@ -42,8 +42,7 @@ class UserPreferencesUpdate(BaseModel):
         examples=[["2018-05-12", "2021-11-20"]],
     )
     board: BoardType | None = Field(
-        default=None,
-        description="Catering/board option preference."
+        default=None, description="Catering/board option preference."
     )
     min_stars: int | None = Field(
         default=None,
@@ -73,10 +72,13 @@ class UserPreferencesUpdate(BaseModel):
 
     @field_validator("countries")
     @classmethod
-    def validate_countries_are_supported(cls, value: list[str] | None) -> list[str] | None:
+    def validate_countries_are_supported(
+        cls, value: list[str] | None
+    ) -> list[str] | None:
         if value is None:
             return None
         from core.models.cell import _allowed_country_codes
+
         allowed = _allowed_country_codes()
         for code in value:
             if code not in allowed:
@@ -85,14 +87,19 @@ class UserPreferencesUpdate(BaseModel):
 
     @field_validator("departure_airports")
     @classmethod
-    def validate_departure_airports_format(cls, value: list[str] | None) -> list[str] | None:
+    def validate_departure_airports_format(
+        cls, value: list[str] | None
+    ) -> list[str] | None:
         if value is None:
             return None
         import re
+
         iata_pattern = re.compile(r"^[A-Z]{3}$")
         for airport in value:
             if not iata_pattern.match(airport):
-                raise ValueError(f"Invalid departure airport code '{airport}'; must be a 3-letter uppercase IATA code.")
+                raise ValueError(
+                    f"Invalid departure airport code '{airport}'; must be a 3-letter uppercase IATA code."
+                )
         return value
 
     @model_validator(mode="after")
@@ -103,12 +110,16 @@ class UserPreferencesUpdate(BaseModel):
 
         if self.duration_max is not None and self.duration_min is not None:
             if self.duration_max < self.duration_min:
-                raise ValueError("duration_max must be greater than or equal to duration_min")
+                raise ValueError(
+                    "duration_max must be greater than or equal to duration_min"
+                )
 
         if self.adults is not None and self.children is not None:
             total_occupants = self.adults + len(self.children)
             if total_occupants > 8:
-                raise ValueError(f"Total occupants (adults + children) cannot exceed 8. Current: {total_occupants}")
+                raise ValueError(
+                    f"Total occupants (adults + children) cannot exceed 8. Current: {total_occupants}"
+                )
 
         return self
 

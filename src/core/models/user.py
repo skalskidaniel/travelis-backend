@@ -76,6 +76,7 @@ class UserPreferences(BaseModel):
     @classmethod
     def validate_countries_are_supported(cls, value: list[str]) -> list[str]:
         from core.models.cell import _allowed_country_codes
+
         allowed = _allowed_country_codes()
         for code in value:
             if code not in allowed:
@@ -86,10 +87,13 @@ class UserPreferences(BaseModel):
     @classmethod
     def validate_departure_airports_format(cls, value: list[str]) -> list[str]:
         import re
+
         iata_pattern = re.compile(r"^[A-Z]{3}$")
         for airport in value:
             if not iata_pattern.match(airport):
-                raise ValueError(f"Invalid departure airport code '{airport}'; must be a 3-letter uppercase IATA code.")
+                raise ValueError(
+                    f"Invalid departure airport code '{airport}'; must be a 3-letter uppercase IATA code."
+                )
         return value
 
     @model_validator(mode="after")
@@ -100,11 +104,15 @@ class UserPreferences(BaseModel):
 
         if self.duration_max is not None:
             if self.duration_max < self.duration_min:
-                raise ValueError("duration_max must be greater than or equal to duration_min")
+                raise ValueError(
+                    "duration_max must be greater than or equal to duration_min"
+                )
 
         total_occupants = self.adults + len(self.children)
         if total_occupants > 8:
-            raise ValueError(f"Total occupants (adults + children) cannot exceed 8. Current: {total_occupants}")
+            raise ValueError(
+                f"Total occupants (adults + children) cannot exceed 8. Current: {total_occupants}"
+            )
 
         return self
 

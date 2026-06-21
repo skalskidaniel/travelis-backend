@@ -33,7 +33,9 @@ async def get_or_create_user(user_id: str, container: Container) -> User:
     response_model=UserPreferences,
     summary="Get user preferences",
     responses={
-        200: {"description": "Successfully retrieved user preferences (creates default preferences if the user is new)."},
+        200: {
+            "description": "Successfully retrieved user preferences (creates default preferences if the user is new)."
+        },
         401: {"description": "Unauthorized - Invalid or missing credentials."},
     },
 )
@@ -51,7 +53,9 @@ async def get_preferences(
     response_model=UserPreferences,
     summary="Update user preferences",
     responses={
-        200: {"description": "Successfully updated preferences, synchronized cells, and scheduled matching."},
+        200: {
+            "description": "Successfully updated preferences, synchronized cells, and scheduled matching."
+        },
         401: {"description": "Unauthorized - Invalid or missing credentials."},
     },
 )
@@ -88,7 +92,9 @@ async def update_preferences(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Enable web push notifications",
     responses={
-        204: {"description": "Successfully registered or updated Web Push subscription details."},
+        204: {
+            "description": "Successfully registered or updated Web Push subscription details."
+        },
         401: {"description": "Unauthorized - Invalid or missing credentials."},
     },
 )
@@ -116,7 +122,9 @@ async def enable_push(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Disable web push notifications",
     responses={
-        204: {"description": "Successfully unregistered or disabled Web Push notifications."},
+        204: {
+            "description": "Successfully unregistered or disabled Web Push notifications."
+        },
         401: {"description": "Unauthorized - Invalid or missing credentials."},
     },
 )
