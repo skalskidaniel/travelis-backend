@@ -39,6 +39,7 @@ The scheduled job router (`handle_non_http(event, context)`) dispatches tasks ba
 | Module   | Prefix           | Responsibility                          |
 | -------- | ---------------- | --------------------------------------- |
 | `auth`   | `/api/v2/auth`   | Delete account (Cognito + data cascade) |
+| `health` | `/api/v2/health` | System health check and telemetry       |
 | `user`   | `/api/v2/user`   | Preferences, push notification settings |
 | `offers` | `/api/v2/offers` | Read-only paginated offer feed          |
 | `jobs`   | _(no HTTP)_      | Orchestrate scrape, match, availability |
