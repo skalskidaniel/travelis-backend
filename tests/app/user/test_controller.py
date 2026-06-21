@@ -43,7 +43,7 @@ def test_get_preferences_new_user_lazy_creates(client, mock_container):
 
 def test_get_preferences_existing_user(client, mock_container):
     existing_user = User(
-        user_id="user-123", preferences=UserPreferences(min_stars=4, countries=["PL"])
+        user_id="user-123", preferences=UserPreferences(min_stars=4, countries=["ES"])
     )
     mock_container.users_repo.get.return_value = existing_user
 
@@ -52,7 +52,7 @@ def test_get_preferences_existing_user(client, mock_container):
     assert response.status_code == 200
     data = response.json()
     assert data["min_stars"] == 4
-    assert data["countries"] == ["PL"]
+    assert data["countries"] == ["ES"]
 
     mock_container.users_repo.get.assert_called_once_with("user-123")
     mock_container.users_repo.put.assert_not_called()

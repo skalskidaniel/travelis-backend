@@ -1,5 +1,5 @@
 from datetime import datetime, date, timezone
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from core.models.common import BoardType
 
@@ -9,11 +9,13 @@ class UserPreferences(BaseModel):
 
     countries: list[str] = Field(
         default_factory=lambda: ["GR", "IT", "ES", "TR", "EG"],
-        description="List of target countries for holiday search (e.g. ['Greece', 'Spain']).",
-        examples=[["Greece", "Spain"]],
+        max_length=20,
+        description="List of target country ISO 3166-1 alpha-2 codes (e.g. ['GR', 'ES']).",
+        examples=[["GR", "ES"]],
     )
     departure_airports: list[str] = Field(
         default_factory=list,
+        max_length=17,
         description="List of departure airport IATA codes.",
         examples=[["WAW", "KRK"]],
     )
@@ -30,12 +32,14 @@ class UserPreferences(BaseModel):
     adults: int = Field(
         default=2,
         ge=1,
-        description="Number of adult travelers.",
+        le=6,
+        description="Number of adult travelers. Total occupants (adults + children) cannot exceed 8.",
         examples=[2],
     )
     children: list[date] = Field(
         default_factory=list,
-        description="Birthdates of child travelers, used to calculate their age during the holiday.",
+        max_length=5,
+        description="Birthdates of child travelers, used to calculate their age during the holiday. Total occupants (adults + children) cannot exceed 8.",
         examples=[["2018-05-12", "2021-11-20"]],
     )
     board: BoardType = Field(
@@ -67,6 +71,42 @@ class UserPreferences(BaseModel):
         description="Maximum trip duration in nights.",
         examples=[14],
     )
+
+    @field_validator("countries")
+    @classmethod
+    def validate_countries_are_supported(cls, value: list[str]) -> list[str]:
+        from core.models.cell import _allowed_country_codes
+        allowed = _allowed_country_codes()
+        for code in value:
+            if code not in allowed:
+                raise ValueError(f"Unsupported country code '{code}'")
+        return value
+
+    @field_validator("departure_airports")
+    @classmethod
+    def validate_departure_airports_format(cls, value: list[str]) -> list[str]:
+        import re
+        iata_pattern = re.compile(r"^[A-Z]{3}$")
+        for airport in value:
+            if not iata_pattern.match(airport):
+                raise ValueError(f"Invalid departure airport code '{airport}'; must be a 3-letter uppercase IATA code.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_preferences_cross_fields(self) -> "UserPreferences":
+        if self.date_from is not None and self.date_to is not None:
+            if self.date_to < self.date_from:
+                raise ValueError("date_to must be on or after date_from")
+
+        if self.duration_max is not None:
+            if self.duration_max < self.duration_min:
+                raise ValueError("duration_max must be greater than or equal to duration_min")
+
+        total_occupants = self.adults + len(self.children)
+        if total_occupants > 8:
+            raise ValueError(f"Total occupants (adults + children) cannot exceed 8. Current: {total_occupants}")
+
+        return self
 
 
 class PushSubscriptionKeys(BaseModel):
