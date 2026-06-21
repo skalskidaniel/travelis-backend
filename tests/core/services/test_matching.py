@@ -459,3 +459,94 @@ async def test_match_user_offers_disables_expired_push(test_user, mock_offers):
     users_repo.update_push.assert_called_once_with(
         "usr_123", enabled=False, subscription=None
     )
+
+
+@pytest.mark.asyncio
+async def test_match_user_not_found():
+    users_repo = MagicMock()
+    users_repo.get = AsyncMock(return_value=None)
+    service = MatchingService(
+        users_repo=users_repo,
+        offers_repo=MagicMock(),
+        user_offers_repo=MagicMock(),
+        feed_repo=MagicMock(),
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+    result = await service.match_user_offers("unknown_user")
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_bulk_match_users_empty():
+    service = MatchingService(
+        users_repo=MagicMock(),
+        offers_repo=MagicMock(),
+        user_offers_repo=MagicMock(),
+        feed_repo=MagicMock(),
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+    assert await service.bulk_match_users([]) == []
+
+
+def test_filter_empty_returns():
+    service = MatchingService(
+        users_repo=MagicMock(),
+        offers_repo=MagicMock(),
+        user_offers_repo=MagicMock(),
+        feed_repo=MagicMock(),
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+    offers = [make_offer()]
+    
+    # Empty on rating
+    prefs_rating = UserPreferences(min_rating=5)
+    assert service._filter_offers_vectorized(offers, prefs_rating) == []
+    
+    # Empty on airports
+    prefs_airports = UserPreferences(departure_airports=["XYZ"])
+    assert service._filter_offers_vectorized(offers, prefs_airports) == []
+    
+    # Empty on duration min
+    prefs_dur_min = UserPreferences(duration_min=14)
+    assert service._filter_offers_vectorized(offers, prefs_dur_min) == []
+    
+    # Empty on duration max
+    prefs_dur_max = UserPreferences(duration_min=2, duration_max=3)
+    assert service._filter_offers_vectorized(offers, prefs_dur_max) == []
+    
+    # Empty on date_from
+    prefs_date_from = UserPreferences(date_from=date(2027, 1, 1))
+    assert service._filter_offers_vectorized(offers, prefs_date_from) == []
+    
+    # Empty on date_to
+    prefs_date_to = UserPreferences(date_to=date(2025, 1, 1))
+    assert service._filter_offers_vectorized(offers, prefs_date_to) == []
+    
+    # Empty on children length
+    prefs_children_len = UserPreferences(children=[date(2015, 1, 1)])
+    assert service._filter_offers_vectorized(offers, prefs_children_len) == []
+
+
+def test_filter_children_ages():
+    service = MatchingService(
+        users_repo=MagicMock(),
+        offers_repo=MagicMock(),
+        user_offers_repo=MagicMock(),
+        feed_repo=MagicMock(),
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+    
+    offers = [make_offer(departure_date=date(2026, 7, 10), children=1)]
+    
+    # Child is 10 years old (success)
+    prefs_valid = UserPreferences(children=[date(2016, 7, 1)])
+    matched = service._filter_offers_vectorized(offers, prefs_valid)
+    assert len(matched) == 1
+    
+    # Child is 18 years old (empty)
+    prefs_invalid = UserPreferences(children=[date(2008, 6, 1)])
+    assert service._filter_offers_vectorized(offers, prefs_invalid) == []

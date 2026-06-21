@@ -210,3 +210,63 @@ def test_get_shared_offer_detail_not_found(client, mock_container):
 
     response = client.get("/api/v2/offers/cell-123/some-offer-id")
     assert response.status_code == 404
+
+
+def test_get_offers_invalid_cursor(client, auth_headers):
+    response = client.get("/api/v2/offers?cursor=not-base-64", headers=auth_headers)
+    assert response.status_code == 400
+    assert "Invalid pagination cursor" in response.json()["detail"]
+
+
+def test_get_offer_detail_missing_from_offers_table(client, mock_container, auth_headers):
+    mock_container.user_offers_repo.get.return_value = {
+        "offer_id": "offer-1",
+        "cell_id": "cell-1",
+    }
+    mock_container.offers_repo.get.return_value = None
+
+    response = client.get("/api/v2/offers/offer-1", headers=auth_headers)
+    assert response.status_code == 404
+    assert "Offer details not found" in response.json()["detail"]
+
+
+def test_get_offers_empty_page_from_zset(client, mock_container, auth_headers):
+    mock_container.feed_repo.get_feed_version.return_value = 1
+    mock_container.feed_repo.get_or_build_sort_zset.return_value = True
+    # ZSET exists but returns empty keys (e.g. offset beyond total size)
+    mock_container.feed_repo.get_page.return_value = []
+
+    response = client.get("/api/v2/offers", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json()["offers"] == []
+
+
+def test_get_offers_with_next_cursor(
+    client, mock_container, auth_headers, sample_domain_offer
+):
+    mock_container.feed_repo.get_feed_version.return_value = 1
+    mock_container.feed_repo.get_or_build_sort_zset.return_value = True
+    
+    # Return exactly limit (limit=2) offers to trigger next_cursor logic
+    offer_id = sample_domain_offer.offer_id
+    mock_container.feed_repo.get_page.return_value = [
+        (offer_id, "cell-1"),
+        ("offer-2", "cell-1"),
+    ]
+    mock_container.offers_repo.get.return_value = sample_domain_offer
+
+    response = client.get("/api/v2/offers?limit=2", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["next_cursor"] is not None
+
+
+from app.offers.controller import calculate_zset_score
+
+def test_calculate_zset_score_coverage(sample_domain_offer):
+    assert calculate_zset_score(sample_domain_offer, "price_total") > 0
+    assert calculate_zset_score(sample_domain_offer, "price_per_day") > 0
+    assert calculate_zset_score(sample_domain_offer, "rating") > 0
+    assert calculate_zset_score(sample_domain_offer, "departure_date") > 0
+    assert calculate_zset_score(sample_domain_offer, "duration") > 0
+    assert calculate_zset_score(sample_domain_offer, "unknown_field") > 0
