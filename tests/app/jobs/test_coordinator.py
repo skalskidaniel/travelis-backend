@@ -284,3 +284,66 @@ async def test_run_scrape_job_retries_exponential(mock_container):
     await run_scrape_job(mock_container)
 
     assert mock_container.tui_provider.search.call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_run_scrape_job_skips_cell_when_all_scored_offers_fail_validation(
+    mock_container,
+):
+    cell = MarketCell(
+        country="ES",
+        month="2026-07",
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    mock_container.cells_repo.scan.return_value = [cell]
+
+    raw_tui = RawOffer(
+        provider=ProviderName.TUI,
+        external_offer_id="tui-invalid",
+        hotel_name="Sol Hotel",
+        location="ES/Mallorca/Palma",
+        departure_airport="WAW",
+        departure_date=date(2026, 7, 10),
+        return_date=date(2026, 7, 17),
+        duration=7,
+        board=BoardType.ALL_INCLUSIVE,
+        stars=3,
+        rating=Decimal("4.0"),
+        review_count=100,
+        price_total=Decimal("2000.00"),
+        price_per_day=Decimal("142.86"),
+        referral_url="https://tui.pl/ref",
+        available=True,
+        room_type="Standard",
+        adults=2,
+        children=0,
+        metadata=OfferMetadata(tui=TuiMetadata(offer_code="tui-invalid")),
+    )
+
+    mock_container.tui_provider.search = AsyncMock(return_value=[raw_tui])
+    mock_container.wakacje_provider.search = AsyncMock(return_value=[])
+
+    with patch("app.jobs.coordinator.get_scorer") as mock_get_scorer:
+        mock_scorer = mock_get_scorer.return_value
+        from core.models.offer import ScoredOffer
+
+        scored_offer = ScoredOffer(**raw_tui.model_dump(), attractiveness_score=0.85)
+        mock_scorer.score.return_value = [scored_offer]
+
+        with patch(
+            "app.jobs.coordinator.Offer",
+            side_effect=ValueError("invalid offer payload"),
+        ):
+            result = await run_scrape_job(mock_container)
+
+    assert result["scraped_cells"] == []
+    assert result["matched_users"] == []
+    assert result["continued"] is False
+    mock_container.offers_repo.query_by_cell.assert_not_called()
+    mock_container.offers_repo.put_batch.assert_not_called()
+    mock_container.cells_repo.update_last_scraped.assert_not_called()
+    mock_container.matching_service.bulk_match_users.assert_not_called()

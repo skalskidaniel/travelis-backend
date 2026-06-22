@@ -115,4 +115,3 @@ async def run_availability_job(container: Container, context=None) -> dict:
         "checked_offers_count": checked_count,
         "updated_offers_count": updated_count,
     }
-

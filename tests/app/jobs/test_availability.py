@@ -22,7 +22,6 @@ def mock_container():
     return c
 
 
-
 @pytest.mark.asyncio
 async def test_run_availability_job_no_cells(mock_container):
     mock_container.cells_repo.scan.return_value = []
@@ -30,7 +29,6 @@ async def test_run_availability_job_no_cells(mock_container):
     assert result["checked_offers_count"] == 0
     assert result["updated_offers_count"] == 0
     mock_container.matching_service.bulk_match_users.assert_not_called()
-
 
 
 @pytest.mark.asyncio
@@ -86,7 +84,6 @@ async def test_run_availability_job_nothing_available(mock_container):
     assert result["updated_offers_count"] == 0
     mock_container.offers_repo.put.assert_not_called()
     mock_container.matching_service.bulk_match_users.assert_not_called()
-
 
 
 @pytest.mark.asyncio

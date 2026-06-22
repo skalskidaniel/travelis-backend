@@ -38,6 +38,17 @@ def test_user_preferences_update_invalid_board():
         UserPreferencesUpdate(board=[])
 
 
+def test_user_preferences_update_board_normalization():
+    update = UserPreferencesUpdate(board="all-inclusive")
+    assert update.board == [BoardType.ALL_INCLUSIVE]
+
+    update = UserPreferencesUpdate(board=BoardType.HALF_BOARD)
+    assert update.board == [BoardType.HALF_BOARD]
+
+    update = UserPreferencesUpdate(board=["all-inclusive", "half-board"])
+    assert update.board == [BoardType.ALL_INCLUSIVE, BoardType.HALF_BOARD]
+
+
 def test_user_preferences_update_invalid_country():
     with pytest.raises(ValidationError):
         UserPreferencesUpdate(countries=["XX"])

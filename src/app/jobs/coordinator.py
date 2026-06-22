@@ -139,6 +139,7 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                             **scored.model_dump(),
                             cell_id=cell.cell_id,
                             offer_id=oid,
+                            # share_url is overridden automatically by Offer's validation logic to build the canonical URL
                             share_url="https://wakacje-travelis.pl/offer/dummy/dummy",
                             scraped_at=now,
                             updated_at=now,
@@ -151,6 +152,13 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                             f"(external_id={scored.external_offer_id}, hotel={scored.hotel_name}) "
                             f"in cell {cell.cell_id} due to validation error: {e}"
                         )
+
+                if not new_offers_map:
+                    logger.error(
+                        f"All {len(scored_offers)} scored offers failed validation for cell {cell.cell_id}; "
+                        "skipping persistence to avoid marking existing offers unavailable."
+                    )
+                    continue
 
                 existing_offers = await container.offers_repo.query_by_cell(
                     cell.cell_id

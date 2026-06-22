@@ -73,6 +73,15 @@ class UserPreferencesUpdate(BaseModel):
         examples=[14],
     )
 
+    @field_validator("board", mode="before")
+    @classmethod
+    def normalize_board(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, (str, BoardType)):
+            return [v]
+        return v
+
     @field_validator("countries")
     @classmethod
     def validate_countries_are_supported(
