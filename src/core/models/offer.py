@@ -209,8 +209,8 @@ class Offer(ScoredOffer):
             raise DateMismatchException(msg)
 
         night_span = (self.return_date - self.departure_date).days
-        if self.duration != night_span:
-            msg = "duration must equal the number of nights between departure_date and return_date"
+        if abs(self.duration - night_span) > 1:
+            msg = "duration must equal the number of nights between departure_date and return_date (+/- 1 day)"
             raise DurationMismatchException(msg)
 
         if (
