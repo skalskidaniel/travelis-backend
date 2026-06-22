@@ -15,8 +15,7 @@ from core.services.scheduler import SchedulerService
 
 async def get_container() -> Container:
     """Dependency provider that lazily initializes the container if needed."""
-    if container.exit_stack is None:
-        await container.initialize()
+    await container.initialize()
     return container
 
 

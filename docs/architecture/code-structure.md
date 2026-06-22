@@ -110,6 +110,11 @@ FastAPI's `Depends` only covers the HTTP path; the EventBridge path never touche
 
 `aioboto3` clients are **async context managers**. The container enters them once at cold start via an `AsyncExitStack` and holds the references for the life of the execution environment, reusing them across warm invocations rather than re-entering per request or per task.
 
+### Event Loop Changes in Lambda
+Because AWS Lambda reuses global instances across warm starts, but executes non-HTTP invocations under a fresh event loop using `asyncio.run()`, the event loop changes between invocations. Reusing the same boto3/HTTPX client session without checking the event loop will trigger `Task got Future attached to a different loop` or `Event loop is closed` errors.
+
+To solve this, all entry points (the API dependency `get_container()` and the Lambda router `handle_non_http()`) must call `await container.initialize()` directly. The container's `initialize()` method contains a check that compares the current running event loop with the loop used to initialize the stack. If the loops differ or the loop is closed, it automatically teardowns the old clients and re-initializes them cleanly.
+
 ## Provider abstraction
 
 A `Provider` Protocol (`async search(cell) -> list[RawOffer]`, `async check_availability(offer) -> bool`), one adapter per site, behind a registry. All contract messiness is contained in the adapter and never leaks past `RawOffer`:

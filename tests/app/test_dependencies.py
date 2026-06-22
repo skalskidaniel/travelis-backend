@@ -16,7 +16,7 @@ from core.container import container, Container
 
 
 @pytest.mark.asyncio
-async def test_get_container_initializes_lazily():
+async def test_get_container_initializes():
     # Setup
     container.exit_stack = None
     container.initialize = AsyncMock()
@@ -28,12 +28,11 @@ async def test_get_container_initializes_lazily():
     assert c is container
     container.initialize.assert_awaited_once()
 
-    # Second call should not initialize again if exit_stack is set
-    container.exit_stack = AsyncMock()
+    # Second call should still call initialize (which delegates logic internally)
     container.initialize.reset_mock()
     c = await get_container()
     assert c is container
-    container.initialize.assert_not_awaited()
+    container.initialize.assert_awaited_once()
 
     # Cleanup
     container.exit_stack = None

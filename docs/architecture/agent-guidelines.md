@@ -56,6 +56,8 @@ There is no continuous "sweeper" cron job polling for preference updates.
 
 - **Rule**: Do not instantiate clients or providers inside the `app` controllers directly. Use `core/container.py` as the composition root.
 - **Rule**: AWS clients (`aioboto3`) are built as async context managers. The container enters them once per Lambda cold start, holding them open via an `AsyncExitStack`. Do not re-create boto3 sessions per request.
+- **Rule**: You must always call `await container.initialize()` at entrypoints (e.g., in dependency getters like `get_container()` or jobs routing via `handle_non_http()`).
+  - *Rationale*: Under AWS Lambda container reuse, global objects (including the `container` instance) persist across requests, but subsequent invocations (particularly non-HTTP jobs executed via `asyncio.run()`) run in different/new event loops. To avoid `Task got Future attached to a different loop` or `Event loop is closed` errors, `container.initialize()` checks if the active event loop is new or closed, and cleanly re-initializes all client connections only when necessary.
 
 ## 8. Rating Normalization
 

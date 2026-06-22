@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "aioboto3>=15.5.0",
-    "fastapi[standard]>=0.137.0",
+    "fastapi>=0.137.0",
     "httpx>=0.28.1",
     "httpx2>=2.4.0",
     "mangum>=0.21.0",
@@ -16,7 +16,6 @@ dependencies = [
     "pyjwt>=2.8.0",
     "pywebpush>=2.3.0",
     "redis[hiredis]>=8.0.0",
-    "types-aioboto3[dynamodb]>=15.5.0",
 ]
 
 [tool.fastapi]
@@ -45,4 +44,6 @@ dev = [
     "pytest-xdist>=3.8.0",
     "respx>=0.23.1",
     "ruff>=0.15.17",
+    "types-aioboto3[dynamodb]>=15.5.0",
+    "uvicorn>=0.30.0",
 ]

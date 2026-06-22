@@ -124,8 +124,7 @@ mangum_handler = Mangum(app, lifespan="off")  # must remain "off" to work with m
 
 async def handle_non_http(event: dict, context) -> dict:
     """Async router for EventBridge, Cognito, and Scheduler events."""
-    if container.exit_stack is None:
-        await container.initialize()
+    await container.initialize()
 
     trigger_source = event.get("triggerSource")
     event_type = event.get("type")

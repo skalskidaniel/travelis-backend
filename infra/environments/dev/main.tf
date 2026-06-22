@@ -82,3 +82,20 @@ module "api_gateway" {
   lambda_arn  = module.lambda.lambda_arn
   lambda_name = module.lambda.lambda_name
 }
+
+resource "aws_lambda_permission" "allow_eventbridge_scrape" {
+  statement_id  = "AllowExecutionFromEventBridgeScrape"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda.lambda_name
+  principal     = "events.amazonaws.com"
+  source_arn    = module.eventbridge.scrape_offers_rule_arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge_availability" {
+  statement_id  = "AllowExecutionFromEventBridgeAvailability"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda.lambda_name
+  principal     = "events.amazonaws.com"
+  source_arn    = module.eventbridge.check_availability_rule_arn
+}
+

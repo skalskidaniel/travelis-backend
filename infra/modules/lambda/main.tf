@@ -27,7 +27,7 @@ resource "null_resource" "lambda_build" {
   }
 
   provisioner "local-exec" {
-    command     = "bash ${path.module}/../../../scripts/build_lambda_package.sh"
+    command     = "bash ${abspath("${path.module}/../../../scripts/build_lambda_package.sh")}"
     working_dir = abspath("${path.module}/../../..")
   }
 }

@@ -12,14 +12,6 @@ resource "aws_cloudwatch_event_target" "scrape_offers_target" {
   input     = jsonencode({ "type" : "scrape_offers" })
 }
 
-resource "aws_lambda_permission" "allow_eventbridge_scrape" {
-  statement_id  = "AllowExecutionFromEventBridgeScrape"
-  action        = "lambda:InvokeFunction"
-  function_name = var.lambda_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.scrape_offers.arn
-}
-
 # 2. Availability Check Cron Rule (1x daily: 04:00 UTC)
 resource "aws_cloudwatch_event_rule" "check_availability" {
   name                = "${var.project}-${var.environment}-check-availability-rule"
@@ -34,13 +26,6 @@ resource "aws_cloudwatch_event_target" "check_availability_target" {
   input     = jsonencode({ "type" : "check_availability" })
 }
 
-resource "aws_lambda_permission" "allow_eventbridge_availability" {
-  statement_id  = "AllowExecutionFromEventBridgeAvailability"
-  action        = "lambda:InvokeFunction"
-  function_name = var.lambda_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.check_availability.arn
-}
 
 # 3. EventBridge Scheduler IAM Role
 # This is the role assumed by the one-time matching schedules created dynamically by the application.

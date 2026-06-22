@@ -90,6 +90,7 @@ def test_lambda_handler_cognito_post_confirmation():
         patch("app.main.container") as mock_container,
     ):
         mock_container.exit_stack = MagicMock()
+        mock_container.initialize = AsyncMock()
         response = handler(event, None)
         assert response == event
         mock_get_or_create.assert_called_once_with("test-user-id", mock_container)
@@ -100,6 +101,7 @@ def test_lambda_handler_scheduler_match_user():
 
     with patch("app.main.container") as mock_container:
         mock_container.exit_stack = MagicMock()
+        mock_container.initialize = AsyncMock()
         mock_container.matching_service.match_user_offers = AsyncMock(return_value=True)
 
         response = handler(event, None)
@@ -116,6 +118,7 @@ def test_lambda_handler_scheduler_match_user_missing_id():
 
     with patch("app.main.container") as mock_container:
         mock_container.exit_stack = MagicMock()
+        mock_container.initialize = AsyncMock()
 
         with pytest.raises(
             MatchSchedulingException, match="Missing user_id for match_user event"
@@ -128,6 +131,7 @@ def test_lambda_handler_unhandled_event():
 
     with patch("app.main.container") as mock_container:
         mock_container.exit_stack = MagicMock()
+        mock_container.initialize = AsyncMock()
         response = handler(event, None)
         assert response["status"] == "success"
         assert "stub" in response["message"]
@@ -141,6 +145,7 @@ def test_lambda_handler_scrape_offers():
         patch("app.main.run_scrape_job") as mock_run_scrape,
     ):
         mock_container.exit_stack = MagicMock()
+        mock_container.initialize = AsyncMock()
         mock_run_scrape.return_value = {"scraped_cells": ["cell-1"]}
 
         response = handler(event, None)
@@ -159,6 +164,7 @@ def test_lambda_handler_check_availability():
         patch("app.main.run_availability_job") as mock_run_availability,
     ):
         mock_container.exit_stack = MagicMock()
+        mock_container.initialize = AsyncMock()
         mock_run_availability.return_value = {"checked_offers_count": 5}
 
         response = handler(event, None)
