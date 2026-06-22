@@ -141,7 +141,8 @@ Optional refinement for fresher availability _between_ scrapes (requires provide
 
 Contract details: [providers/wakacjepl/contract.md](../providers/wakacjepl/contract.md#offer-availability). Prototype: `notebooks/wakacje_pl_availability.ipynb`.
 
-If the check determines that the offer is no longer available, the offer is deleted from the `Offers` table. Otherwise, if the offer is still available but its price has changed, its price attributes (`price_total` and `price_per_day`) are updated in-place.
+If the check determines that the offer is no longer available, the offer is deleted from the `Offers` table. If one or more offers are deleted, the availability job collects their `cell_id`s and triggers a bulk user re-matching run (`MatchingService.bulk_match_users`) at the end of the job to immediately prune the deleted offers from `UserOffers`. Otherwise, if the offer is still available but its price has changed, its price attributes (`price_total` and `price_per_day`) are updated in-place.
+
 
 ## Redis feed rebuild and lazy ZSET pagination
 

@@ -42,6 +42,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
     checked_count = 0
     updated_count = 0
     sem = asyncio.Semaphore(15)
+    deleted_cell_ids = set()
 
     tui = container.tui_provider
     wakacje = container.wakacje_provider
@@ -62,6 +63,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
 
                 if not is_available:
                     await container.offers_repo.delete(offer.cell_id, offer.offer_id)
+                    deleted_cell_ids.add(offer.cell_id)
                     logger.info(
                         f"Offer {offer.offer_id} ({offer.provider}) is no longer available. Deleted."
                     )
@@ -100,6 +102,12 @@ async def run_availability_job(container: Container, context=None) -> dict:
     tasks = [check_single_offer(offer) for offer in available_offers]
     await asyncio.gather(*tasks)
 
+    if deleted_cell_ids:
+        logger.info(
+            f"Triggering bulk user matching for {len(deleted_cell_ids)} cell(s) affected by availability deletions."
+        )
+        await container.matching_service.bulk_match_users(list(deleted_cell_ids))
+
     logger.info(
         f"Availability check complete. Checked: {checked_count}, Updated: {updated_count}"
     )
@@ -107,3 +115,4 @@ async def run_availability_job(container: Container, context=None) -> dict:
         "checked_offers_count": checked_count,
         "updated_offers_count": updated_count,
     }
+

@@ -18,7 +18,9 @@ def mock_container():
     c.offers_repo = AsyncMock()
     c.tui_provider = MagicMock()
     c.wakacje_provider = MagicMock()
+    c.matching_service = AsyncMock()
     return c
+
 
 
 @pytest.mark.asyncio
@@ -27,6 +29,8 @@ async def test_run_availability_job_no_cells(mock_container):
     result = await run_availability_job(mock_container)
     assert result["checked_offers_count"] == 0
     assert result["updated_offers_count"] == 0
+    mock_container.matching_service.bulk_match_users.assert_not_called()
+
 
 
 @pytest.mark.asyncio
@@ -81,6 +85,8 @@ async def test_run_availability_job_nothing_available(mock_container):
     assert result["checked_offers_count"] == 0
     assert result["updated_offers_count"] == 0
     mock_container.offers_repo.put.assert_not_called()
+    mock_container.matching_service.bulk_match_users.assert_not_called()
+
 
 
 @pytest.mark.asyncio
@@ -143,6 +149,9 @@ async def test_run_availability_job_becomes_unavailable(mock_container):
         offer.cell_id, offer.offer_id
     )
     mock_container.offers_repo.put.assert_not_called()
+    mock_container.matching_service.bulk_match_users.assert_called_once_with(
+        [offer.cell_id]
+    )
 
 
 @pytest.mark.asyncio
@@ -209,3 +218,4 @@ async def test_run_availability_job_price_updates(mock_container):
     assert saved_offer.available is True
     assert saved_offer.price_total == Decimal("1200")
     assert saved_offer.price_per_day == Decimal("85.71")
+    mock_container.matching_service.bulk_match_users.assert_not_called()
