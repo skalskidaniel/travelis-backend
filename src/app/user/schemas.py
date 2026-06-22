@@ -45,6 +45,7 @@ class UserPreferencesUpdate(BaseModel):
         default=None,
         min_length=1,
         description="Catering/board option preference.",
+        examples=[["all-inclusive", "half-board"]],
     )
     min_stars: int | None = Field(
         default=None,
@@ -129,18 +130,31 @@ class UserPreferencesUpdate(BaseModel):
 class PushSubscriptionKeysSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    p256dh: str
-    auth: str
+    p256dh: str = Field(
+        description="Base64url-encoded P-256 elliptic curve public key.",
+        examples=["BIPZ4aYJpTk3BRFw..."],
+    )
+    auth: str = Field(
+        description="Base64url-encoded authentication secret key.",
+        examples=["f8ST3128G..."],
+    )
 
 
 class PushSubscriptionSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    endpoint: str
-    keys: PushSubscriptionKeysSchema
+    endpoint: str = Field(
+        description="The push subscription URL received from the browser's PushManager.",
+        examples=["https://fcm.googleapis.com/fcm/send/fzkS_co..."],
+    )
+    keys: PushSubscriptionKeysSchema = Field(
+        description="Cryptographic public keys used to encrypt push payloads."
+    )
 
 
 class PushEnableRequest(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    subscription: PushSubscriptionSchema
+    subscription: PushSubscriptionSchema = Field(
+        description="Web push subscription metadata containing endpoint and client public keys."
+    )
