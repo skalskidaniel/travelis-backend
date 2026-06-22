@@ -1,6 +1,6 @@
 import asyncio
 import json
-import logging
+from aws_lambda_powertools import Logger
 from datetime import datetime, time, timezone
 
 from core.container import Container
@@ -13,7 +13,7 @@ from core.services.ingest import (
 )
 from core.services.scoring import get_scorer
 
-logger = logging.getLogger(__name__)
+logger = Logger(child=True)
 
 
 def is_timeout_approaching(context, threshold_ms: int = 15000) -> bool:

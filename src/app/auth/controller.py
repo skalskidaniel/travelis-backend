@@ -1,4 +1,4 @@
-import logging
+from aws_lambda_powertools import Logger
 from fastapi import APIRouter, Depends, status
 
 from app.auth.dependencies import get_current_user
@@ -7,7 +7,8 @@ from app.exceptions import AccountDeletionException
 from core.container import Container
 from core.services.activation import generate_required_cells
 
-logger = logging.getLogger(__name__)
+logger = Logger(child=True)
+
 
 router = APIRouter(tags=["Authentication"])
 

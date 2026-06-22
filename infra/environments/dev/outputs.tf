@@ -44,3 +44,9 @@ output "dynamodb_user_offers_table" {
   value = module.dynamodb.user_offers_table_name
 }
 
+output "grafana_cloud_role_arn" {
+  description = "The ARN of the IAM Role created for Grafana Cloud read access."
+  value       = module.monitoring.grafana_cloud_role_arn
+}
+
+

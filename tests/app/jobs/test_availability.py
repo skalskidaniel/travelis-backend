@@ -139,7 +139,9 @@ async def test_run_availability_job_becomes_unavailable(mock_container):
     assert result["checked_offers_count"] == 1
     assert result["updated_offers_count"] == 0
 
-    mock_container.offers_repo.delete.assert_called_once_with(offer.cell_id, offer.offer_id)
+    mock_container.offers_repo.delete.assert_called_once_with(
+        offer.cell_id, offer.offer_id
+    )
     mock_container.offers_repo.put.assert_not_called()
 
 

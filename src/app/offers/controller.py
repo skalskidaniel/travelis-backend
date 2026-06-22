@@ -1,7 +1,7 @@
 import asyncio
 import base64
 import json
-import logging
+from aws_lambda_powertools import Logger
 from datetime import datetime, time, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Path
@@ -16,7 +16,7 @@ from app.offers.schemas import (
 from core.container import Container
 from core.models.offer import Offer
 
-logger = logging.getLogger(__name__)
+logger = Logger(child=True)
 
 router = APIRouter(tags=["Offers Feed"])
 

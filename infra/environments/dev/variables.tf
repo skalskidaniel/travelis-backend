@@ -47,3 +47,16 @@ variable "vapid_private_key" {
   sensitive   = true
 }
 
+variable "grafana_cloud_aws_account_id" {
+  description = "The Grafana Labs AWS Account ID (provided in Grafana Cloud setup)"
+  type        = string
+  default     = ""
+}
+
+variable "grafana_cloud_external_id" {
+  description = "The External ID provided by Grafana Cloud for security cross-account trust"
+  type        = string
+  default     = ""
+}
+
+

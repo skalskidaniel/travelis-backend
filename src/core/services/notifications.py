@@ -1,6 +1,6 @@
 import asyncio
 import json
-import logging
+from aws_lambda_powertools import Logger
 import random
 from enum import Enum
 
@@ -8,7 +8,7 @@ from pywebpush import webpush, WebPushException
 
 from core.models.user import PushSubscription
 
-logger = logging.getLogger(__name__)
+logger = Logger(child=True)
 
 NOTIFICATION_TEMPLATES = [
     {

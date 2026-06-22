@@ -1,13 +1,13 @@
 import asyncio
-import logging
 from datetime import datetime, timezone
 from decimal import Decimal
+from aws_lambda_powertools import Logger
 
 from core.container import Container
 from core.models.offer import Offer
 from core.models.common import ProviderName
 
-logger = logging.getLogger(__name__)
+logger = Logger(child=True)
 
 
 async def run_availability_job(container: Container, context=None) -> dict:

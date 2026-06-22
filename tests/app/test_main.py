@@ -6,6 +6,18 @@ from app.exceptions import MatchSchedulingException
 from app.main import handler
 
 
+@pytest.fixture
+def lambda_context():
+    context = MagicMock()
+    context.function_name = "travelis-dev-lambdalith"
+    context.memory_limit_in_mb = 1024
+    context.invoked_function_arn = (
+        "arn:aws:lambda:eu-central-1:123456789012:function:travelis-dev-lambdalith"
+    )
+    context.aws_request_id = "test-request-id"
+    return context
+
+
 def test_cors_headers(client):
     response = client.get(
         "/api/v2/health",
@@ -22,7 +34,7 @@ def test_cors_headers(client):
     ]
 
 
-def test_lambda_handler_api_gateway():
+def test_lambda_handler_api_gateway(lambda_context):
     import asyncio
 
     try:
@@ -62,13 +74,13 @@ def test_lambda_handler_api_gateway():
         "isBase64Encoded": False,
     }
 
-    response = handler(event, None)
+    response = handler(event, lambda_context)
 
     assert response["statusCode"] == 200
     assert "body" in response
 
 
-def test_lambda_handler_cognito_post_confirmation():
+def test_lambda_handler_cognito_post_confirmation(lambda_context):
     event = {
         "version": "1",
         "region": "eu-central-1",
@@ -91,12 +103,12 @@ def test_lambda_handler_cognito_post_confirmation():
     ):
         mock_container.exit_stack = MagicMock()
         mock_container.initialize = AsyncMock()
-        response = handler(event, None)
+        response = handler(event, lambda_context)
         assert response == event
         mock_get_or_create.assert_called_once_with("test-user-id", mock_container)
 
 
-def test_lambda_handler_scheduler_match_user():
+def test_lambda_handler_scheduler_match_user(lambda_context):
     event = {"type": "match_user", "user_id": "user-123"}
 
     with patch("app.main.container") as mock_container:
@@ -104,7 +116,7 @@ def test_lambda_handler_scheduler_match_user():
         mock_container.initialize = AsyncMock()
         mock_container.matching_service.match_user_offers = AsyncMock(return_value=True)
 
-        response = handler(event, None)
+        response = handler(event, lambda_context)
 
         assert response["status"] == "success"
         assert response["feed_changed"] is True
@@ -113,7 +125,7 @@ def test_lambda_handler_scheduler_match_user():
         )
 
 
-def test_lambda_handler_scheduler_match_user_missing_id():
+def test_lambda_handler_scheduler_match_user_missing_id(lambda_context):
     event = {"type": "match_user"}
 
     with patch("app.main.container") as mock_container:
@@ -123,21 +135,21 @@ def test_lambda_handler_scheduler_match_user_missing_id():
         with pytest.raises(
             MatchSchedulingException, match="Missing user_id for match_user event"
         ):
-            handler(event, None)
+            handler(event, lambda_context)
 
 
-def test_lambda_handler_unhandled_event():
+def test_lambda_handler_unhandled_event(lambda_context):
     event = {"type": "unknown_event_type"}
 
     with patch("app.main.container") as mock_container:
         mock_container.exit_stack = MagicMock()
         mock_container.initialize = AsyncMock()
-        response = handler(event, None)
+        response = handler(event, lambda_context)
         assert response["status"] == "success"
         assert "stub" in response["message"]
 
 
-def test_lambda_handler_scrape_offers():
+def test_lambda_handler_scrape_offers(lambda_context):
     event = {"type": "scrape_offers"}
 
     with (
@@ -148,7 +160,7 @@ def test_lambda_handler_scrape_offers():
         mock_container.initialize = AsyncMock()
         mock_run_scrape.return_value = {"scraped_cells": ["cell-1"]}
 
-        response = handler(event, None)
+        response = handler(event, lambda_context)
 
         assert response["status"] == "success"
         assert "completed" in response["message"]
@@ -156,7 +168,7 @@ def test_lambda_handler_scrape_offers():
         mock_run_scrape.assert_called_once()
 
 
-def test_lambda_handler_check_availability():
+def test_lambda_handler_check_availability(lambda_context):
     event = {"type": "check_availability"}
 
     with (
@@ -167,7 +179,7 @@ def test_lambda_handler_check_availability():
         mock_container.initialize = AsyncMock()
         mock_run_availability.return_value = {"checked_offers_count": 5}
 
-        response = handler(event, None)
+        response = handler(event, lambda_context)
 
         assert response["status"] == "success"
         assert "completed" in response["message"]

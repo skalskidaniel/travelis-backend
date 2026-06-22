@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from mangum import Mangum
+from aws_lambda_powertools import Logger
 
 from app.auth.controller import router as auth_router
 from app.exceptions import (
@@ -19,6 +20,8 @@ from app.jobs.coordinator import run_scrape_job
 from app.jobs.availability import run_availability_job
 from core.container import container
 from core.exceptions.scheduler import SchedulerException
+
+logger = Logger(service="travelis-backend")
 
 
 @asynccontextmanager
@@ -138,14 +141,16 @@ async def handle_non_http(event: dict, context) -> dict:
             from app.user.controller import get_or_create_user
 
             await get_or_create_user(user_id, container)
-            print(f"Cognito PostConfirmation: successfully provisioned user {user_id}")
+            logger.info(
+                "Cognito PostConfirmation: successfully provisioned user %s", user_id
+            )
         return event  # Cognito triggers must echo the event
 
     # B. EventBridge Scheduler debounced match job
     elif event_type == "match_user":
         user_id = event.get("user_id")
         if user_id:
-            print(f"EventBridge Scheduler: matching user {user_id}")
+            logger.info("EventBridge Scheduler: matching user %s", user_id)
             feed_changed = await container.matching_service.match_user_offers(user_id)
             return {
                 "status": "success",
@@ -157,7 +162,7 @@ async def handle_non_http(event: dict, context) -> dict:
 
     # C. EventBridge scrape coordinator job
     elif event_type == "scrape_offers":
-        print("EventBridge: Starting scrape_offers job")
+        logger.info("EventBridge: Starting scrape_offers job")
 
         results = await run_scrape_job(container, context, payload=event)
         return {
@@ -168,7 +173,7 @@ async def handle_non_http(event: dict, context) -> dict:
 
     # D. EventBridge availability check job
     elif event_type == "check_availability":
-        print("EventBridge: Starting check_availability job")
+        logger.info("EventBridge: Starting check_availability job")
 
         results = await run_availability_job(container, context)
         return {
@@ -179,8 +184,10 @@ async def handle_non_http(event: dict, context) -> dict:
 
     # E. Other non-HTTP events (stubs)
     else:
-        print(
-            f"Non-HTTP event received: triggerSource={trigger_source}, type={event_type}"
+        logger.warning(
+            "Non-HTTP event received: triggerSource=%s, type=%s",
+            trigger_source,
+            event_type,
         )
         return {
             "status": "success",
@@ -189,6 +196,7 @@ async def handle_non_http(event: dict, context) -> dict:
         }
 
 
+@logger.inject_lambda_context(clear_state=True)
 def handler(event: dict, context) -> dict:
     """Dual-entry Lambda handler.
 

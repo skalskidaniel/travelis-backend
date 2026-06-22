@@ -1,5 +1,5 @@
 import asyncio
-import logging
+from aws_lambda_powertools import Logger
 from datetime import date, datetime, timezone
 import pandas as pd
 
@@ -14,7 +14,7 @@ from core.repositories.base import (
 from core.services.activation import generate_required_cells, ActivationService
 from core.services.notifications import NotificationsService, PushSendResult
 
-logger = logging.getLogger(__name__)
+logger = Logger(child=True)
 
 
 class MatchingService:

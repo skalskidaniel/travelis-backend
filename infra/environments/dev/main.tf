@@ -99,3 +99,13 @@ resource "aws_lambda_permission" "allow_eventbridge_availability" {
   source_arn    = module.eventbridge.check_availability_rule_arn
 }
 
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project                      = var.project
+  environment                  = var.environment
+  grafana_cloud_aws_account_id = var.grafana_cloud_aws_account_id
+  grafana_cloud_external_id    = var.grafana_cloud_external_id
+}
+
+

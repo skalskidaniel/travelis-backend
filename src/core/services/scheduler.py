@@ -1,5 +1,5 @@
 import json
-import logging
+from aws_lambda_powertools import Logger
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -10,7 +10,7 @@ from core.exceptions.scheduler import (
     ScheduleUpdateException,
 )
 
-logger = logging.getLogger(__name__)
+logger = Logger(child=True)
 
 MATCH_DEBOUNCE_SECONDS = 15
 

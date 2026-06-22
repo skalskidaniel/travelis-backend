@@ -1,4 +1,4 @@
-import logging
+from aws_lambda_powertools import Logger
 from typing import Any
 
 import httpx
@@ -11,7 +11,7 @@ from core.exceptions.cognito import (
     CognitoJwtValidationException,
 )
 
-logger = logging.getLogger(__name__)
+logger = Logger(child=True)
 
 
 class CognitoJwtVerifier:
