@@ -185,9 +185,10 @@ resource "aws_lambda_function" "lambdalith" {
       LAMBDA_FUNCTION_ARN        = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project}-${var.environment}-lambdalith"
       SCHEDULER_ROLE_ARN         = var.scheduler_role_arn
       POWERTOOLS_SERVICE_NAME    = "${var.project}-backend"
-      POWERTOOLS_LOG_LEVEL       = "INFO"
+      POWERTOOLS_LOG_LEVEL       = var.environment == "prod" ? "INFO" : "DEBUG"
     }
   }
+
 
 
   tags = {

@@ -39,6 +39,11 @@ class CognitoJwtVerifier:
         self, *, force_refresh: bool = False
     ) -> dict[str, dict[str, Any]]:
         if self._jwks_keys is None or force_refresh:
+            logger.debug(
+                "Fetching JWKS from Cognito: url=%s (force_refresh=%s)",
+                self.jwks_url,
+                force_refresh,
+            )
             response = await self.http_client.get(self.jwks_url)
             response.raise_for_status()
             self._jwks_keys = {
@@ -54,9 +59,13 @@ class CognitoJwtVerifier:
                 "COGNITO_APP_CLIENT_ID is not configured"
             )
 
+        logger.debug("Verifying Cognito JWT token...")
         try:
             header = jwt.get_unverified_header(token)
             kid = header.get("kid")
+            logger.debug(
+                "JWT unverified header: kid=%s, alg=%s", kid, header.get("alg")
+            )
             if not kid:
                 raise CognitoJwtValidationException("Invalid token: missing kid header")
 
@@ -101,6 +110,12 @@ class CognitoJwtVerifier:
             raise CognitoJwtValidationException("Invalid token_use claim")
 
         user_id = payload.get("sub")
+        logger.debug(
+            "JWT validation succeeded: sub=%s, token_use=%s, exp=%s",
+            user_id,
+            token_use,
+            payload.get("exp"),
+        )
         if not user_id:
             raise CognitoJwtValidationException("Invalid token: missing sub claim")
 

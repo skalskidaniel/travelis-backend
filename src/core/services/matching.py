@@ -69,6 +69,12 @@ class MatchingService:
 
         # 2. Resolve required cell IDs
         required_cells = generate_required_cells(prefs, ref)
+        logger.debug(
+            "Resolved %d required cells for user %s: %s",
+            len(required_cells),
+            user_id,
+            [c.cell_id for c in required_cells],
+        )
         if not required_cells:
             return False
 
@@ -77,10 +83,22 @@ class MatchingService:
         for cell in required_cells:
             cell_offers = await self.offers_repo.query_by_cell(cell.cell_id)
             offers.extend(cell_offers)
+        logger.debug(
+            "Queried %d raw offers from %d cells for user %s",
+            len(offers),
+            len(required_cells),
+            user_id,
+        )
 
         # 4. Filter offers in Python using Pandas/NumPy
         matched_offers = await asyncio.to_thread(
             self._filter_offers_vectorized, offers, prefs
+        )
+        logger.debug(
+            "Vectorized filtering complete for user %s: %d matches out of %d total offers",
+            user_id,
+            len(matched_offers),
+            len(offers),
         )
 
         # 5. Sync UserOffers rows
@@ -94,6 +112,13 @@ class MatchingService:
         ]
 
         feed_changed = len(to_delete_ids) > 0 or len(to_insert_offers) > 0
+        logger.debug(
+            "Feed diff for user %s: to_delete=%d, to_insert=%d, feed_changed=%s",
+            user_id,
+            len(to_delete_ids),
+            len(to_insert_offers),
+            feed_changed,
+        )
 
         if to_delete_ids:
             await self.user_offers_repo.delete_batch(
@@ -146,20 +171,35 @@ class MatchingService:
             for o in offers
         ]
         df = pd.DataFrame(offers_data)
+        logger.debug("Starting vectorized filtering on %d offers", len(df))
 
         df = df[df["rating"] >= prefs.min_rating]
+        logger.debug(
+            "Filtered by rating (min=%s): %d remaining", prefs.min_rating, len(df)
+        )
         if df.empty:
             return []
 
         if prefs.departure_airports:
             pref_airports = {a.upper().strip() for a in prefs.departure_airports}
             df = df[df["departure_airport"].str.upper().str.strip().isin(pref_airports)]
+            logger.debug(
+                "Filtered by departure airports (%s): %d remaining",
+                pref_airports,
+                len(df),
+            )
             if df.empty:
                 return []
 
         df = df[df["duration"] >= prefs.duration_min]
         if prefs.duration_max is not None:
             df = df[df["duration"] <= prefs.duration_max]
+        logger.debug(
+            "Filtered by duration (min=%s, max=%s): %d remaining",
+            prefs.duration_min,
+            prefs.duration_max,
+            len(df),
+        )
         if df.empty:
             return []
 
@@ -167,10 +207,21 @@ class MatchingService:
             df = df[df["departure_date"] >= prefs.date_from]
         if prefs.date_to is not None:
             df = df[df["return_date"] <= prefs.date_to]
+        logger.debug(
+            "Filtered by travel dates (from=%s, to=%s): %d remaining",
+            prefs.date_from,
+            prefs.date_to,
+            len(df),
+        )
         if df.empty:
             return []
 
         df = df[df["children"] == len(prefs.children)]
+        logger.debug(
+            "Filtered by children count (expected=%d): %d remaining",
+            len(prefs.children),
+            len(df),
+        )
         if df.empty:
             return []
 
@@ -202,6 +253,11 @@ class MatchingService:
 
         affected_set = set(affected_cell_ids)
         users = await self.users_repo.scan()
+        logger.debug(
+            "Scanning %d users for bulk match candidates against %d cells",
+            len(users),
+            len(affected_cell_ids),
+        )
 
         matched_user_ids = []
         for user in users:
@@ -209,6 +265,11 @@ class MatchingService:
             user_cell_ids = {c.cell_id for c in user_cells}
 
             if user_cell_ids & affected_set:
+                logger.debug(
+                    "User %s matches affected cells (overlap: %s); running match_user_offers",
+                    user.user_id,
+                    user_cell_ids & affected_set,
+                )
                 feed_changed = await self.match_user_offers(
                     user.user_id, reference_date
                 )

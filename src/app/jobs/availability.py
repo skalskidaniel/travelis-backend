@@ -33,6 +33,12 @@ async def run_availability_job(container: Container, context=None) -> dict:
         logger.info("No available offers found in database to check.")
         return {"checked_offers_count": 0, "updated_offers_count": 0}
 
+    logger.debug(
+        "Scanning database: found %d available offers across %d cells to verify",
+        len(available_offers),
+        len(cells),
+    )
+
     checked_count = 0
     updated_count = 0
     sem = asyncio.Semaphore(15)
@@ -45,6 +51,12 @@ async def run_availability_job(container: Container, context=None) -> dict:
         async with sem:
             checked_count += 1
             provider = tui if offer.provider == ProviderName.TUI else wakacje
+            logger.debug(
+                "Checking availability for offer %s (provider=%s, cell_id=%s)",
+                offer.offer_id,
+                offer.provider,
+                offer.cell_id,
+            )
             try:
                 is_available = await provider.check_availability(offer)
 
@@ -54,6 +66,11 @@ async def run_availability_job(container: Container, context=None) -> dict:
                         f"Offer {offer.offer_id} ({offer.provider}) is no longer available. Deleted."
                     )
                 else:
+                    logger.debug(
+                        "Offer %s is still available. Verifying price (current: %s)...",
+                        offer.offer_id,
+                        offer.price_total,
+                    )
                     new_price = await provider.check_price(offer)
                     if new_price != offer.price_total:
                         offer.price_total = new_price
@@ -67,6 +84,12 @@ async def run_availability_job(container: Container, context=None) -> dict:
                         updated_count += 1
                         logger.info(
                             f"Offer {offer.offer_id} ({offer.provider}) price updated to {new_price}."
+                        )
+                    else:
+                        logger.debug(
+                            "Offer %s price is unchanged (%s)",
+                            offer.offer_id,
+                            offer.price_total,
                         )
 
             except Exception as e:
