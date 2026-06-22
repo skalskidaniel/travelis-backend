@@ -1,9 +1,7 @@
 resource "aws_dynamodb_table" "users" {
-  name           = "${var.project}-${var.environment}-users"
-  billing_mode   = "PROVISIONED"
-  read_capacity  = 5
-  write_capacity = 5
-  hash_key       = "user_id"
+  name         = "${var.project}-${var.environment}-users"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "user_id"
 
   attribute {
     name = "user_id"
@@ -16,11 +14,9 @@ resource "aws_dynamodb_table" "users" {
 }
 
 resource "aws_dynamodb_table" "cells" {
-  name           = "${var.project}-${var.environment}-cells"
-  billing_mode   = "PROVISIONED"
-  read_capacity  = 5
-  write_capacity = 5
-  hash_key       = "cell_id"
+  name         = "${var.project}-${var.environment}-cells"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "cell_id"
 
   attribute {
     name = "cell_id"
@@ -33,12 +29,10 @@ resource "aws_dynamodb_table" "cells" {
 }
 
 resource "aws_dynamodb_table" "offers" {
-  name           = "${var.project}-${var.environment}-offers"
-  billing_mode   = "PROVISIONED"
-  read_capacity  = 5
-  write_capacity = 5
-  hash_key       = "cell_id"
-  range_key      = "offer_id"
+  name         = "${var.project}-${var.environment}-offers"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "cell_id"
+  range_key    = "offer_id"
 
   attribute {
     name = "cell_id"
@@ -61,12 +55,10 @@ resource "aws_dynamodb_table" "offers" {
 }
 
 resource "aws_dynamodb_table" "user_offers" {
-  name           = "${var.project}-${var.environment}-user-offers"
-  billing_mode   = "PROVISIONED"
-  read_capacity  = 5
-  write_capacity = 5
-  hash_key       = "user_id"
-  range_key      = "offer_id"
+  name         = "${var.project}-${var.environment}-user-offers"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "user_id"
+  range_key    = "offer_id"
 
   attribute {
     name = "user_id"

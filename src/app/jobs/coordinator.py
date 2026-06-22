@@ -126,24 +126,31 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                 now = datetime.now(timezone.utc)
                 new_offers_map = {}
                 for scored in scored_offers:
-                    oid = compute_offer_id(scored)
-                    expected_ttl = int(
-                        datetime.combine(
-                            scored.departure_date,
-                            time.min,
-                            tzinfo=timezone.utc,
-                        ).timestamp()
-                    )
-                    offer = Offer(
-                        **scored.model_dump(),
-                        cell_id=cell.cell_id,
-                        offer_id=oid,
-                        share_url="https://wakacje-travelis.pl/offer/dummy/dummy",
-                        scraped_at=now,
-                        updated_at=now,
-                        ttl=expected_ttl,
-                    )
-                    new_offers_map[oid] = offer
+                    try:
+                        oid = compute_offer_id(scored)
+                        expected_ttl = int(
+                            datetime.combine(
+                                scored.departure_date,
+                                time.min,
+                                tzinfo=timezone.utc,
+                            ).timestamp()
+                        )
+                        offer = Offer(
+                            **scored.model_dump(),
+                            cell_id=cell.cell_id,
+                            offer_id=oid,
+                            share_url="https://wakacje-travelis.pl/offer/dummy/dummy",
+                            scraped_at=now,
+                            updated_at=now,
+                            ttl=expected_ttl,
+                        )
+                        new_offers_map[oid] = offer
+                    except Exception as e:
+                        logger.warning(
+                            f"Skipping invalid offer from provider {scored.provider} "
+                            f"(external_id={scored.external_offer_id}, hotel={scored.hotel_name}) "
+                            f"in cell {cell.cell_id} due to validation error: {e}"
+                        )
 
                 existing_offers = await container.offers_repo.query_by_cell(
                     cell.cell_id
