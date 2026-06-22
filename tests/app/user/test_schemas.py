@@ -10,12 +10,12 @@ def test_user_preferences_update_valid():
     data = {
         "countries": ["GR", "DE"],
         "adults": 3,
-        "board": "all-inclusive",
+        "board": ["all-inclusive", "half-board"],
     }
     update = UserPreferencesUpdate(**data)
     assert update.countries == ["GR", "DE"]
     assert update.adults == 3
-    assert update.board == BoardType.ALL_INCLUSIVE
+    assert update.board == [BoardType.ALL_INCLUSIVE, BoardType.HALF_BOARD]
 
 
 def test_user_preferences_update_empty():
@@ -32,6 +32,10 @@ def test_user_preferences_update_invalid_adults():
 def test_user_preferences_update_invalid_board():
     with pytest.raises(ValidationError):
         UserPreferencesUpdate(board="invalid_board")
+    with pytest.raises(ValidationError):
+        UserPreferencesUpdate(board=["invalid_board"])
+    with pytest.raises(ValidationError):
+        UserPreferencesUpdate(board=[])
 
 
 def test_user_preferences_update_invalid_country():

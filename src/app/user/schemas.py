@@ -41,8 +41,10 @@ class UserPreferencesUpdate(BaseModel):
         description="Birthdates of child travelers, used to calculate their age during the holiday. Total occupants (adults + children) cannot exceed 8.",
         examples=[["2018-05-12", "2021-11-20"]],
     )
-    board: BoardType | None = Field(
-        default=None, description="Catering/board option preference."
+    board: list[BoardType] | None = Field(
+        default=None,
+        min_length=1,
+        description="Catering/board option preference.",
     )
     min_stars: int | None = Field(
         default=None,

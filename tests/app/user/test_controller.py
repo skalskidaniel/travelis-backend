@@ -65,6 +65,7 @@ def test_update_preferences(client, mock_container):
     payload = {
         "min_stars": 5,
         "countries": ["IT", "ES"],
+        "board": ["all-inclusive", "half-board"],
     }
     response = client.patch("/api/v2/user/preferences", json=payload)
 
@@ -72,6 +73,7 @@ def test_update_preferences(client, mock_container):
     data = response.json()
     assert data["min_stars"] == 5
     assert data["countries"] == ["IT", "ES"]
+    assert data["board"] == ["all-inclusive", "half-board"]
 
     mock_container.users_repo.put.assert_called_once()
     mock_container.activation_service.update_cell_activations.assert_called_once()

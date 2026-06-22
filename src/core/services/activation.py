@@ -68,17 +68,18 @@ def generate_required_cells(
     cells = []
     for country in preferences.countries:
         for month in months:
-            cells.append(
-                MarketCell(
-                    country=country,
-                    month=month,
-                    min_stars=preferences.min_stars,
-                    board=preferences.board,
-                    adults=preferences.adults,
-                    children=len(preferences.children),
-                    activation_count=1,
+            for board_type in preferences.board:
+                cells.append(
+                    MarketCell(
+                        country=country,
+                        month=month,
+                        min_stars=preferences.min_stars,
+                        board=board_type,
+                        adults=preferences.adults,
+                        children=len(preferences.children),
+                        activation_count=1,
+                    )
                 )
-            )
     return cells
 
 

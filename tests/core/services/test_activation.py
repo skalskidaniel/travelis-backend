@@ -40,7 +40,7 @@ def test_generate_required_cells():
         countries=["GR", "IT"],
         adults=2,
         children=[date(2018, 5, 10)],
-        board=BoardType.ALL_INCLUSIVE,
+        board=[BoardType.ALL_INCLUSIVE],
         min_stars=4,
         date_from=date(2026, 7, 1),
         date_to=date(2026, 7, 31),
@@ -55,6 +55,29 @@ def test_generate_required_cells():
     assert gr_cell.board == BoardType.ALL_INCLUSIVE
     assert gr_cell.adults == 2
     assert gr_cell.children == 1
+
+
+def test_generate_required_cells_multiple_boards():
+    prefs = UserPreferences(
+        countries=["GR"],
+        adults=2,
+        children=[date(2018, 5, 10)],
+        board=[BoardType.ALL_INCLUSIVE, BoardType.HALF_BOARD],
+        min_stars=4,
+        date_from=date(2026, 7, 1),
+        date_to=date(2026, 7, 31),
+    )
+
+    cells = generate_required_cells(prefs, date(2026, 6, 15))
+    assert len(cells) == 2
+
+    ai_cell = [c for c in cells if c.board == BoardType.ALL_INCLUSIVE][0]
+    hb_cell = [c for c in cells if c.board == BoardType.HALF_BOARD][0]
+
+    assert ai_cell.country == "GR"
+    assert ai_cell.month == "2026-07"
+    assert hb_cell.country == "GR"
+    assert hb_cell.month == "2026-07"
 
 
 @pytest.mark.asyncio
