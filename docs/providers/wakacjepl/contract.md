@@ -503,7 +503,7 @@ customHeaders: {"Page-Source":"PO","Tour-Operator-Code":"VITX","Tour-Operator-Id
 }
 ```
 
-Use `data.availability === true` and `data.status === "OK"`. Update `Offers.available` and `price_total` when changed.
+Use `data.availability === true` and `data.status === "OK"`. If the offer is no longer available, the daily availability job deletes it directly from the database; otherwise, the job updates `price_total` (and recomputes `price_per_day`) when changed.
 
 ### Departure airport IDs
 

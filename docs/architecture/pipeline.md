@@ -141,7 +141,7 @@ Optional refinement for fresher availability _between_ scrapes (requires provide
 
 Contract details: [providers/wakacjepl/contract.md](../providers/wakacjepl/contract.md#offer-availability). Prototype: `notebooks/wakacje_pl_availability.ipynb`.
 
-Update `Offers.available` and `price_total` when they change.
+If the check determines that the offer is no longer available, the offer is deleted from the `Offers` table. Otherwise, if the offer is still available but its price has changed, its price attributes (`price_total` and `price_per_day`) are updated in-place.
 
 ## Redis feed rebuild and lazy ZSET pagination
 

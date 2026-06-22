@@ -47,14 +47,11 @@ async def run_availability_job(container: Container, context=None) -> dict:
             provider = tui if offer.provider == ProviderName.TUI else wakacje
             try:
                 is_available = await provider.check_availability(offer)
-                changed = False
 
                 if not is_available:
-                    offer.available = False
-                    offer.updated_at = datetime.now(timezone.utc)
-                    changed = True
+                    await container.offers_repo.delete(offer.cell_id, offer.offer_id)
                     logger.info(
-                        f"Offer {offer.offer_id} ({offer.provider}) is no longer available."
+                        f"Offer {offer.offer_id} ({offer.provider}) is no longer available. Deleted."
                     )
                 else:
                     new_price = await provider.check_price(offer)
@@ -66,14 +63,11 @@ async def run_availability_job(container: Container, context=None) -> dict:
                             / (offer.adults + offer.children)
                         ).quantize(Decimal("0.01"))
                         offer.updated_at = datetime.now(timezone.utc)
-                        changed = True
+                        await container.offers_repo.put(offer)
+                        updated_count += 1
                         logger.info(
                             f"Offer {offer.offer_id} ({offer.provider}) price updated to {new_price}."
                         )
-
-                if changed:
-                    await container.offers_repo.put(offer)
-                    updated_count += 1
 
             except Exception as e:
                 logger.error(
