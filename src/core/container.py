@@ -18,6 +18,7 @@ class Container:
     def __init__(self) -> None:
         self.settings = Settings()
         self.exit_stack: AsyncExitStack | None = None
+        self._loop: Any = None
 
         # Clients / Resources
         self.dynamodb_resource: Any = None
@@ -47,8 +48,23 @@ class Container:
 
     async def initialize(self) -> None:
         """Initialize all shared resources once per cold start."""
+        import asyncio
+
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
         if self.exit_stack is not None:
-            return
+            if (
+                self._loop == current_loop
+                and current_loop is not None
+                and not current_loop.is_closed()
+            ):
+                return
+            await self.cleanup()
+
+        self._loop = current_loop
 
         import httpx
         from core.providers.tui.main import TuiProvider
@@ -62,7 +78,7 @@ class Container:
         self.tui_provider = TuiProvider(self.http_client)
         self.wakacje_provider = WakacjePlProvider(self.http_client)
 
-        session = aioboto3.Session()
+        session = aioboto3.Session(profile_name=self.settings.aws_profile)
         self.dynamodb_resource = await self.exit_stack.enter_async_context(
             session.resource("dynamodb", region_name=self.settings.aws_region)
         )
@@ -127,7 +143,10 @@ class Container:
     async def cleanup(self) -> None:
         """Close and release all resources cleanly."""
         if self.exit_stack is not None:
-            await self.exit_stack.aclose()
+            try:
+                await self.exit_stack.aclose()
+            except Exception:
+                pass
             self.exit_stack = None
             self.dynamodb_resource = None
             self.redis_client = None
@@ -147,6 +166,7 @@ class Container:
             self.notifications_service = None
             self.scheduler_service = None
             self.cognito_jwt_verifier = None
+            self._loop = None
 
 
 container = Container()

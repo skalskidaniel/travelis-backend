@@ -31,6 +31,10 @@ class Settings(BaseSettings):
         default="eu-central-1",
         validation_alias=AliasChoices("AWS_REGION"),
     )
+    aws_profile: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("AWS_PROFILE"),
+    )
     redis_url: str = Field(
         validation_alias=AliasChoices("REDIS_URL"),
     )

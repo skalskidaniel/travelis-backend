@@ -199,6 +199,11 @@ def handler(event: dict, context) -> dict:
     is_http = "requestContext" in event or "httpMethod" in event or "rawPath" in event
 
     if is_http:
+        try:
+            asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
         return mangum_handler(event, context)
 
     return asyncio.run(handle_non_http(event, context))
