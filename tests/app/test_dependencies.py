@@ -42,7 +42,7 @@ async def test_get_container_initializes_lazily():
 @pytest.mark.asyncio
 async def test_getters_return_correct_attributes():
     mock_container = AsyncMock(spec=Container)
-    
+
     # We assign mock attributes matching what the getters expect
     mock_container.users_repo = "mock_users_repo"
     mock_container.cells_repo = "mock_cells_repo"

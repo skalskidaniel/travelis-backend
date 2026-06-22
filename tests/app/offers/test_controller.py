@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
 from app.main import app
+from app.offers.controller import calculate_zset_score
 from core.models.common import BoardType, ProviderName
 from core.models.offer import Offer, OfferMetadata, OfferSource, TuiMetadata
 
@@ -218,7 +219,9 @@ def test_get_offers_invalid_cursor(client, auth_headers):
     assert "Invalid pagination cursor" in response.json()["detail"]
 
 
-def test_get_offer_detail_missing_from_offers_table(client, mock_container, auth_headers):
+def test_get_offer_detail_missing_from_offers_table(
+    client, mock_container, auth_headers
+):
     mock_container.user_offers_repo.get.return_value = {
         "offer_id": "offer-1",
         "cell_id": "cell-1",
@@ -246,7 +249,7 @@ def test_get_offers_with_next_cursor(
 ):
     mock_container.feed_repo.get_feed_version.return_value = 1
     mock_container.feed_repo.get_or_build_sort_zset.return_value = True
-    
+
     # Return exactly limit (limit=2) offers to trigger next_cursor logic
     offer_id = sample_domain_offer.offer_id
     mock_container.feed_repo.get_page.return_value = [
@@ -260,8 +263,6 @@ def test_get_offers_with_next_cursor(
     data = response.json()
     assert data["next_cursor"] is not None
 
-
-from app.offers.controller import calculate_zset_score
 
 def test_calculate_zset_score_coverage(sample_domain_offer):
     assert calculate_zset_score(sample_domain_offer, "price_total") > 0
