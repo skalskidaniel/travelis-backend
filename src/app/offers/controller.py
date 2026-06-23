@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import json
 from aws_lambda_powertools import Logger
@@ -164,13 +163,14 @@ async def get_offers_feed(
 
     if not offer_keys:
         return PaginatedOffersResponse(
-            offers=[], next_cursor=None, feed_version=current_version, total_count=total_count
+            offers=[],
+            next_cursor=None,
+            feed_version=current_version,
+            total_count=total_count,
         )
 
     batch_keys = [
-        (cell_id, offer_id)
-        for offer_id, cell_id in offer_keys
-        if offer_id and cell_id
+        (cell_id, offer_id) for offer_id, cell_id in offer_keys if offer_id and cell_id
     ]
     hydrated_offers = await container.offers_repo.get_batch(batch_keys)
 
@@ -191,7 +191,10 @@ async def get_offers_feed(
     feed_items = [OfferFeedItem.from_domain(o) for o in sorted_offers]
 
     return PaginatedOffersResponse(
-        offers=feed_items, next_cursor=next_cursor, feed_version=current_version, total_count=total_count
+        offers=feed_items,
+        next_cursor=next_cursor,
+        feed_version=current_version,
+        total_count=total_count,
     )
 
 

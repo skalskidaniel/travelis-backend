@@ -105,9 +105,10 @@ async def retryable_service_exception_handler(
 async def scheduler_exception_handler(
     request: Request, exc: SchedulerException
 ) -> JSONResponse:
+    logger.error(f"Scheduler exception occurred: {exc}", exc_info=True)
     return JSONResponse(
         status_code=503,
-        content={"detail": str(exc), "retryable": True},
+        content={"detail": "Service temporarily unavailable", "retryable": True},
     )
 
 

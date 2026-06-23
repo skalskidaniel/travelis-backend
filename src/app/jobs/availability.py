@@ -107,7 +107,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
     if offers_to_delete:
         await container.offers_repo.delete_batch(offers_to_delete)
         logger.info(f"Batch deleted {len(offers_to_delete)} unavailable offers.")
-    
+
     if offers_to_update:
         await container.offers_repo.put_batch(offers_to_update)
         logger.info(f"Batch updated {len(offers_to_update)} offers with new prices.")

@@ -6,7 +6,12 @@ from botocore.exceptions import ClientError
 from core.exceptions.repository import ItemNotFoundException, ReadException
 from core.models.cell import MarketCell
 from core.repositories.base import CellsRepository
-from core.repositories.utils import serialize_item, deserialize_item, chunked, BATCH_READ_LIMIT
+from core.repositories.utils import (
+    serialize_item,
+    deserialize_item,
+    chunked,
+    BATCH_READ_LIMIT,
+)
 
 
 class DynamoCellsRepository(CellsRepository):
@@ -34,7 +39,7 @@ class DynamoCellsRepository(CellsRepository):
             request_items = {
                 table_name: {
                     "Keys": [{"cell_id": cid} for cid in chunk],
-                    "ConsistentRead": False
+                    "ConsistentRead": False,
                 }
             }
 
@@ -50,7 +55,7 @@ class DynamoCellsRepository(CellsRepository):
                 unprocessed = response.get("UnprocessedKeys", {})
                 if unprocessed:
                     retries += 1
-                    await asyncio.sleep(0.1 * (2 ** retries))
+                    await asyncio.sleep(0.1 * (2**retries))
 
             if unprocessed:
                 raise ReadException("Failed to read some cells in batch after retries.")

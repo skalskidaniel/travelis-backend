@@ -68,9 +68,7 @@ class RedisFeedRepository(FeedRepository):
                 parsed.append((val, ""))
         return parsed
 
-    async def get_size(
-        self, user_id: str, field: str, order: str, version: int
-    ) -> int:
+    async def get_size(self, user_id: str, field: str, order: str, version: int) -> int:
         key = f"user:{user_id}:sort:{field}:{order}:v{version}"
         return await self.redis.zcard(key)
 

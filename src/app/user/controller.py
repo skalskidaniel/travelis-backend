@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, status
+from aws_lambda_powertools import Logger
 
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
 from app.rate_limiter import RateLimiter
 from app.user.schemas import UserPreferencesUpdate, PushEnableRequest
 from core.container import Container
+from core.exceptions.scheduler import SchedulerException
 from core.models.user import (
     User,
     UserPreferences,
@@ -13,6 +15,7 @@ from core.models.user import (
     PushSubscriptionKeys,
 )
 
+logger = Logger(child=True)
 router = APIRouter(tags=["User Preferences & Notifications"])
 
 
@@ -25,7 +28,12 @@ async def get_or_create_user(user_id: str, container: Container) -> User:
         await container.activation_service.update_cell_activations(
             new_prefs=user.preferences, old_prefs=None
         )
-        await container.scheduler_service.schedule_match(user_id)
+        try:
+            await container.scheduler_service.schedule_match(user_id)
+        except SchedulerException as exc:
+            logger.warning(
+                f"Failed to schedule match for new user {user_id} (ignoring): {exc}"
+            )
     return user
 
 
@@ -85,7 +93,12 @@ async def update_preferences(
         new_prefs=new_prefs, old_prefs=old_prefs
     )
 
-    await container.scheduler_service.schedule_match(user_id)
+    try:
+        await container.scheduler_service.schedule_match(user_id)
+    except SchedulerException as exc:
+        logger.warning(
+            f"Failed to schedule match after preference update for user {user_id} (ignoring): {exc}"
+        )
 
     return user.preferences
 

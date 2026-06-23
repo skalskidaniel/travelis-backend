@@ -39,6 +39,8 @@ async def test_schedule_match_raises_when_arns_missing(monkeypatch):
     monkeypatch.delenv("SCHEDULER_ROLE_ARN", raising=False)
 
     settings = Settings()
+    settings.lambda_function_arn = None
+    settings.scheduler_role_arn = None
     mock_client = AsyncMock()
     service = SchedulerService(scheduler_client=mock_client, settings=settings)
 

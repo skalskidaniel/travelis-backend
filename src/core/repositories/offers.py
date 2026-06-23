@@ -35,33 +35,38 @@ class DynamoOffersRepository(OffersRepository):
 
         client = self.table.meta.client
         table_name = self.table.name
-        
+
         offers = []
         for chunk in chunked(keys, BATCH_READ_LIMIT):
             request_items = {
                 table_name: {
-                    "Keys": [{"cell_id": cell_id, "offer_id": offer_id} for cell_id, offer_id in chunk],
-                    "ConsistentRead": False
+                    "Keys": [
+                        {"cell_id": cell_id, "offer_id": offer_id}
+                        for cell_id, offer_id in chunk
+                    ],
+                    "ConsistentRead": False,
                 }
             }
-            
+
             unprocessed = request_items
             retries = 0
             while unprocessed and retries < 5:
                 response = await client.batch_get_item(RequestItems=unprocessed)
-                
+
                 responses = response.get("Responses", {}).get(table_name, [])
                 for item in responses:
                     offers.append(Offer(**deserialize_item(item)))
-                
+
                 unprocessed = response.get("UnprocessedKeys", {})
                 if unprocessed:
                     retries += 1
-                    await asyncio.sleep(0.1 * (2 ** retries))
-            
+                    await asyncio.sleep(0.1 * (2**retries))
+
             if unprocessed:
-                raise ReadException("Failed to read some offers in batch after retries.")
-                
+                raise ReadException(
+                    "Failed to read some offers in batch after retries."
+                )
+
         return offers
 
     async def put(self, offer: Offer) -> None:
