@@ -72,3 +72,71 @@ resource "aws_iam_role_policy_attachment" "grafana_cloud_logs" {
   role       = aws_iam_role.grafana_cloud_read.name
   policy_arn = aws_iam_policy.grafana_cloud_logs_policy.arn
 }
+
+resource "aws_cloudwatch_metric_alarm" "api_lambda_errors" {
+  alarm_name          = "${var.project}-${var.environment}-api-lambda-errors"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 1
+  alarm_description   = "API Lambda reported one or more errors in a 5-minute window."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    FunctionName = var.api_lambda_name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "cron_lambda_errors" {
+  alarm_name          = "${var.project}-${var.environment}-cron-lambda-errors"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 1
+  alarm_description   = "Cron Lambda reported one or more errors in a 5-minute window."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    FunctionName = var.cron_lambda_name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "api_lambda_duration_p99" {
+  alarm_name          = "${var.project}-${var.environment}-api-lambda-duration-p99"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "Duration"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  extended_statistic  = "p99"
+  threshold           = 25000
+  alarm_description   = "API Lambda p99 duration exceeded 25s (30s timeout)."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    FunctionName = var.api_lambda_name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "api_gateway_5xx" {
+  alarm_name          = "${var.project}-${var.environment}-api-gateway-5xx"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "5xx"
+  namespace           = "AWS/ApiGateway"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 5
+  alarm_description   = "API Gateway returned 5 or more 5xx responses in a 5-minute window."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    ApiId = var.api_gateway_id
+  }
+}

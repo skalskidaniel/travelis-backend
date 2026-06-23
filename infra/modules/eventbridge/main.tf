@@ -58,9 +58,7 @@ resource "aws_iam_policy" "scheduler_lambda_invoke" {
         Action = [
           "lambda:InvokeFunction"
         ]
-        Resource = [
-          var.lambda_arn
-        ]
+        Resource = var.scheduler_invoke_lambda_arns
       }
     ]
   })

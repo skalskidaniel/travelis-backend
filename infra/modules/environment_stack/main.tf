@@ -32,10 +32,11 @@ module "cognito" {
 module "eventbridge" {
   source = "../eventbridge"
 
-  project     = var.project
-  environment = var.environment
-  lambda_arn  = local.cron_lambda_arn
-  lambda_name = local.cron_lambda_name
+  project                      = var.project
+  environment                  = var.environment
+  lambda_arn                   = local.cron_lambda_arn
+  lambda_name                  = local.cron_lambda_name
+  scheduler_invoke_lambda_arns = [local.api_lambda_arn]
 }
 
 module "lambda" {
@@ -105,6 +106,9 @@ module "monitoring" {
   environment                  = var.environment
   grafana_cloud_aws_account_id = var.grafana_cloud_aws_account_id
   grafana_cloud_external_id    = var.grafana_cloud_external_id
+  api_lambda_name              = module.lambda.api_lambda_name
+  cron_lambda_name             = module.lambda.cron_lambda_name
+  api_gateway_id               = module.api_gateway.api_id
 }
 
 # -----------------------------------------------------------------------------

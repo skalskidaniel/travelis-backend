@@ -150,9 +150,28 @@ resource "aws_iam_policy" "lambda_custom_policy" {
         Resource = [
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project}-${var.environment}-lambdalith-*"
         ]
+      },
+      # Secrets Manager (VAPID private key)
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [
+          aws_secretsmanager_secret.vapid_private_key.arn
+        ]
       }
     ]
   })
+}
+
+resource "aws_secretsmanager_secret" "vapid_private_key" {
+  name = "${var.project}-${var.environment}-vapid-private-key"
+}
+
+resource "aws_secretsmanager_secret_version" "vapid_private_key" {
+  secret_id     = aws_secretsmanager_secret.vapid_private_key.id
+  secret_string = var.vapid_private_key
 }
 
 resource "aws_iam_role_policy_attachment" "custom_policy_attachment" {
@@ -172,21 +191,21 @@ resource "aws_cloudwatch_log_group" "cron_lambda_logs" {
 
 locals {
   common_environment_variables = {
-    REDIS_URL                  = var.redis_url
-    COGNITO_USER_POOL_ID       = var.cognito_user_pool_id
-    COGNITO_APP_CLIENT_ID      = var.cognito_app_client_id
-    DYNAMODB_USERS_TABLE       = var.users_table_name
-    DYNAMODB_CELLS_TABLE       = var.cells_table_name
-    DYNAMODB_OFFERS_TABLE      = var.offers_table_name
-    DYNAMODB_USER_OFFERS_TABLE = var.user_offers_table_name
-    VAPID_PUBLIC_KEY           = var.vapid_public_key
-    VAPID_PRIVATE_KEY          = var.vapid_private_key
-    FRONTEND_URL               = var.frontend_url
-    SCHEDULER_ROLE_ARN         = var.scheduler_role_arn
-    ATTRACTIVENESS_Z_THRESHOLD = tostring(var.attractiveness_z_threshold)
-    POWERTOOLS_SERVICE_NAME    = "${var.project}-backend"
-    POWERTOOLS_LOG_LEVEL       = var.environment == "prod" ? "INFO" : "DEBUG"
-    ENVIRONMENT                = var.environment
+    REDIS_URL                      = var.redis_url
+    COGNITO_USER_POOL_ID           = var.cognito_user_pool_id
+    COGNITO_APP_CLIENT_ID          = var.cognito_app_client_id
+    DYNAMODB_USERS_TABLE           = var.users_table_name
+    DYNAMODB_CELLS_TABLE           = var.cells_table_name
+    DYNAMODB_OFFERS_TABLE          = var.offers_table_name
+    DYNAMODB_USER_OFFERS_TABLE     = var.user_offers_table_name
+    VAPID_PUBLIC_KEY               = var.vapid_public_key
+    VAPID_PRIVATE_KEY_SECRET_ARN   = aws_secretsmanager_secret.vapid_private_key.arn
+    FRONTEND_URL                   = var.frontend_url
+    SCHEDULER_ROLE_ARN             = var.scheduler_role_arn
+    ATTRACTIVENESS_Z_THRESHOLD     = tostring(var.attractiveness_z_threshold)
+    POWERTOOLS_SERVICE_NAME        = "${var.project}-backend"
+    POWERTOOLS_LOG_LEVEL           = var.environment == "prod" ? "INFO" : "DEBUG"
+    ENVIRONMENT                    = var.environment
   }
 }
 

@@ -17,3 +17,8 @@ variable "lambda_name" {
   description = "Name of the Lambdalith function."
   type        = string
 }
+
+variable "scheduler_invoke_lambda_arns" {
+  description = "Lambda ARNs the EventBridge Scheduler execution role may invoke (e.g. API Lambda for debounced match)."
+  type        = list(string)
+}
