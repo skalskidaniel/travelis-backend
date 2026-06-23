@@ -10,6 +10,7 @@ from core.container import Container
 from core.models.cell import MarketCell
 from core.models.common import BoardType, ProviderName
 from core.models.offer import Offer, OfferMetadata, RawOffer, TuiMetadata
+from core.services.ingest import compute_offer_id
 
 
 @pytest.fixture
@@ -349,3 +350,109 @@ async def test_run_scrape_job_skips_cell_when_all_scored_offers_fail_validation(
     mock_container.offers_repo.put_batch.assert_not_called()
     mock_container.cells_repo.update_last_scraped.assert_not_called()
     mock_container.matching_service.bulk_match_users.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_scrape_job_partial_validation_failure_keeps_existing_available(
+    mock_container,
+):
+    cell = MarketCell(
+        country="ES",
+        month="2026-07",
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    mock_container.cells_repo.scan.return_value = [cell]
+
+    valid_raw = RawOffer(
+        provider=ProviderName.TUI,
+        external_offer_id="tui-valid",
+        hotel_name="Sol Hotel",
+        location="ES/Mallorca/Palma",
+        departure_airport="WAW",
+        departure_date=date(2026, 7, 10),
+        return_date=date(2026, 7, 17),
+        duration=7,
+        board=BoardType.ALL_INCLUSIVE,
+        stars=3,
+        rating=Decimal("4.0"),
+        review_count=100,
+        price_total=Decimal("2000.00"),
+        price_per_day=Decimal("142.86"),
+        referral_url="https://tui.pl/ref",
+        available=True,
+        room_type="Standard",
+        adults=2,
+        children=0,
+        metadata=OfferMetadata(tui=TuiMetadata(offer_code="tui-valid")),
+    )
+    invalid_raw = RawOffer(
+        provider=ProviderName.TUI,
+        external_offer_id="tui-invalid",
+        hotel_name="Bad Hotel",
+        location="ES/Mallorca/Palma",
+        departure_airport="WAW",
+        departure_date=date(2026, 7, 10),
+        return_date=date(2026, 7, 17),
+        duration=7,
+        board=BoardType.ALL_INCLUSIVE,
+        stars=3,
+        rating=Decimal("4.0"),
+        review_count=100,
+        price_total=Decimal("2500.00"),
+        price_per_day=Decimal("178.57"),
+        referral_url="https://tui.pl/ref2",
+        available=True,
+        room_type="Standard",
+        adults=2,
+        children=0,
+        metadata=OfferMetadata(tui=TuiMetadata(offer_code="tui-invalid")),
+    )
+
+    invalid_offer_id = compute_offer_id(invalid_raw)
+    existing_offer = Offer(
+        **invalid_raw.model_dump(),
+        cell_id=cell.cell_id,
+        offer_id=invalid_offer_id,
+        share_url="https://wakacje-travelis.pl/offer/dummy/dummy",
+        scraped_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        ttl=1783641600,
+        attractiveness_score=0.5,
+    )
+
+    mock_container.tui_provider.search = AsyncMock(
+        return_value=[valid_raw, invalid_raw]
+    )
+    mock_container.wakacje_provider.search = AsyncMock(return_value=[])
+
+    with patch("app.jobs.coordinator.get_scorer") as mock_get_scorer:
+        from core.models.offer import ScoredOffer
+
+        mock_scorer = mock_get_scorer.return_value
+        mock_scorer.score.return_value = [
+            ScoredOffer(**valid_raw.model_dump(), attractiveness_score=0.85),
+            ScoredOffer(**invalid_raw.model_dump(), attractiveness_score=0.75),
+        ]
+
+        mock_container.offers_repo.query_by_cell.return_value = [existing_offer]
+
+        original_offer_cls = Offer
+
+        def offer_factory(*args, **kwargs):
+            external_id = kwargs.get("external_offer_id")
+            if external_id == "tui-invalid":
+                raise ValueError("invalid offer payload")
+            return original_offer_cls(*args, **kwargs)
+
+        with patch("app.jobs.coordinator.Offer", side_effect=offer_factory):
+            await run_scrape_job(mock_container)
+
+    saved = mock_container.offers_repo.put_batch.call_args[0][0]
+    unavailable_existing = [
+        o for o in saved if o.offer_id == invalid_offer_id and not o.available
+    ]
+    assert unavailable_existing == []

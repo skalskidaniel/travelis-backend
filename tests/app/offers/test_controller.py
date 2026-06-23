@@ -106,7 +106,9 @@ def test_get_offers_cached_feed(
     mock_container.feed_repo.get_size.return_value = 1
 
     offer_id = sample_domain_offer.offer_id
-    mock_container.feed_repo.get_page.return_value = [(offer_id, "cell-1")]
+    mock_container.feed_repo.get_page.return_value = [
+        (offer_id, sample_domain_offer.cell_id)
+    ]
     mock_container.offers_repo.get_batch.return_value = [sample_domain_offer]
 
     response = client.get("/api/v2/offers", headers=auth_headers)
@@ -127,11 +129,13 @@ def test_get_offers_build_zset(
 
     offer_id = sample_domain_offer.offer_id
     mock_container.user_offers_repo.query_by_user.return_value = [
-        {"offer_id": offer_id, "cell_id": "cell-1"}
+        {"offer_id": offer_id, "cell_id": sample_domain_offer.cell_id}
     ]
     mock_container.offers_repo.get_batch.return_value = [sample_domain_offer]
 
-    mock_container.feed_repo.get_page.return_value = [(offer_id, "cell-1")]
+    mock_container.feed_repo.get_page.return_value = [
+        (offer_id, sample_domain_offer.cell_id)
+    ]
 
     response = client.get("/api/v2/offers", headers=auth_headers)
     assert response.status_code == 200
@@ -151,7 +155,7 @@ def test_get_offers_outdated_cursor_resets(
     mock_container.feed_repo.get_or_build_sort_zset.return_value = True
     mock_container.feed_repo.get_size.return_value = 1
     mock_container.feed_repo.get_page.return_value = [
-        (sample_domain_offer.offer_id, "cell-1")
+        (sample_domain_offer.offer_id, sample_domain_offer.cell_id)
     ]
     mock_container.offers_repo.get_batch.return_value = [sample_domain_offer]
 
@@ -224,6 +228,43 @@ def test_get_offers_invalid_cursor(client, auth_headers):
     assert "Invalid pagination cursor" in response.json()["detail"]
 
 
+def test_get_offers_rejects_negative_cursor_offset(
+    client, mock_container, auth_headers
+):
+    mock_container.feed_repo.get_feed_version.return_value = 1
+    cursor_data = {"offset": -5, "feed_version": 1}
+    cursor_str = base64.b64encode(json.dumps(cursor_data).encode("utf-8")).decode(
+        "utf-8"
+    )
+
+    response = client.get(f"/api/v2/offers?cursor={cursor_str}", headers=auth_headers)
+
+    assert response.status_code == 400
+
+
+def test_get_offers_prunes_stale_user_offers_on_hydration_miss(
+    client, mock_container, auth_headers, sample_domain_offer
+):
+    mock_container.feed_repo.get_feed_version.return_value = 1
+    mock_container.feed_repo.get_or_build_sort_zset.return_value = True
+    mock_container.feed_repo.get_size.return_value = 1
+    mock_container.feed_repo.get_page.return_value = [
+        (sample_domain_offer.offer_id, sample_domain_offer.cell_id)
+    ]
+    mock_container.offers_repo.get_batch.return_value = []
+    mock_container.feed_repo.increment_feed_version.return_value = 2
+    mock_container.feed_repo.get_feed_version.side_effect = [1, 2]
+    mock_container.feed_repo.get_size.return_value = 0
+
+    response = client.get("/api/v2/offers", headers=auth_headers)
+
+    assert response.status_code == 200
+    mock_container.user_offers_repo.delete_batch.assert_called_once_with(
+        [("user-123", sample_domain_offer.offer_id)]
+    )
+    mock_container.feed_repo.increment_feed_version.assert_called_once_with("user-123")
+
+
 def test_get_offer_detail_missing_from_offers_table(
     client, mock_container, auth_headers
 ):
@@ -261,8 +302,8 @@ def test_get_offers_with_next_cursor(
     # Return exactly limit (limit=2) offers to trigger next_cursor logic
     offer_id = sample_domain_offer.offer_id
     mock_container.feed_repo.get_page.return_value = [
-        (offer_id, "cell-1"),
-        ("offer-2", "cell-1"),
+        (offer_id, sample_domain_offer.cell_id),
+        ("offer-2", sample_domain_offer.cell_id),
     ]
     mock_container.offers_repo.get_batch.return_value = [sample_domain_offer]
 

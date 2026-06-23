@@ -242,9 +242,17 @@ async def test_match_user_offers_self_healing_month_shift(test_user, mock_offers
 
     ref_date = date(2026, 7, 15)
 
+    call_order = []
+
+    async def record_put(user):
+        call_order.append("put")
+
+    async def record_activation(**kwargs):
+        call_order.append("activation")
+
     users_repo = MagicMock()
     users_repo.get = AsyncMock(return_value=test_user)
-    users_repo.put = AsyncMock()
+    users_repo.put = AsyncMock(side_effect=record_put)
 
     offers_repo = MagicMock()
     offers_repo.query_by_cell = AsyncMock(return_value=[])
@@ -256,7 +264,9 @@ async def test_match_user_offers_self_healing_month_shift(test_user, mock_offers
 
     feed_repo = MagicMock()
     activation_service = MagicMock()
-    activation_service.update_cell_activations = AsyncMock()
+    activation_service.update_cell_activations = AsyncMock(
+        side_effect=record_activation
+    )
 
     notifications_service = MagicMock()
 
@@ -271,12 +281,11 @@ async def test_match_user_offers_self_healing_month_shift(test_user, mock_offers
 
     await service.match_user_offers("usr_123", ref_date)
 
+    assert call_order == ["put", "activation"]
     activation_service.update_cell_activations.assert_called_once()
     called_args = activation_service.update_cell_activations.call_args[1]
     assert called_args["new_reference_date"] == ref_date
     assert called_args["old_reference_date"] == date(2026, 6, 17)
-
-    users_repo.put.assert_called_once_with(test_user)
     assert test_user.updated_at.month == 7
 
 
@@ -573,3 +582,115 @@ def test_filter_availability():
     matched = service._filter_offers_vectorized(offers, prefs)
 
     assert [o.offer_id for o in matched] == ["a" * 32]
+
+
+@pytest.mark.asyncio
+async def test_match_user_offers_self_healing_skipped_after_timestamp_persisted(
+    test_user,
+):
+    test_user.preferences.date_from = None
+    test_user.preferences.date_to = None
+    test_user.updated_at = datetime(2026, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+    ref_date = date(2026, 7, 15)
+
+    users_repo = MagicMock()
+    users_repo.get = AsyncMock(return_value=test_user)
+    users_repo.put = AsyncMock()
+
+    activation_service = MagicMock()
+    activation_service.update_cell_activations = AsyncMock()
+
+    service = MatchingService(
+        users_repo=users_repo,
+        offers_repo=MagicMock(query_by_cell=AsyncMock(return_value=[])),
+        user_offers_repo=MagicMock(
+            query_by_user=AsyncMock(return_value=[]),
+            delete_batch=AsyncMock(),
+            put_batch=AsyncMock(),
+        ),
+        feed_repo=MagicMock(),
+        notifications_service=MagicMock(),
+        activation_service=activation_service,
+    )
+
+    await service.match_user_offers("usr_123", ref_date)
+
+    users_repo.put.assert_not_called()
+    activation_service.update_cell_activations.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_match_user_offers_inserts_before_deletes(test_user, mock_offers):
+    users_repo = MagicMock()
+    users_repo.get = AsyncMock(return_value=test_user)
+
+    offers_repo = MagicMock()
+    offers_repo.query_by_cell = AsyncMock(return_value=mock_offers)
+
+    call_order = []
+
+    async def record_put_batch(items):
+        call_order.append("put")
+
+    async def record_delete_batch(keys):
+        call_order.append("delete")
+
+    user_offers_repo = MagicMock()
+    user_offers_repo.query_by_user = AsyncMock(
+        return_value=[{"user_id": "usr_123", "offer_id": "old-offer-id"}]
+    )
+    user_offers_repo.put_batch = AsyncMock(side_effect=record_put_batch)
+    user_offers_repo.delete_batch = AsyncMock(side_effect=record_delete_batch)
+
+    feed_repo = MagicMock()
+    feed_repo.increment_feed_version = AsyncMock()
+
+    test_user.push_enabled = False
+
+    service = MatchingService(
+        users_repo=users_repo,
+        offers_repo=offers_repo,
+        user_offers_repo=user_offers_repo,
+        feed_repo=feed_repo,
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+
+    await service.match_user_offers("usr_123", date(2026, 6, 18))
+
+    assert call_order == ["put", "delete"]
+
+
+@pytest.mark.asyncio
+async def test_match_user_offers_clears_stale_matches_when_no_required_cells(
+    test_user,
+):
+    test_user.preferences.countries = []
+
+    users_repo = MagicMock()
+    users_repo.get = AsyncMock(return_value=test_user)
+
+    user_offers_repo = MagicMock()
+    user_offers_repo.query_by_user = AsyncMock(
+        return_value=[{"user_id": "usr_123", "offer_id": "stale-offer"}]
+    )
+    user_offers_repo.delete_batch = AsyncMock()
+
+    feed_repo = MagicMock()
+    feed_repo.increment_feed_version = AsyncMock()
+
+    service = MatchingService(
+        users_repo=users_repo,
+        offers_repo=MagicMock(),
+        user_offers_repo=user_offers_repo,
+        feed_repo=feed_repo,
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+
+    feed_changed = await service.match_user_offers("usr_123", date(2026, 6, 18))
+
+    assert feed_changed is True
+    user_offers_repo.delete_batch.assert_called_once_with([("usr_123", "stale-offer")])
+    feed_repo.increment_feed_version.assert_called_once_with("usr_123")

@@ -126,6 +126,7 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                     continue
 
                 now = datetime.now(timezone.utc)
+                seen_offer_ids = {compute_offer_id(scored) for scored in scored_offers}
                 new_offers_map = {}
                 for scored in scored_offers:
                     try:
@@ -180,7 +181,7 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
 
                 # Availability-by-absence logic
                 for oid, existing_offer in existing_map.items():
-                    if oid not in new_offers_map and existing_offer.available:
+                    if oid not in seen_offer_ids and existing_offer.available:
                         existing_offer.available = False
                         existing_offer.updated_at = now
                         offers_to_save.append(existing_offer)

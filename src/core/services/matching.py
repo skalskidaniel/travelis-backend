@@ -55,17 +55,17 @@ class MatchingService:
                 logger.info(
                     f"Self-healing: shifting active months for user {user_id} from {updated_date} to {ref}"
                 )
+                current_time = datetime.now(timezone.utc).time()
+                user.updated_at = datetime.combine(
+                    ref, current_time, tzinfo=timezone.utc
+                )
+                await self.users_repo.put(user)
                 await self.activation_service.update_cell_activations(
                     new_prefs=prefs,
                     old_prefs=prefs,
                     new_reference_date=ref,
                     old_reference_date=updated_date,
                 )
-                current_time = datetime.now(timezone.utc).time()
-                user.updated_at = datetime.combine(
-                    ref, current_time, tzinfo=timezone.utc
-                )
-                await self.users_repo.put(user)
 
         # 2. Resolve required cell IDs
         required_cells = generate_required_cells(prefs, ref)
@@ -76,7 +76,15 @@ class MatchingService:
             [c.cell_id for c in required_cells],
         )
         if not required_cells:
-            return False
+            existing_items = await self.user_offers_repo.query_by_user(user_id)
+            if not existing_items:
+                return False
+
+            await self.user_offers_repo.delete_batch(
+                [(user_id, item["offer_id"]) for item in existing_items]
+            )
+            await self.feed_repo.increment_feed_version(user_id)
+            return True
 
         # 3. Query Offers for those cells
         offers = []
@@ -120,11 +128,6 @@ class MatchingService:
             feed_changed,
         )
 
-        if to_delete_ids:
-            await self.user_offers_repo.delete_batch(
-                [(user_id, oid) for oid in to_delete_ids]
-            )
-
         if to_insert_offers:
             matched_at = datetime.now(timezone.utc)
             items_to_insert = [
@@ -138,10 +141,15 @@ class MatchingService:
             ]
             await self.user_offers_repo.put_batch(items_to_insert)
 
+        if to_delete_ids:
+            await self.user_offers_repo.delete_batch(
+                [(user_id, oid) for oid in to_delete_ids]
+            )
+
         # 6. If feed changed, increment feed version in Redis and send Web Push
         if feed_changed:
             await self.feed_repo.increment_feed_version(user_id)
-            if user.push_enabled and user.push_subscription:
+            if to_insert_offers and user.push_enabled and user.push_subscription:
                 result = await self.notifications_service.send_random_notification(
                     user.push_subscription
                 )

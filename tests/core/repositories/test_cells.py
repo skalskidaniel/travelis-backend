@@ -139,3 +139,13 @@ async def test_cells_repo_decrement_raises_when_cell_missing(cells_table):
 
     with pytest.raises(ItemNotFoundException, match="Cell not found: missing-cell"):
         await repo.decrement_activations(["missing-cell"])
+
+
+async def test_cells_repo_update_last_scraped_does_not_create_missing_cell(cells_table):
+    repo = DynamoCellsRepository(cells_table)
+
+    now = datetime(2026, 6, 17, 12, 0, 0)
+    await repo.update_last_scraped(["missing-cell-id"], now)
+
+    assert await repo.get("missing-cell-id") is None
+    assert await repo.scan() == []

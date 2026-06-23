@@ -21,6 +21,30 @@ logger = Logger(child=True)
 router = APIRouter(tags=["Offers Feed"])
 
 
+async def _prune_stale_user_offers(
+    container: Container,
+    user_id: str,
+    requested_keys: list[tuple[str, str]],
+    hydrated_offers: list[Offer],
+) -> bool:
+    """Remove UserOffers rows whose offers no longer exist and bump feed version."""
+    returned_keys = {(offer.cell_id, offer.offer_id) for offer in hydrated_offers}
+    stale_keys = [key for key in requested_keys if key not in returned_keys]
+    if not stale_keys:
+        return False
+
+    await container.user_offers_repo.delete_batch(
+        [(user_id, offer_id) for _, offer_id in stale_keys]
+    )
+    await container.feed_repo.increment_feed_version(user_id)
+    logger.info(
+        "Pruned %d stale UserOffers rows for user %s after missing offer hydration",
+        len(stale_keys),
+        user_id,
+    )
+    return True
+
+
 def calculate_zset_score(offer: Offer, field: str) -> float:
     """Deterministic score builder embedding a lexicographical tie-breaker float fraction."""
     hash_fraction = int(offer.offer_id[:6], 16) / 1e10
@@ -99,8 +123,16 @@ async def get_offers_feed(
             cursor_data = json.loads(
                 base64.b64decode(cursor.encode("utf-8")).decode("utf-8")
             )
+            if not isinstance(cursor_data, dict):
+                raise ValueError("cursor must decode to an object")
             offset = int(cursor_data.get("offset", 0))
+            if offset < 0:
+                raise ValueError("cursor offset must be non-negative")
             cursor_feed_version = cursor_data.get("feed_version")
+            if cursor_feed_version is not None and not isinstance(
+                cursor_feed_version, int
+            ):
+                raise ValueError("cursor feed_version must be an integer")
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -134,7 +166,10 @@ async def get_offers_feed(
 
         offer_keys = [(item["cell_id"], item["offer_id"]) for item in user_offers]
         offers = await container.offers_repo.get_batch(offer_keys)
-        valid_offers = [o for o in offers if o is not None]
+        if await _prune_stale_user_offers(container, user_id, offer_keys, offers):
+            current_version = await container.feed_repo.get_feed_version(user_id)
+
+        valid_offers = offers
 
         members = [
             (f"{o.offer_id}:{o.cell_id}", calculate_zset_score(o, sort))
@@ -173,6 +208,14 @@ async def get_offers_feed(
         (cell_id, offer_id) for offer_id, cell_id in offer_keys if offer_id and cell_id
     ]
     hydrated_offers = await container.offers_repo.get_batch(batch_keys)
+    if await _prune_stale_user_offers(container, user_id, batch_keys, hydrated_offers):
+        current_version = await container.feed_repo.get_feed_version(user_id)
+        total_count = await container.feed_repo.get_size(
+            user_id=user_id,
+            field=sort,
+            order=order,
+            version=current_version,
+        )
 
     offer_ids = [oid for oid, _ in offer_keys]
     offer_map = {o.offer_id: o for o in hydrated_offers if o is not None}
