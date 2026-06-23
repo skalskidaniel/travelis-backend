@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from core.config import Settings
@@ -13,10 +14,11 @@ def env_vars(monkeypatch):
     monkeypatch.setenv("VAPID_PUBLIC_KEY", "test-public-key")
     monkeypatch.setenv("VAPID_PRIVATE_KEY", "test-private-key")
     monkeypatch.setenv("ATTRACTIVENESS_Z_THRESHOLD", "-0.5")
+    monkeypatch.setenv("POWERTOOLS_LOG_LEVEL", "DEBUG")
 
 
 def test_settings_loads_flat_environment_variables(env_vars):
-    settings = Settings()
+    settings = Settings(_env_file=None)
 
     assert settings.redis_url == "redis://localhost:6379/0"
     assert settings.users_table == "CustomUsers"
@@ -26,10 +28,11 @@ def test_settings_loads_flat_environment_variables(env_vars):
     assert settings.vapid_public_key == "test-public-key"
     assert settings.vapid_private_key == "test-private-key"
     assert settings.attractiveness_z_threshold == -0.5
+    assert settings.powertools_log_level == "DEBUG"
 
 
 def test_settings_exposes_nested_views(env_vars):
-    settings = Settings()
+    settings = Settings(_env_file=None)
 
     assert settings.db is not None
     assert settings.db.users_table == "CustomUsers"
@@ -37,3 +40,21 @@ def test_settings_exposes_nested_views(env_vars):
     assert settings.push.vapid_public_key == "test-public-key"
     assert settings.scoring is not None
     assert settings.scoring.attractiveness_z_threshold == -0.5
+
+
+def test_settings_log_level_fallback(monkeypatch):
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.delenv("POWERTOOLS_LOG_LEVEL", raising=False)
+    monkeypatch.setenv("LOG_LEVEL", "WARNING")
+
+    settings = Settings(_env_file=None)
+    assert settings.powertools_log_level == "WARNING"
+
+
+def test_settings_sets_powertools_log_level_env_var(monkeypatch):
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.delenv("POWERTOOLS_LOG_LEVEL", raising=False)
+    monkeypatch.setenv("LOG_LEVEL", "CRITICAL")
+
+    Settings(_env_file=None)
+    assert os.environ.get("POWERTOOLS_LOG_LEVEL") == "CRITICAL"

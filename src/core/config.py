@@ -87,6 +87,10 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("COGNITO_APP_CLIENT_ID"),
     )
+    powertools_log_level: str = Field(
+        default="INFO",
+        validation_alias=AliasChoices("POWERTOOLS_LOG_LEVEL", "LOG_LEVEL"),
+    )
 
     db: DatabaseSettings | None = None
     push: PushSettings | None = None
@@ -94,6 +98,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def populate_nested_settings(self) -> Self:
+        import os
+
+        os.environ["POWERTOOLS_LOG_LEVEL"] = self.powertools_log_level
+
         object.__setattr__(
             self,
             "db",

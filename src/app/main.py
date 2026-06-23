@@ -21,7 +21,10 @@ from app.jobs.availability import run_availability_job
 from core.container import container
 from core.exceptions.scheduler import SchedulerException
 
-logger = Logger(service="travelis-backend")
+logger = Logger(
+    service="travelis-backend",
+    level=container.settings.powertools_log_level,
+)
 
 
 @asynccontextmanager
