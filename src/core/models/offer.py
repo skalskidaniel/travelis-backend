@@ -251,33 +251,18 @@ class Offer(ScoredOffer):
         referral_qs = urlencode(REFERRAL_PARAMS, doseq=True)
 
         if parts.query and "=" not in parts.query:
-            separator = "&" if parts.query else "?"
-            new_query = (
-                f"{parts.query}{separator}{referral_qs}" if parts.query else referral_qs
-            )
-            new_url = urlunsplit(
-                (
-                    parts.scheme,
-                    parts.netloc,
-                    parts.path,
-                    new_query,
-                    parts.fragment,
-                )
-            )
-            return type(value)(new_url)
+            # Opaque wakacje.pl selector (e.g. "od-2026-08-26,7-dni,all-inclusive") —
+            # parse_qsl cannot represent it, so keep it verbatim as the base.
+            base_query = parts.query
+        else:
+            pairs = [
+                (k, v)
+                for k, v in parse_qsl(parts.query, keep_blank_values=True)
+                if k not in REFERRAL_PARAMS
+            ]
+            base_query = urlencode(pairs, doseq=True)
 
-        params = dict(parse_qsl(parts.query, keep_blank_values=True))
-
-        changed = False
-        for key, val in REFERRAL_PARAMS.items():
-            if params.get(key) != val:
-                params[key] = val
-                changed = True
-
-        if not changed:
-            return value
-
-        new_query = urlencode(params, doseq=True)
+        new_query = f"{base_query}&{referral_qs}" if base_query else referral_qs
         new_url = urlunsplit(
             (
                 parts.scheme,
@@ -287,5 +272,4 @@ class Offer(ScoredOffer):
                 parts.fragment,
             )
         )
-
         return type(value)(new_url)
