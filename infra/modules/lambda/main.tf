@@ -186,6 +186,7 @@ resource "aws_lambda_function" "lambdalith" {
       SCHEDULER_ROLE_ARN         = var.scheduler_role_arn
       POWERTOOLS_SERVICE_NAME    = "${var.project}-backend"
       POWERTOOLS_LOG_LEVEL       = var.environment == "prod" ? "INFO" : "DEBUG"
+      ENVIRONMENT                = var.environment
     }
   }
 

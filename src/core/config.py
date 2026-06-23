@@ -31,6 +31,10 @@ class Settings(BaseSettings):
         default="eu-central-1",
         validation_alias=AliasChoices("AWS_REGION"),
     )
+    environment: str = Field(
+        default="dev",
+        validation_alias=AliasChoices("ENVIRONMENT", "STAGE"),
+    )
     aws_profile: str | None = Field(
         default=None,
         validation_alias=AliasChoices("AWS_PROFILE"),

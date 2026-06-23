@@ -69,12 +69,17 @@ TAGS_METADATA = [
     },
 ]
 
+is_prod = container.settings.environment == "prod"
+
 app = FastAPI(
     title="TraveLis Backend API",
     version="2.0.0",
     description=API_DESCRIPTION,
     openapi_tags=TAGS_METADATA,
     lifespan=lifespan,
+    docs_url=None if is_prod else "/docs",
+    redoc_url=None if is_prod else "/redoc",
+    openapi_url=None if is_prod else "/openapi.json",
 )
 
 

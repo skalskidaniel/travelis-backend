@@ -15,6 +15,7 @@ def env_vars(monkeypatch):
     monkeypatch.setenv("VAPID_PRIVATE_KEY", "test-private-key")
     monkeypatch.setenv("ATTRACTIVENESS_Z_THRESHOLD", "-0.5")
     monkeypatch.setenv("POWERTOOLS_LOG_LEVEL", "DEBUG")
+    monkeypatch.setenv("ENVIRONMENT", "prod")
 
 
 def test_settings_loads_flat_environment_variables(env_vars):
@@ -29,6 +30,7 @@ def test_settings_loads_flat_environment_variables(env_vars):
     assert settings.vapid_private_key == "test-private-key"
     assert settings.attractiveness_z_threshold == -0.5
     assert settings.powertools_log_level == "DEBUG"
+    assert settings.environment == "prod"
 
 
 def test_settings_exposes_nested_views(env_vars):
@@ -58,3 +60,24 @@ def test_settings_sets_powertools_log_level_env_var(monkeypatch):
 
     Settings(_env_file=None)
     assert os.environ.get("POWERTOOLS_LOG_LEVEL") == "CRITICAL"
+
+
+def test_settings_environment_loading(monkeypatch):
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+
+    # 1. Default should be "dev"
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("STAGE", raising=False)
+    settings_default = Settings(_env_file=None)
+    assert settings_default.environment == "dev"
+
+    # 2. ENVIRONMENT should take precedence
+    monkeypatch.setenv("ENVIRONMENT", "prod")
+    settings_env = Settings(_env_file=None)
+    assert settings_env.environment == "prod"
+
+    # 3. STAGE should act as fallback
+    monkeypatch.delenv("ENVIRONMENT")
+    monkeypatch.setenv("STAGE", "staging")
+    settings_alias = Settings(_env_file=None)
+    assert settings_alias.environment == "staging"

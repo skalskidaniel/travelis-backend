@@ -7,6 +7,8 @@ os.environ["AWS_SESSION_TOKEN"] = "testing"
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 os.environ["AWS_CONFIG_FILE"] = "/dev/null"
 os.environ["AWS_SHARED_CREDENTIALS_FILE"] = "/dev/null"
+os.environ.pop("AWS_PROFILE", None)
+os.environ.pop("AWS_DEFAULT_PROFILE", None)
 
 import pytest
 
