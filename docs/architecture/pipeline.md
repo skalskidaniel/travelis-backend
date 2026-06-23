@@ -39,7 +39,7 @@ A global market cell is identified by:
 
 - `country` — ISO 3166-1 alpha-2
 - `month` — `YYYY-MM` (derived from user date range)
-  - **Travel Month Expansion**: If a user's date range spans multiple months, they activate cells for all months overlapping that range. If the user's travel dates are not configured ("Any"), they activate cells for the current month and the next 8 months (9 months total).
+  - **Travel Month Expansion**: If a user's date range spans multiple months, they activate cells for all months overlapping that range. If the user's travel dates are not configured ("Any"), they activate cells for the current month and the next 5 months (6 months total).
 - `min_stars`, `board`, `adults`, `children` — from user preferences
 
 This same tuple is used for **scraping**, **statistical comparison**, and **scoring**.
@@ -110,7 +110,7 @@ On `PATCH /api/v2/user/preferences`:
 For each claimed user:
 
 1. Load preferences.
-2. **Self-healing month shift** (open-ended dates only): when `date_from` and `date_to` are both unset, matching compares the reference date to the month stored in `user.updated_at`. If the calendar month changed, re-run cell activation for the rolling 9-month window anchored to the new reference date, then persist `updated_at` with the new month. This keeps active cells aligned with "Any" travel dates without a sweeper cron. Users who never match still rely on the next preference PATCH or bulk post-scrape match to refresh cells.
+2. **Self-healing month shift** (open-ended dates only): when `date_from` and `date_to` are both unset, matching compares the reference date to the month stored in `user.updated_at`. If the calendar month changed, re-run cell activation for the rolling 6-month window anchored to the new reference date, then persist `updated_at` with the new month. This keeps active cells aligned with "Any" travel dates without a sweeper cron. Users who never match still rely on the next preference PATCH or bulk post-scrape match to refresh cells.
 3. Resolve required `cell_id` set.
 4. Query `Offers` for those cells.
 5. Filter in Python using the user's exact preferences:

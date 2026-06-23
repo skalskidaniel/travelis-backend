@@ -64,10 +64,10 @@ Users can configure:
 ### Default preferences
 
 | Field              | Default                             | Behavior / Representation                            |
-| ------------------ | ----------------------------------- | ---------------------------------------------------- |
+| ------------------ | ----------------------------------- |------------------------------------------------------|
 | Countries          | Greece, Italy, Spain, Turkey, Egypt | `["GR", "IT", "ES", "TR", "EG"]`                     |
 | Departure airports | Any                                 | Represented as empty list `[]`                       |
-| Travel dates       | Any                                 | Slid window: current month + next 8 months (9 total) |
+| Travel dates       | Any                                 | Slid window: current month + next 5 months (6 total) |
 | Occupancy          | 2 adults, 0 children                | `adults = 2`, `children = []`                        |
 | Board type         | All-inclusive                       | `"all-inclusive"`                                    |
 | Hotel stars        | 2                                   | `min_stars = 2, min_rating = 0`                      |

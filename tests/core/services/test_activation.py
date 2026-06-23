@@ -16,9 +16,9 @@ def test_resolve_months_for_range():
 
     # Both None -> 9 months starting from reference
     months = resolve_months_for_range(None, None, ref)
-    assert len(months) == 9
+    assert len(months) == 6
     assert months[0] == "2026-06"
-    assert months[8] == "2027-02"
+    assert months[5] == "2026-11"
 
     # Specific range spanning multiple months
     months = resolve_months_for_range(date(2026, 6, 20), date(2026, 8, 5), ref)

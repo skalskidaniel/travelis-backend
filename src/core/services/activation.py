@@ -11,7 +11,7 @@ def resolve_months_for_range(
     reference_date: date | None = None,
 ) -> list[str]:
     """Resolve YYYY-MM month strings based on the user's travel date range.
-    If dates are not configured, return the current month and the next 8 months (9 months total).
+    If dates are not configured, return the current month and the next 5 months (6 months total).
     """
     ref = reference_date or date.today()
 
@@ -19,7 +19,7 @@ def resolve_months_for_range(
         start_year = ref.year
         start_month = ref.month
         months = []
-        for _ in range(9):
+        for _ in range(6):
             months.append(f"{start_year:04d}-{start_month:02d}")
             start_month += 1
             if start_month > 12:
