@@ -274,6 +274,7 @@ class WakacjePlProvider:
                         "maxCategory": 50,
                         "sort": 13,
                         "order": 1,
+                        "totalPrice": True,
                         "rooms": [
                             {
                                 "adult": cell.adults,
