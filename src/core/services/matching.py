@@ -3,7 +3,7 @@ from aws_lambda_powertools import Logger
 from datetime import date, datetime, timezone
 import pandas as pd
 
-from core.models.user import UserPreferences
+from core.models.user import User, UserPreferences
 from core.models.offer import Offer
 from core.repositories.base import (
     UsersRepository,
@@ -37,10 +37,14 @@ class MatchingService:
         self.activation_service = activation_service
 
     async def match_user_offers(
-        self, user_id: str, reference_date: date | None = None
+        self,
+        user_id: str,
+        reference_date: date | None = None,
+        user: User | None = None,
     ) -> bool:
         """Matches offers for a single user, updates their matches in UserOffers, and invalidates feed."""
-        user = await self.users_repo.get(user_id)
+        if user is None:
+            user = await self.users_repo.get(user_id)
         if not user:
             logger.warning(f"User not found for matching: {user_id}")
             return False
@@ -86,11 +90,11 @@ class MatchingService:
             await self.feed_repo.increment_feed_version(user_id)
             return True
 
-        # 3. Query Offers for those cells
-        offers = []
-        for cell in required_cells:
-            cell_offers = await self.offers_repo.query_by_cell(cell.cell_id)
-            offers.extend(cell_offers)
+        # 3. Query Offers for those cells in parallel
+        cell_offers_lists = await asyncio.gather(
+            *[self.offers_repo.query_by_cell(cell.cell_id) for cell in required_cells]
+        )
+        offers = [offer for sublist in cell_offers_lists for offer in sublist]
         logger.debug(
             "Queried %d raw offers from %d cells for user %s",
             len(offers),
@@ -285,7 +289,7 @@ class MatchingService:
                     user_cell_ids & affected_set,
                 )
                 feed_changed = await self.match_user_offers(
-                    user.user_id, reference_date
+                    user.user_id, reference_date, user=user
                 )
                 if feed_changed:
                     matched_user_ids.append(user.user_id)

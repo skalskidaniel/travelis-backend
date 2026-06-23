@@ -35,7 +35,7 @@ def resolve_months_for_range(
         end_date = max(date_to, start_date)
     else:
         end_year = start_date.year
-        end_month = start_date.month + 8
+        end_month = start_date.month + 5
         while end_month > 12:
             end_month -= 12
             end_year += 1

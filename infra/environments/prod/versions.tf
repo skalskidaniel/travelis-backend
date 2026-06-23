@@ -1,16 +1,13 @@
 terraform {
   required_version = ">= 1.5"
 
-  # Uncomment the following block to configure remote state storage on AWS S3 
-  # once you have created the S3 bucket and DynamoDB lock table.
-  #
-  # backend "s3" {
-  #   bucket         = "travelis-prod-terraform-state"
-  #   key            = "state/terraform.tfstate"
-  #   region         = "eu-central-1"
-  #   dynamodb_table = "travelis-prod-terraform-locks"
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket         = "travelis-prod-terraform-state"
+    key            = "state/terraform.tfstate"
+    region         = "eu-central-1"
+    dynamodb_table = "travelis-prod-terraform-locks"
+    encrypt        = true
+  }
 
   required_providers {
     aws = {

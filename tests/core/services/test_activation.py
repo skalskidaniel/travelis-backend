@@ -28,11 +28,11 @@ def test_resolve_months_for_range():
     months = resolve_months_for_range(date(2026, 5, 1), date(2026, 7, 10), ref)
     assert months == ["2026-06", "2026-07"]
 
-    # Date from set, date to None -> 9 months starting from date_from
+    # Date from set, date to None -> 6 months starting from date_from
     months = resolve_months_for_range(date(2026, 8, 10), None, ref)
-    assert len(months) == 9
+    assert len(months) == 6
     assert months[0] == "2026-08"
-    assert months[8] == "2027-04"
+    assert months[5] == "2027-01"
 
 
 def test_generate_required_cells():

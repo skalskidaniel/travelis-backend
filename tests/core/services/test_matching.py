@@ -311,7 +311,7 @@ async def test_bulk_match_users(test_user):
         )[0].cell_id
         matched = await service.bulk_match_users([matching_cell_id], date(2026, 6, 15))
         assert matched == ["usr_123"]
-        mock_match.assert_called_once_with("usr_123", date(2026, 6, 15))
+        mock_match.assert_called_once_with("usr_123", date(2026, 6, 15), user=test_user)
 
     with patch.object(
         service, "match_user_offers", AsyncMock(return_value=True)

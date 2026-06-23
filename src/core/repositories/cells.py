@@ -166,7 +166,16 @@ class DynamoCellsRepository(CellsRepository):
                 raise
             new_count = int(response["Attributes"]["activation_count"])
             if new_count <= 0:
-                await self.table.delete_item(Key={"cell_id": cell_id})
+                try:
+                    await self.table.delete_item(
+                        Key={"cell_id": cell_id},
+                        ConditionExpression="activation_count <= :zero",
+                        ExpressionAttributeValues={":zero": 0},
+                    )
+                except ClientError as exc:
+                    error_code = exc.response.get("Error", {}).get("Code")
+                    if error_code != "ConditionalCheckFailedException":
+                        raise
                 return cell_id, 0
             return cell_id, new_count
 

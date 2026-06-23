@@ -190,13 +190,14 @@ def merge_existing_and_new_offer(existing: Offer, new: Offer) -> Offer:
         new_provider=new.provider,
     )
 
-    if existing.provider == new.provider:
+    cheapest_source = min(merged_sources_list, key=lambda s: s.price_total)
+
+    if cheapest_source.provider == new.provider:
         winner_offer = new
+    elif cheapest_source.provider == existing.provider:
+        winner_offer = existing
     else:
-        if new.price_total < existing.price_total:
-            winner_offer = new
-        else:
-            winner_offer = existing
+        winner_offer = new
 
     has_wakacje = any(
         src.provider == ProviderName.WAKACJE_PL for src in merged_sources_list

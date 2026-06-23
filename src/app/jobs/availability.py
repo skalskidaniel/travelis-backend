@@ -22,12 +22,15 @@ async def run_availability_job(container: Container, context=None) -> dict:
         logger.info("No active market cells found. Skipping availability check.")
         return {"checked_offers_count": 0, "updated_offers_count": 0}
 
-    available_offers = []
-    for cell in cells:
-        cell_offers = await container.offers_repo.query_by_cell(cell.cell_id)
-        for offer in cell_offers:
-            if offer.available:
-                available_offers.append(offer)
+    cell_offers_lists = await asyncio.gather(
+        *[container.offers_repo.query_by_cell(cell.cell_id) for cell in cells]
+    )
+    available_offers = [
+        offer
+        for sublist in cell_offers_lists
+        for offer in sublist
+        if offer.available
+    ]
 
     if not available_offers:
         logger.info("No available offers found in database to check.")
