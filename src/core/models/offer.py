@@ -248,6 +248,24 @@ class Offer(ScoredOffer):
         url_str = str(value)
         parts = urlsplit(url_str)
 
+        referral_qs = urlencode(REFERRAL_PARAMS, doseq=True)
+
+        if parts.query and "=" not in parts.query:
+            separator = "&" if parts.query else "?"
+            new_query = (
+                f"{parts.query}{separator}{referral_qs}" if parts.query else referral_qs
+            )
+            new_url = urlunsplit(
+                (
+                    parts.scheme,
+                    parts.netloc,
+                    parts.path,
+                    new_query,
+                    parts.fragment,
+                )
+            )
+            return type(value)(new_url)
+
         params = dict(parse_qsl(parts.query, keep_blank_values=True))
 
         changed = False

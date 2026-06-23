@@ -88,6 +88,21 @@ def test_referral_url_appending_overwrites_existing_referral_params(valid_offer_
     assert "utm_medium=bad" not in url_str
 
 
+def test_referral_url_preserves_wakacje_selector_query(valid_offer_kwargs):
+    selector = "od-2026-08-26,7-dni,all-inclusive"
+    valid_offer_kwargs["referral_url"] = (
+        f"https://www.wakacje.pl/wczasy/grecja/oferta.html?{selector}"
+    )
+    offer = Offer(**valid_offer_kwargs)
+
+    url_str = str(offer.referral_url)
+    assert url_str.startswith(
+        f"https://www.wakacje.pl/wczasy/grecja/oferta.html?{selector}&"
+    )
+    assert "utm_source=travellead" in url_str
+    assert f"{selector}=" not in url_str
+
+
 def test_referral_url_no_modification_when_already_correct(valid_offer_kwargs):
     correct_url = (
         "https://www.tui.pl/details-gre-123"
