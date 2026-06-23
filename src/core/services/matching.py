@@ -167,11 +167,17 @@ class MatchingService:
                 "departure_date": o.departure_date,
                 "return_date": o.return_date,
                 "children": o.children,
+                "available": o.available,
             }
             for o in offers
         ]
         df = pd.DataFrame(offers_data)
         logger.debug("Starting vectorized filtering on %d offers", len(df))
+
+        df = df[df["available"]]
+        logger.debug("Filtered by availability (available=True): %d remaining", len(df))
+        if df.empty:
+            return []
 
         df = df[df["rating"] >= prefs.min_rating]
         logger.debug(

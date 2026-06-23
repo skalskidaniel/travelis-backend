@@ -550,3 +550,26 @@ def test_filter_children_ages():
     # Child is 18 years old (empty)
     prefs_invalid = UserPreferences(children=[date(2008, 6, 1)])
     assert service._filter_offers_vectorized(offers, prefs_invalid) == []
+
+
+def test_filter_availability():
+    service = MatchingService(
+        users_repo=MagicMock(),
+        offers_repo=MagicMock(),
+        user_offers_repo=MagicMock(),
+        feed_repo=MagicMock(),
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+    prefs = UserPreferences(
+        countries=["GR"],
+        min_rating=4,
+    )
+    offer_avail = make_offer(offer_id="a" * 32)
+    offer_unavail = make_offer(offer_id="b" * 32)
+    offer_unavail.available = False
+
+    offers = [offer_avail, offer_unavail]
+    matched = service._filter_offers_vectorized(offers, prefs)
+
+    assert [o.offer_id for o in matched] == ["a" * 32]
