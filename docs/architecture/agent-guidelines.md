@@ -36,6 +36,7 @@ DynamoDB tables are heavily optimized for access patterns. Do not "fix" these st
 
 - **Rule**: The `Offers` table has **NO GSIs**. All offer reads must utilize the composite primary key: `PK = cell_id`, `SK = offer_id`.
 - **Rule**: You cannot look up an offer using only `offer_id`. The application requires `(cell_id, offer_id)` to hydrate a single offer (hence denormalizing `cell_id` onto `UserOffers`).
+- **Rule**: When fetching multiple offers (e.g., paginating feeds or building caches), always use `BatchGetItem` via the `OffersRepository.get_batch` method rather than executing concurrent `GetItem` queries to prevent the N+1 queries problem and AWS API rate limiting.
 - **Rule**: There is no status attribute for `MarketCells`. A cell exists if and only if its `activation_count > 0`. If `activation_count` reaches 0, the row must be deleted.
 
 ## 5. Event-Driven Matching

@@ -23,3 +23,9 @@ class WriteException(RepositoryException):
     """Raised when a batch write or delete operation fails."""
 
     pass
+
+
+class ReadException(RepositoryException):
+    """Raised when a batch read operation fails."""
+
+    pass

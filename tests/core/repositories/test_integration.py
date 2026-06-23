@@ -389,16 +389,20 @@ async def test_feed_repo_integration_zset(redis_client):
     assert await repo.get_or_build_sort_zset(user_id, field, "desc", 1) is False
 
     members = [
-        ("offer_int_1", 1000.5),
-        ("offer_int_2", 500.2),
-        ("offer_int_3", 1500.7),
+        ("offer_int_1:cell_int_1", 1000.5),
+        ("offer_int_2:cell_int_1", 500.2),
+        ("offer_int_3:cell_int_1", 1500.7),
     ]
     await repo.add_to_sort_zset(user_id, field, "desc", 1, members)
 
     assert await repo.get_or_build_sort_zset(user_id, field, "desc", 1) is True
 
     page_desc = await repo.get_page(user_id, field, "desc", 1, offset=0, limit=10)
-    assert page_desc == ["offer_int_3", "offer_int_1", "offer_int_2"]
+    assert page_desc == [
+        ("offer_int_3", "cell_int_1"),
+        ("offer_int_1", "cell_int_1"),
+        ("offer_int_2", "cell_int_1"),
+    ]
 
 
 async def test_feed_repo_integration_clear_user(redis_client):

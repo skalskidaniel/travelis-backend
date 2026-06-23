@@ -133,11 +133,8 @@ async def get_offers_feed(
                 offers=[], next_cursor=None, feed_version=current_version
             )
 
-        tasks = [
-            container.offers_repo.get(item["cell_id"], item["offer_id"])
-            for item in user_offers
-        ]
-        offers = await asyncio.gather(*tasks)
+        offer_keys = [(item["cell_id"], item["offer_id"]) for item in user_offers]
+        offers = await container.offers_repo.get_batch(offer_keys)
         valid_offers = [o for o in offers if o is not None]
 
         members = [
@@ -162,12 +159,12 @@ async def get_offers_feed(
             offers=[], next_cursor=None, feed_version=current_version
         )
 
-    offer_tasks = [
-        container.offers_repo.get(cell_id, offer_id)
+    batch_keys = [
+        (cell_id, offer_id)
         for offer_id, cell_id in offer_keys
         if offer_id and cell_id
     ]
-    hydrated_offers = await asyncio.gather(*offer_tasks)
+    hydrated_offers = await container.offers_repo.get_batch(batch_keys)
 
     offer_ids = [oid for oid, _ in offer_keys]
     offer_map = {o.offer_id: o for o in hydrated_offers if o is not None}
