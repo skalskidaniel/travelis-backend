@@ -142,8 +142,8 @@ async def test_run_availability_job_becomes_unavailable(mock_container):
     assert result["checked_offers_count"] == 1
     assert result["updated_offers_count"] == 0
 
-    mock_container.offers_repo.delete.assert_called_once_with(
-        offer.cell_id, offer.offer_id
+    mock_container.offers_repo.delete_batch.assert_called_once_with(
+        [(offer.cell_id, offer.offer_id)]
     )
     mock_container.offers_repo.put.assert_not_called()
     mock_container.matching_service.bulk_match_users.assert_called_once_with(
@@ -210,8 +210,8 @@ async def test_run_availability_job_price_updates(mock_container):
     assert result["checked_offers_count"] == 1
     assert result["updated_offers_count"] == 1
 
-    mock_container.offers_repo.put.assert_called_once()
-    saved_offer = mock_container.offers_repo.put.call_args[0][0]
+    mock_container.offers_repo.put_batch.assert_called_once_with([offer])
+    saved_offer = mock_container.offers_repo.put_batch.call_args[0][0][0]
     assert saved_offer.available is True
     assert saved_offer.price_total == Decimal("1200")
     assert saved_offer.price_per_day == Decimal("85.71")

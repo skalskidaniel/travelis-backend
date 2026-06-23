@@ -3,10 +3,10 @@ from datetime import datetime
 from typing import Any
 from botocore.exceptions import ClientError
 
-from core.exceptions.repository import ItemNotFoundException
+from core.exceptions.repository import ItemNotFoundException, ReadException
 from core.models.cell import MarketCell
 from core.repositories.base import CellsRepository
-from core.repositories.utils import serialize_item, deserialize_item
+from core.repositories.utils import serialize_item, deserialize_item, chunked, BATCH_READ_LIMIT
 
 
 class DynamoCellsRepository(CellsRepository):
@@ -21,6 +21,41 @@ class DynamoCellsRepository(CellsRepository):
         if not item:
             return None
         return MarketCell(**deserialize_item(item))
+
+    async def get_batch(self, cell_ids: list[str]) -> list[MarketCell]:
+        if not cell_ids:
+            return []
+
+        client = self.table.meta.client
+        table_name = self.table.name
+
+        cells = []
+        for chunk in chunked(cell_ids, BATCH_READ_LIMIT):
+            request_items = {
+                table_name: {
+                    "Keys": [{"cell_id": cid} for cid in chunk],
+                    "ConsistentRead": False
+                }
+            }
+
+            unprocessed = request_items
+            retries = 0
+            while unprocessed and retries < 5:
+                response = await client.batch_get_item(RequestItems=unprocessed)
+
+                responses = response.get("Responses", {}).get(table_name, [])
+                for item in responses:
+                    cells.append(MarketCell(**deserialize_item(item)))
+
+                unprocessed = response.get("UnprocessedKeys", {})
+                if unprocessed:
+                    retries += 1
+                    await asyncio.sleep(0.1 * (2 ** retries))
+
+            if unprocessed:
+                raise ReadException("Failed to read some cells in batch after retries.")
+
+        return cells
 
     async def put(self, cell: MarketCell) -> None:
         item = serialize_item(cell.model_dump())

@@ -56,9 +56,7 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
         logger.info(
             f"Resuming scrape coordinator job for {len(remaining_cells_ids)} cells."
         )
-        tasks = [container.cells_repo.get(cid) for cid in remaining_cells_ids]
-        cells_retrieved = await asyncio.gather(*tasks)
-        cells = [c for c in cells_retrieved if c is not None]
+        cells = await container.cells_repo.get_batch(remaining_cells_ids)
     else:
         logger.info("Starting fresh scrape coordinator job.")
         cells = await container.cells_repo.scan()

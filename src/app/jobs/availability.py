@@ -43,6 +43,8 @@ async def run_availability_job(container: Container, context=None) -> dict:
     updated_count = 0
     sem = asyncio.Semaphore(15)
     deleted_cell_ids = set()
+    offers_to_delete = []
+    offers_to_update = []
 
     tui = container.tui_provider
     wakacje = container.wakacje_provider
@@ -62,7 +64,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
                 is_available = await provider.check_availability(offer)
 
                 if not is_available:
-                    await container.offers_repo.delete(offer.cell_id, offer.offer_id)
+                    offers_to_delete.append((offer.cell_id, offer.offer_id))
                     deleted_cell_ids.add(offer.cell_id)
                     logger.info(
                         f"Offer {offer.offer_id} ({offer.provider}) is no longer available. Deleted."
@@ -82,7 +84,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
                             / (offer.adults + offer.children)
                         ).quantize(Decimal("0.01"))
                         offer.updated_at = datetime.now(timezone.utc)
-                        await container.offers_repo.put(offer)
+                        offers_to_update.append(offer)
                         updated_count += 1
                         logger.info(
                             f"Offer {offer.offer_id} ({offer.provider}) price updated to {new_price}."
@@ -101,6 +103,14 @@ async def run_availability_job(container: Container, context=None) -> dict:
 
     tasks = [check_single_offer(offer) for offer in available_offers]
     await asyncio.gather(*tasks)
+
+    if offers_to_delete:
+        await container.offers_repo.delete_batch(offers_to_delete)
+        logger.info(f"Batch deleted {len(offers_to_delete)} unavailable offers.")
+    
+    if offers_to_update:
+        await container.offers_repo.put_batch(offers_to_update)
+        logger.info(f"Batch updated {len(offers_to_update)} offers with new prices.")
 
     if deleted_cell_ids:
         logger.info(
