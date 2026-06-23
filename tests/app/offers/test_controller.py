@@ -95,6 +95,7 @@ def test_get_offers_empty_feed(client, mock_container, auth_headers):
     assert data["offers"] == []
     assert data["next_cursor"] is None
     assert data["feed_version"] == 1
+    assert data["total_count"] == 0
 
 
 def test_get_offers_cached_feed(
@@ -102,6 +103,7 @@ def test_get_offers_cached_feed(
 ):
     mock_container.feed_repo.get_feed_version.return_value = 42
     mock_container.feed_repo.get_or_build_sort_zset.return_value = True
+    mock_container.feed_repo.get_size.return_value = 1
 
     offer_id = sample_domain_offer.offer_id
     mock_container.feed_repo.get_page.return_value = [(offer_id, "cell-1")]
@@ -114,6 +116,7 @@ def test_get_offers_cached_feed(
     assert data["offers"][0]["offer_id"] == offer_id
     assert data["feed_version"] == 42
     assert data["next_cursor"] is None
+    assert data["total_count"] == 1
 
 
 def test_get_offers_build_zset(
@@ -135,6 +138,7 @@ def test_get_offers_build_zset(
     data = response.json()
     assert len(data["offers"]) == 1
     assert data["offers"][0]["offer_id"] == offer_id
+    assert data["total_count"] == 1
 
     # Assert ZSET was built
     mock_container.feed_repo.add_to_sort_zset.assert_called_once()
@@ -145,6 +149,7 @@ def test_get_offers_outdated_cursor_resets(
 ):
     mock_container.feed_repo.get_feed_version.return_value = 50
     mock_container.feed_repo.get_or_build_sort_zset.return_value = True
+    mock_container.feed_repo.get_size.return_value = 1
     mock_container.feed_repo.get_page.return_value = [
         (sample_domain_offer.offer_id, "cell-1")
     ]
@@ -236,12 +241,14 @@ def test_get_offer_detail_missing_from_offers_table(
 def test_get_offers_empty_page_from_zset(client, mock_container, auth_headers):
     mock_container.feed_repo.get_feed_version.return_value = 1
     mock_container.feed_repo.get_or_build_sort_zset.return_value = True
+    mock_container.feed_repo.get_size.return_value = 10
     # ZSET exists but returns empty keys (e.g. offset beyond total size)
     mock_container.feed_repo.get_page.return_value = []
 
     response = client.get("/api/v2/offers", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["offers"] == []
+    assert response.json()["total_count"] == 10
 
 
 def test_get_offers_with_next_cursor(
@@ -249,6 +256,7 @@ def test_get_offers_with_next_cursor(
 ):
     mock_container.feed_repo.get_feed_version.return_value = 1
     mock_container.feed_repo.get_or_build_sort_zset.return_value = True
+    mock_container.feed_repo.get_size.return_value = 2
 
     # Return exactly limit (limit=2) offers to trigger next_cursor logic
     offer_id = sample_domain_offer.offer_id
@@ -262,6 +270,7 @@ def test_get_offers_with_next_cursor(
     assert response.status_code == 200
     data = response.json()
     assert data["next_cursor"] is not None
+    assert data["total_count"] == 2
 
 
 def test_calculate_zset_score_coverage(sample_domain_offer):

@@ -261,3 +261,6 @@ class PaginatedOffersResponse(BaseModel):
     feed_version: int | None = Field(
         default=None, description="The version of the feed used for pagination."
     )
+    total_count: int = Field(
+        description="The total number of matched offers available in the feed."
+    )

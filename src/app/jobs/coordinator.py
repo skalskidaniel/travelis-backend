@@ -11,7 +11,7 @@ from core.services.ingest import (
     merge_existing_and_new_offer,
     compute_offer_id,
 )
-from core.services.scoring import get_scorer
+from core.services.scoring import get_scorer, StatisticalScorerConfig
 
 logger = Logger(child=True)
 
@@ -116,7 +116,11 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                 if not collapsed_raw:
                     continue
 
-                scorer = get_scorer()
+                scorer = get_scorer(
+                    config=StatisticalScorerConfig(
+                        z_threshold=container.settings.scoring.attractiveness_z_threshold
+                    )
+                )
                 scored_offers = await asyncio.to_thread(scorer.score, collapsed_raw)
                 if not scored_offers:
                     continue

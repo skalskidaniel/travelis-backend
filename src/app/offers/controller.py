@@ -130,7 +130,7 @@ async def get_offers_feed(
         user_offers = await container.user_offers_repo.query_by_user(user_id)
         if not user_offers:
             return PaginatedOffersResponse(
-                offers=[], next_cursor=None, feed_version=current_version
+                offers=[], next_cursor=None, feed_version=current_version, total_count=0
             )
 
         offer_keys = [(item["cell_id"], item["offer_id"]) for item in user_offers]
@@ -144,6 +144,14 @@ async def get_offers_feed(
         await container.feed_repo.add_to_sort_zset(
             user_id, sort, order, current_version, members
         )
+        total_count = len(valid_offers)
+    else:
+        total_count = await container.feed_repo.get_size(
+            user_id=user_id,
+            field=sort,
+            order=order,
+            version=current_version,
+        )
 
     offer_keys = await container.feed_repo.get_page(
         user_id=user_id,
@@ -156,7 +164,7 @@ async def get_offers_feed(
 
     if not offer_keys:
         return PaginatedOffersResponse(
-            offers=[], next_cursor=None, feed_version=current_version
+            offers=[], next_cursor=None, feed_version=current_version, total_count=total_count
         )
 
     batch_keys = [
@@ -183,7 +191,7 @@ async def get_offers_feed(
     feed_items = [OfferFeedItem.from_domain(o) for o in sorted_offers]
 
     return PaginatedOffersResponse(
-        offers=feed_items, next_cursor=next_cursor, feed_version=current_version
+        offers=feed_items, next_cursor=next_cursor, feed_version=current_version, total_count=total_count
     )
 
 

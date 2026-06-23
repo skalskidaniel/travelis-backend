@@ -141,11 +141,12 @@ Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB
     }
   ],
   "next_cursor": "eyJzY29yZSI6...",
-  "feed_version": 42
+  "feed_version": 42,
+  "total_count": 125
 }
 ```
 
-`feed_version` lets the client detect feed changes (e.g. for in-app "new offers" badge).
+`feed_version` lets the client detect feed changes (e.g. for in-app "new offers" badge). `total_count` indicates the total number of matched offers in the user's feed.
 
 ### `GET /api/v2/offers/{offer_id}`
 
