@@ -78,8 +78,8 @@ async def test_rate_limiter_exceeds_limit(client):
 @pytest.mark.asyncio
 async def test_rate_limiter_by_user_id(client):
     # We will forge JWT tokens with different subs
-    token1 = jwt.encode({"sub": "user_a"}, "secret", algorithm="HS256")
-    token2 = jwt.encode({"sub": "user_b"}, "secret", algorithm="HS256")
+    token1 = jwt.encode({"sub": "user_a"}, "secret_key_that_is_at_least_32_bytes_long", algorithm="HS256")
+    token2 = jwt.encode({"sub": "user_b"}, "secret_key_that_is_at_least_32_bytes_long", algorithm="HS256")
 
     headers1 = {"Authorization": f"Bearer {token1}"}
     headers2 = {"Authorization": f"Bearer {token2}"}
