@@ -6,8 +6,11 @@ resource "aws_cognito_user_pool" "pool" {
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
-  lambda_config {
-    post_confirmation = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project}-${var.environment}-lambdalith"
+  # lambda_config is managed out-of-band by the null_resource in environment_stack
+  lifecycle {
+    ignore_changes = [
+      lambda_config
+    ]
   }
 
   password_policy {

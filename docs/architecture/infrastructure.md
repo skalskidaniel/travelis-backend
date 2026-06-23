@@ -15,14 +15,19 @@ infra/
 │   ├── eventbridge/      # Cron rules + Scheduler (debounced match) role
 │   └── monitoring/       # CloudWatch, Grafana integration
 └── environments/
-    └── dev/
-        ├── main.tf       # Composes modules
+    ├── dev/
+    │   ├── main.tf       # Composes modules
+    │   ├── variables.tf
+    │   ├── outputs.tf
+    │   └── terraform.tfvars
+    └── prod/
+        ├── main.tf       # Composes modules (production settings)
         ├── variables.tf
         ├── outputs.tf
-        └── terraform.tfvars
+        ├── terraform.tfvars # Production parameters template
+        ├── versions.tf   # Remote S3 state backend config option
+        └── README.md     # Production deployment instructions
 ```
-
-Add `environments/prod/` when deploying to production.
 
 ## AWS resources
 

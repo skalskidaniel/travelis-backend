@@ -1,11 +1,21 @@
-output "lambda_arn" {
-  value       = aws_lambda_function.lambdalith.arn
-  description = "The ARN of the Lambdalith function."
+output "api_lambda_arn" {
+  value       = aws_lambda_function.api_lambda.arn
+  description = "The ARN of the API Lambda function."
 }
 
-output "lambda_name" {
-  value       = aws_lambda_function.lambdalith.function_name
-  description = "The name of the Lambdalith function."
+output "api_lambda_name" {
+  value       = aws_lambda_function.api_lambda.function_name
+  description = "The name of the API Lambda function."
+}
+
+output "cron_lambda_arn" {
+  value       = aws_lambda_function.cron_lambda.arn
+  description = "The ARN of the Cron Lambda function."
+}
+
+output "cron_lambda_name" {
+  value       = aws_lambda_function.cron_lambda.function_name
+  description = "The name of the Cron Lambda function."
 }
 
 output "lambda_role_arn" {

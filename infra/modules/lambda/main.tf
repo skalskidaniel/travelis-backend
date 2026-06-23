@@ -148,7 +148,7 @@ resource "aws_iam_policy" "lambda_custom_policy" {
           "lambda:InvokeFunction"
         ]
         Resource = [
-          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project}-${var.environment}-lambdalith"
+          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project}-${var.environment}-lambdalith-*"
         ]
       }
     ]
@@ -160,47 +160,85 @@ resource "aws_iam_role_policy_attachment" "custom_policy_attachment" {
   policy_arn = aws_iam_policy.lambda_custom_policy.arn
 }
 
-resource "aws_lambda_function" "lambdalith" {
-  function_name    = "${var.project}-${var.environment}-lambdalith"
+resource "aws_cloudwatch_log_group" "api_lambda_logs" {
+  name              = "/aws/lambda/${var.project}-${var.environment}-lambdalith-api"
+  retention_in_days = var.environment == "prod" ? 30 : 14
+}
+
+resource "aws_cloudwatch_log_group" "cron_lambda_logs" {
+  name              = "/aws/lambda/${var.project}-${var.environment}-lambdalith-cron"
+  retention_in_days = var.environment == "prod" ? 30 : 14
+}
+
+locals {
+  common_environment_variables = {
+    REDIS_URL                  = var.redis_url
+    COGNITO_USER_POOL_ID       = var.cognito_user_pool_id
+    COGNITO_APP_CLIENT_ID      = var.cognito_app_client_id
+    DYNAMODB_USERS_TABLE       = var.users_table_name
+    DYNAMODB_CELLS_TABLE       = var.cells_table_name
+    DYNAMODB_OFFERS_TABLE      = var.offers_table_name
+    DYNAMODB_USER_OFFERS_TABLE = var.user_offers_table_name
+    VAPID_PUBLIC_KEY           = var.vapid_public_key
+    VAPID_PRIVATE_KEY          = var.vapid_private_key
+    FRONTEND_URL               = var.frontend_url
+    SCHEDULER_ROLE_ARN         = var.scheduler_role_arn
+    POWERTOOLS_SERVICE_NAME    = "${var.project}-backend"
+    POWERTOOLS_LOG_LEVEL       = var.environment == "prod" ? "INFO" : "DEBUG"
+    ENVIRONMENT                = var.environment
+  }
+}
+
+resource "aws_lambda_function" "api_lambda" {
+  function_name    = "${var.project}-${var.environment}-lambdalith-api"
   role             = aws_iam_role.lambda_role.arn
   handler          = "app.main.handler"
   runtime          = "python3.13"
-  timeout          = 900 # 15 minutes
+  timeout          = 30 # 30 seconds for API GW
   memory_size      = 1024
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   environment {
-    variables = {
-      REDIS_URL                  = var.redis_url
-      COGNITO_USER_POOL_ID       = var.cognito_user_pool_id
-      COGNITO_APP_CLIENT_ID      = var.cognito_app_client_id
-      DYNAMODB_USERS_TABLE       = var.users_table_name
-      DYNAMODB_CELLS_TABLE       = var.cells_table_name
-      DYNAMODB_OFFERS_TABLE      = var.offers_table_name
-      DYNAMODB_USER_OFFERS_TABLE = var.user_offers_table_name
-      VAPID_PUBLIC_KEY           = var.vapid_public_key
-      VAPID_PRIVATE_KEY          = var.vapid_private_key
-      FRONTEND_URL               = var.frontend_url
-      LAMBDA_FUNCTION_ARN        = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project}-${var.environment}-lambdalith"
-      SCHEDULER_ROLE_ARN         = var.scheduler_role_arn
-      POWERTOOLS_SERVICE_NAME    = "${var.project}-backend"
-      POWERTOOLS_LOG_LEVEL       = var.environment == "prod" ? "INFO" : "DEBUG"
-      ENVIRONMENT                = var.environment
-    }
+    variables = merge(local.common_environment_variables, {
+      LAMBDA_FUNCTION_ARN = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project}-${var.environment}-lambdalith-api"
+    })
   }
-
-
 
   tags = {
-    Name = "${var.project}-${var.environment}-lambdalith"
+    Name = "${var.project}-${var.environment}-lambdalith-api"
   }
+
+  depends_on = [aws_cloudwatch_log_group.api_lambda_logs]
+}
+
+resource "aws_lambda_function" "cron_lambda" {
+  function_name    = "${var.project}-${var.environment}-lambdalith-cron"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "app.main.handler"
+  runtime          = "python3.13"
+  timeout          = 900 # 15 minutes for cron jobs
+  memory_size      = 1024
+  filename         = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
+  environment {
+    variables = merge(local.common_environment_variables, {
+      LAMBDA_FUNCTION_ARN = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project}-${var.environment}-lambdalith-cron"
+    })
+  }
+
+  tags = {
+    Name = "${var.project}-${var.environment}-lambdalith-cron"
+  }
+
+  depends_on = [aws_cloudwatch_log_group.cron_lambda_logs]
 }
 
 resource "aws_lambda_permission" "cognito_trigger" {
   statement_id  = "AllowExecutionFromCognito"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambdalith.function_name
+  function_name = aws_lambda_function.api_lambda.function_name
   principal     = "cognito-idp.amazonaws.com"
   source_arn    = var.cognito_user_pool_arn
 }
