@@ -13,6 +13,7 @@ from app.exceptions import (
     MatchSchedulingException,
     RetryableServiceException,
     ServiceConfigurationException,
+    UnknownJobEventException,
 )
 from app.health.controller import router as health_router
 from app.jobs.availability import run_availability_job
@@ -192,18 +193,16 @@ async def handle_non_http(event: dict, context) -> dict:
             "results": results,
         }
 
-    # E. Other non-HTTP events (stubs)
+    # E. Unrecognized non-HTTP events
     else:
-        logger.warning(
-            "Non-HTTP event received: triggerSource=%s, type=%s",
+        logger.error(
+            "Unrecognized non-HTTP event: triggerSource=%s, type=%s",
             trigger_source,
             event_type,
         )
-        return {
-            "status": "success",
-            "message": "Event received and logged (stub)",
-            "event": event,
-        }
+        raise UnknownJobEventException(
+            f"Unrecognized job event (triggerSource={trigger_source!r}, type={event_type!r})"
+        )
 
 
 @logger.inject_lambda_context(clear_state=True)

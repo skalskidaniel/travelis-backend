@@ -32,3 +32,9 @@ class ServiceConfigurationException(AppException):
     """Raised when required application configuration is missing or invalid."""
 
     pass
+
+
+class UnknownJobEventException(AppException):
+    """Raised when a non-HTTP Lambda event cannot be routed to a known handler."""
+
+    pass

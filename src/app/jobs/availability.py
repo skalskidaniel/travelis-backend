@@ -26,10 +26,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
         *[container.offers_repo.query_by_cell(cell.cell_id) for cell in cells]
     )
     available_offers = [
-        offer
-        for sublist in cell_offers_lists
-        for offer in sublist
-        if offer.available
+        offer for sublist in cell_offers_lists for offer in sublist if offer.available
     ]
 
     if not available_offers:

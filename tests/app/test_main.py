@@ -1,9 +1,11 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi.testclient import TestClient
 
-from app.exceptions import MatchSchedulingException
-from app.main import handler
+from app.dependencies import get_container
+from app.exceptions import MatchSchedulingException, UnknownJobEventException
+from app.main import app, handler
 
 
 @pytest.fixture
@@ -18,29 +20,51 @@ def lambda_context():
     return context
 
 
-def test_cors_headers(client):
-    response = client.get(
-        "/api/v2/health",
-        headers={
-            "Origin": "https://wakacje-travelis.pl",
-            "Access-Control-Request-Method": "GET",
-        },
-    )
-    assert response.status_code == 200
+@pytest.fixture
+def healthy_container():
+    c = MagicMock()
+    c.settings = MagicMock()
+    c.settings.environment = "dev"
+    c.settings.frontend_url = "https://wakacje-travelis.pl"
+    c.settings.users_table = "test-users"
+    c.redis_client = AsyncMock()
+    c.redis_client.ping = AsyncMock(return_value=True)
+    c.users_repo = MagicMock()
+    c.users_repo.table = MagicMock()
+    c.users_repo.table.meta = MagicMock()
+    c.users_repo.table.meta.client = MagicMock()
+    c.users_repo.table.meta.client.describe_table = AsyncMock(return_value={})
+    return c
 
-    from core.container import container
 
-    if container.settings.environment == "prod":
-        assert "access-control-allow-origin" in response.headers
-        assert (
-            response.headers["access-control-allow-origin"]
-            == container.settings.frontend_url
+def test_cors_headers(healthy_container):
+    app.dependency_overrides[get_container] = lambda: healthy_container
+    client = TestClient(app)
+    try:
+        response = client.get(
+            "/api/v2/health",
+            headers={
+                "Origin": "https://wakacje-travelis.pl",
+                "Access-Control-Request-Method": "GET",
+            },
         )
-    else:
-        assert "access-control-allow-origin" not in response.headers
+        assert response.status_code == 200
+
+        from core.container import container
+
+        if container.settings.environment == "prod":
+            assert "access-control-allow-origin" in response.headers
+            assert (
+                response.headers["access-control-allow-origin"]
+                == container.settings.frontend_url
+            )
+        else:
+            assert "access-control-allow-origin" not in response.headers
+    finally:
+        app.dependency_overrides.clear()
 
 
-def test_lambda_handler_api_gateway(lambda_context):
+def test_lambda_handler_api_gateway(lambda_context, healthy_container):
     import asyncio
 
     try:
@@ -80,7 +104,11 @@ def test_lambda_handler_api_gateway(lambda_context):
         "isBase64Encoded": False,
     }
 
-    response = handler(event, lambda_context)
+    app.dependency_overrides[get_container] = lambda: healthy_container
+    try:
+        response = handler(event, lambda_context)
+    finally:
+        app.dependency_overrides.clear()
 
     assert response["statusCode"] == 200
     assert "body" in response
@@ -150,9 +178,9 @@ def test_lambda_handler_unhandled_event(lambda_context):
     with patch("app.main.container") as mock_container:
         mock_container.exit_stack = MagicMock()
         mock_container.initialize = AsyncMock()
-        response = handler(event, lambda_context)
-        assert response["status"] == "success"
-        assert "stub" in response["message"]
+
+        with pytest.raises(UnknownJobEventException, match="unknown_event_type"):
+            handler(event, lambda_context)
 
 
 def test_lambda_handler_scrape_offers(lambda_context):

@@ -116,11 +116,21 @@ class Container:
         from core.services.scheduler import SchedulerService
         from core.services.cognito_jwt import CognitoJwtVerifier
 
+        vapid_private_key = self.settings.vapid_private_key
+        if self.settings.vapid_private_key_secret_arn:
+            secrets_client = await self.exit_stack.enter_async_context(
+                session.client("secretsmanager", region_name=self.settings.aws_region)
+            )
+            secret_response = await secrets_client.get_secret_value(
+                SecretId=self.settings.vapid_private_key_secret_arn
+            )
+            vapid_private_key = secret_response["SecretString"]
+
         self.activation_service = ActivationService(
             cells_repo=self.cells_repo,
         )
         self.notifications_service = NotificationsService(
-            vapid_private_key=self.settings.push.vapid_private_key,
+            vapid_private_key=vapid_private_key,
             vapid_public_key=self.settings.push.vapid_public_key,
         )
         self.matching_service = MatchingService(

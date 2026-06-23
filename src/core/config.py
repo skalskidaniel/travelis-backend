@@ -71,6 +71,10 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("VAPID_PRIVATE_KEY"),
     )
+    vapid_private_key_secret_arn: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VAPID_PRIVATE_KEY_SECRET_ARN"),
+    )
     attractiveness_z_threshold: float = Field(
         default=-1.2,
         validation_alias=AliasChoices("ATTRACTIVENESS_Z_THRESHOLD"),

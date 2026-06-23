@@ -171,19 +171,20 @@ async def test_run_scrape_job_availability_by_absence(mock_container):
         mock_scorer.score.return_value = [scored_offer]
 
         mock_container.offers_repo.query_by_cell.return_value = [existing_offer]
+        mock_container.offers_repo.delete_batch = AsyncMock()
 
         await run_scrape_job(mock_container)
 
-        # Check what was saved to the DB
         calls = mock_container.offers_repo.put_batch.call_args[0][0]
-        # There should be 2 offers saved: new scraped (available=True) and existing (available=False)
-        assert len(calls) == 2
+        assert len(calls) == 1
 
-        new_saved = next(o for o in calls if o.external_offer_id == "tui-new")
+        new_saved = calls[0]
+        assert new_saved.external_offer_id == "tui-new"
         assert new_saved.available is True
 
-        existing_saved = next(o for o in calls if o.external_offer_id == "tui-existing")
-        assert existing_saved.available is False
+        mock_container.offers_repo.delete_batch.assert_called_once_with(
+            [(cell.cell_id, existing_offer.offer_id)]
+        )
 
 
 @pytest.mark.asyncio

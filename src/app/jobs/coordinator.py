@@ -179,14 +179,19 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                     else:
                         offers_to_save.append(new_offer)
 
-                # Availability-by-absence logic
+                # Availability-by-absence: delete offers no longer returned by providers
+                offers_to_delete = []
                 for oid, existing_offer in existing_map.items():
                     if oid not in seen_offer_ids and existing_offer.available:
-                        existing_offer.available = False
-                        existing_offer.updated_at = now
-                        offers_to_save.append(existing_offer)
+                        offers_to_delete.append((cell.cell_id, oid))
 
-                await container.offers_repo.put_batch(offers_to_save)
+                if offers_to_save:
+                    await container.offers_repo.put_batch(offers_to_save)
+                if offers_to_delete:
+                    await container.offers_repo.delete_batch(offers_to_delete)
+                    logger.info(
+                        f"Deleted {len(offers_to_delete)} unavailable offers for cell {cell.cell_id}"
+                    )
                 await container.cells_repo.update_last_scraped([cell.cell_id], now)
 
                 scraped_cell_ids.append(cell.cell_id)
