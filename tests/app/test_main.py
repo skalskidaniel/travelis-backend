@@ -27,11 +27,17 @@ def test_cors_headers(client):
         },
     )
     assert response.status_code == 200
-    assert "access-control-allow-origin" in response.headers
-    assert response.headers["access-control-allow-origin"] in [
-        "*",
-        "https://wakacje-travelis.pl",
-    ]
+
+    from core.container import container
+
+    if container.settings.environment == "prod":
+        assert "access-control-allow-origin" in response.headers
+        assert (
+            response.headers["access-control-allow-origin"]
+            == container.settings.frontend_url
+        )
+    else:
+        assert "access-control-allow-origin" not in response.headers
 
 
 def test_lambda_handler_api_gateway(lambda_context):

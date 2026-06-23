@@ -1,10 +1,11 @@
 import asyncio
 from contextlib import asynccontextmanager
+
+from aws_lambda_powertools import Logger
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from mangum import Mangum
-from aws_lambda_powertools import Logger
 
 from app.auth.controller import router as auth_router
 from app.exceptions import (
@@ -14,10 +15,10 @@ from app.exceptions import (
     ServiceConfigurationException,
 )
 from app.health.controller import router as health_router
+from app.jobs.availability import run_availability_job
+from app.jobs.coordinator import run_scrape_job
 from app.offers.controller import router as offers_router
 from app.user.controller import router as user_router
-from app.jobs.coordinator import run_scrape_job
-from app.jobs.availability import run_availability_job
 from core.container import container
 from core.exceptions.scheduler import SchedulerException
 
@@ -117,13 +118,14 @@ async def service_configuration_exception_handler(
     return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if is_prod:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[container.settings.frontend_url],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
+    )
 
 app.include_router(auth_router, prefix="/api/v2/auth")
 app.include_router(health_router, prefix="/api/v2/health")
