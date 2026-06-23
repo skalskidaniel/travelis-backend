@@ -95,6 +95,10 @@ class Settings(BaseSettings):
         default="INFO",
         validation_alias=AliasChoices("POWERTOOLS_LOG_LEVEL", "LOG_LEVEL"),
     )
+    rate_limiting_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RATE_LIMITING_ENABLED"),
+    )
 
     db: DatabaseSettings | None = None
     push: PushSettings | None = None

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
+from app.rate_limiter import RateLimiter
 from app.exceptions import AccountDeletionException
 from core.container import Container
 from core.services.activation import generate_required_cells
@@ -17,6 +18,7 @@ router = APIRouter(tags=["Authentication"])
     "/account",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete user account",
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
     responses={
         204: {
             "description": "Account and all associated preferences, matched feed, and web push subscriptions were successfully deleted."

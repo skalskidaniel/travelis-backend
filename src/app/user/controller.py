@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
+from app.rate_limiter import RateLimiter
 from app.user.schemas import UserPreferencesUpdate, PushEnableRequest
 from core.container import Container
 from core.models.user import (
@@ -32,6 +33,7 @@ async def get_or_create_user(user_id: str, container: Container) -> User:
     "/preferences",
     response_model=UserPreferences,
     summary="Get user preferences",
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
     responses={
         200: {
             "description": "Successfully retrieved user preferences (creates default preferences if the user is new)."
@@ -52,6 +54,7 @@ async def get_preferences(
     "/preferences",
     response_model=UserPreferences,
     summary="Update user preferences",
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
     responses={
         200: {
             "description": "Successfully updated preferences, synchronized cells, and scheduled matching."
@@ -91,6 +94,7 @@ async def update_preferences(
     "/push/enable",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Enable web push notifications",
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
     responses={
         204: {
             "description": "Successfully registered or updated Web Push subscription details."
@@ -121,6 +125,7 @@ async def enable_push(
     "/push/disable",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Disable web push notifications",
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
     responses={
         204: {
             "description": "Successfully unregistered or disabled Web Push notifications."

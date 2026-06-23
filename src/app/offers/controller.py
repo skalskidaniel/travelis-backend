@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status, Path
 
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
+from app.rate_limiter import RateLimiter
 from app.offers.schemas import (
     OfferDetailResponse,
     OfferFeedItem,
@@ -50,6 +51,7 @@ def calculate_zset_score(offer: Offer, field: str) -> float:
     "",
     response_model=PaginatedOffersResponse,
     summary="Retrieve matched offers feed",
+    dependencies=[Depends(RateLimiter(times=100, seconds=60))],
     responses={
         200: {
             "description": "Successfully retrieved user's personalized matched feed."
@@ -192,6 +194,7 @@ async def get_offers_feed(
     "/{offer_id}",
     response_model=OfferDetailResponse,
     summary="Get offer details",
+    dependencies=[Depends(RateLimiter(times=100, seconds=60))],
     responses={
         200: {"description": "Successfully retrieved offer details."},
         401: {"description": "Unauthorized - Invalid or missing credentials."},
@@ -231,6 +234,7 @@ async def get_offer_detail(
     "/{cell_id}/{offer_id}",
     response_model=OfferDetailResponse,
     summary="Get shared offer details",
+    dependencies=[Depends(RateLimiter(times=60, seconds=60))],
     responses={
         200: {
             "description": "Successfully retrieved shared offer details without authentication."

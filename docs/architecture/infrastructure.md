@@ -134,7 +134,7 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 | Setting    | Value                                                                |
 | ---------- | -------------------------------------------------------------------- |
 | Provider   | [Redis Cloud](https://redis.com/redis-enterprise-cloud/) (free tier) |
-| Purpose    | User offer feed ZSETs, optional offer payload cache                  |
+| Purpose    | User offer feed ZSETs, rate limiting, optional offer payload cache |
 | Connection | `REDIS_URL` env var on Lambda                                        |
 | TLS        | Required (Redis Cloud default)                                       |
 
@@ -155,6 +155,7 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 | `VAPID_PRIVATE_KEY`          | Vault            | Web Push signing                                          |
 | `VAPID_PUBLIC_KEY`           | SSM              | Web Push public key                                       |
 | `FRONTEND_URL`               | SSM / env        | e.g. `https://wakacje-travelis.pl` (used for `share_url`) |
+| `RATE_LIMITING_ENABLED`      | SSM / env        | If `False`, rate limiting is bypassed (defaults to `True` if omitted) |
 
 Never commit secrets. Use `.env.example` with placeholders for local dev.
 

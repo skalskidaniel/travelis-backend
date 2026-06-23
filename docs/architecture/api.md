@@ -18,7 +18,7 @@ app.include_router(user_router,   prefix="/api/v2/user")
 | Content-Type  | `application/json`                      |
 | Error format  | `{ "detail": "..." }` (FastAPI default) |
 | Pagination    | Cursor-based (`cursor`, `limit`)        |
-| Rate limiting | FastAPI Limiter                         |
+| Rate limiting | Redis-backed custom Rate Limiter dependency |
 
 ## Auth — `/api/v2/auth`
 
@@ -224,11 +224,30 @@ Single offer detail by cell and offer ID. Used for shared offer lookups (e.g. fr
 
 No authentication required.
 
-## Planned middleware
+## Middleware & Rate Limiting
 
-- CORS (frontend origin whitelist)
-- JWT validation dependency on protected routers
-- FastAPI Limiter (per-user rate limits)
+The API implements three security and resource management layers:
+1. **CORS:** Restricts API consumption to whitelisted origins (e.g. the PWA).
+2. **JWT Validation:** Verifies AWS Cognito JWT tokens on protected routers.
+3. **Redis-backed Rate Limiting:** Enforces route-level request limits using a custom, fail-open rate limiter.
+
+If a client exceeds their limit, the API returns a `429 Too Many Requests` response with a `Retry-After` header indicating the cooldown period in seconds.
+
+### Identifier Tracking
+* **Authenticated Requests:** Identified by the Cognito `sub` (User ID) claim extracted from the `Authorization` header.
+* **Unauthenticated/Public Requests:** Identified by the client's host IP address.
+
+### Configured Rate Limits
+
+| Endpoint Group | Route | Rate Limit | Identified By |
+| -------------- | ----- | ---------- | ------------- |
+| **Authentication** | `DELETE /api/v2/auth/account` | 3 / minute | User ID |
+| **User Preferences** | `GET /api/v2/user/preferences`<br>`PATCH /api/v2/user/preferences` | 10 / minute | User ID |
+| **User Notifications** | `POST /api/v2/user/push/enable`<br>`POST /api/v2/user/push/disable` | 10 / minute | User ID |
+| **Offers Feed** | `GET /api/v2/offers` | 100 / minute | User ID |
+| **Offer Details** | `GET /api/v2/offers/{offer_id}` | 100 / minute | User ID |
+| **Shared Offer Details** | `GET /api/v2/offers/{cell_id}/{offer_id}` | 60 / minute | Client IP |
+| **System** | `GET /api/v2/health` | No Limit | — |
 
 ## HTTP status codes
 
