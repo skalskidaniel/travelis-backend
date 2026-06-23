@@ -70,3 +70,21 @@ async def test_feed_repo_clear_user(redis_client):
 
     assert not await redis_client.exists(f"user:{user_id}:feed_version")
     assert not await redis_client.exists(f"user:{user_id}:sort:price:desc:v1")
+
+
+async def test_feed_repo_get_size(redis_client):
+    repo = RedisFeedRepository(redis_client)
+    user_id = "usr_123"
+    field = "price"
+
+    # Initially empty / key doesn't exist
+    assert await repo.get_size(user_id, field, "desc", 1) == 0
+
+    # Add items and check size
+    members = [
+        ("offer_1:cell_1", 1000.5),
+        ("offer_2:cell_1", 500.2),
+        ("offer_3:cell_1", 1500.7),
+    ]
+    await repo.add_to_sort_zset(user_id, field, "desc", 1, members)
+    assert await repo.get_size(user_id, field, "desc", 1) == 3

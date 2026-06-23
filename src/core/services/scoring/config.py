@@ -5,11 +5,11 @@ class StatisticalScorerConfig(BaseModel):
     """Configuration for the Statistical Offer Scorer."""
 
     z_threshold: float = Field(
-        default=-1.0,
+        default=-1.2,
         description="Z-score threshold for Stage 1. Offers with z <= threshold pass.",
     )
     small_sample_threshold: int = Field(
-        default=30,
+        default=80,
         description="Minimum number of offers in a cell to use Z-score gating.",
     )
     small_sample_keep_ratio: float = Field(

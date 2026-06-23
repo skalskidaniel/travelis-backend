@@ -37,14 +37,14 @@ z = (price_per_day_per_person - mean) / stddev
 An offer passes stage 1 if:
 
 ```
-z <= -1.0
+z <= -1.2
 ```
 
-Offers cheaper than ~84% of the comparison group are kept. Configurable via SSM/env (`ATTRACTIVENESS_Z_THRESHOLD`).
+Offers cheaper than ~88.5% of the comparison group are kept. Configurable via SSM/env (`ATTRACTIVENESS_Z_THRESHOLD`).
 
 ### Small sample fallback
 
-If the comparison group has **fewer than 30 offers**, Z-score is unreliable. Fallback:
+If the comparison group has **fewer than 80 offers**, Z-score is unreliable. Fallback:
 
 - Skip Z-score gate.
 - Keep the top **10%** cheapest by `price_per_day_per_person`.

@@ -25,6 +25,8 @@ def mock_container():
     c.settings.lambda_function_arn = (
         "arn:aws:lambda:eu-central-1:123456789012:function:travelis-backend"
     )
+    c.settings.scoring = MagicMock()
+    c.settings.scoring.attractiveness_z_threshold = -1.0
     return c
 
 

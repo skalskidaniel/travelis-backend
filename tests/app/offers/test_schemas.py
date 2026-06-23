@@ -82,10 +82,12 @@ def test_paginated_offers_response_valid():
         offers=[],
         next_cursor="cursor-123",
         feed_version=1,
+        total_count=0,
     )
     assert response.offers == []
     assert response.next_cursor == "cursor-123"
     assert response.feed_version == 1
+    assert response.total_count == 0
 
 
 def test_paginated_offers_response_invalid_types():
@@ -94,4 +96,5 @@ def test_paginated_offers_response_invalid_types():
             offers="not-a-list",
             next_cursor=123,
             feed_version="not-an-int",
+            total_count="not-an-int",
         )

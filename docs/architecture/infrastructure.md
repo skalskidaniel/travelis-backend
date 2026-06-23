@@ -151,7 +151,7 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 | `DYNAMODB_CELLS_TABLE`       | Terraform output |                                                           |
 | `DYNAMODB_OFFERS_TABLE`      | Terraform output |                                                           |
 | `DYNAMODB_USER_OFFERS_TABLE` | Terraform output |                                                           |
-| `ATTRACTIVENESS_Z_THRESHOLD` | SSM              | Default `-1.0`                                            |
+| `ATTRACTIVENESS_Z_THRESHOLD` | SSM              | Default `-1.2`                                            |
 | `VAPID_PRIVATE_KEY`          | Vault            | Web Push signing                                          |
 | `VAPID_PUBLIC_KEY`           | SSM              | Web Push public key                                       |
 | `FRONTEND_URL`               | SSM / env        | e.g. `https://wakacje-travelis.pl` (used for `share_url`) |

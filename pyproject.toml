@@ -37,7 +37,9 @@ filterwarnings = [
 dev = [
     "fakeredis[lua]>=2.36.2",
     "ipykernel>=7.3.0",
+    "matplotlib>=3.11.0",
     "moto[dynamodb]>=5.2.2",
+    "nbconvert>=7.17.1",
     "playwright>=1.60.0",
     "pytest>=9.1.0",
     "pytest-asyncio>=1.4.0",
@@ -45,6 +47,7 @@ dev = [
     "pytest-xdist>=3.8.0",
     "respx>=0.23.1",
     "ruff>=0.15.17",
+    "seaborn>=0.13.2",
     "types-aioboto3[dynamodb]>=15.5.0",
     "uvicorn>=0.30.0",
 ]
