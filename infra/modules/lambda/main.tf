@@ -183,6 +183,7 @@ locals {
     VAPID_PRIVATE_KEY          = var.vapid_private_key
     FRONTEND_URL               = var.frontend_url
     SCHEDULER_ROLE_ARN         = var.scheduler_role_arn
+    ATTRACTIVENESS_Z_THRESHOLD = tostring(var.attractiveness_z_threshold)
     POWERTOOLS_SERVICE_NAME    = "${var.project}-backend"
     POWERTOOLS_LOG_LEVEL       = var.environment == "prod" ? "INFO" : "DEBUG"
     ENVIRONMENT                = var.environment

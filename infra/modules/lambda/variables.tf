@@ -84,3 +84,9 @@ variable "scheduler_role_arn" {
   description = "ARN of the role EventBridge Scheduler uses to invoke Lambda (required for PassRole)."
   type        = string
 }
+
+variable "attractiveness_z_threshold" {
+  description = "Z-score threshold for Stage 1 attractiveness filtering."
+  type        = number
+  default     = -1.2
+}

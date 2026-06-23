@@ -3,9 +3,9 @@ resource "aws_apigatewayv2_api" "api" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_headers = ["*"]
-    allow_methods = ["*"]
-    allow_origins = ["*"] # whitelisted client-side, but allowed at gateway level for ease of use
+    allow_headers = ["Content-Type", "Authorization"]
+    allow_methods = ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+    allow_origins = [var.frontend_url]
     max_age       = 300
   }
 }

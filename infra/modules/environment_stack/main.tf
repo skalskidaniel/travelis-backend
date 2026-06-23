@@ -61,15 +61,17 @@ module "lambda" {
   vapid_public_key        = var.vapid_public_key
   vapid_private_key       = var.vapid_private_key
   scheduler_role_arn      = module.eventbridge.scheduler_role_arn
+  attractiveness_z_threshold = var.attractiveness_z_threshold
 }
 
 module "api_gateway" {
   source = "../api_gateway"
 
-  project     = var.project
-  environment = var.environment
-  lambda_arn  = module.lambda.api_lambda_arn
-  lambda_name = module.lambda.api_lambda_name
+  project      = var.project
+  environment  = var.environment
+  frontend_url = var.frontend_url
+  lambda_arn   = module.lambda.api_lambda_arn
+  lambda_name  = module.lambda.api_lambda_name
 }
 
 resource "aws_lambda_permission" "allow_eventbridge_scrape" {
@@ -86,6 +88,14 @@ resource "aws_lambda_permission" "allow_eventbridge_availability" {
   function_name = module.lambda.cron_lambda_name
   principal     = "events.amazonaws.com"
   source_arn    = module.eventbridge.check_availability_rule_arn
+}
+
+resource "aws_lambda_permission" "allow_scheduler_match" {
+  statement_id  = "AllowExecutionFromEventBridgeScheduler"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda.api_lambda_name
+  principal     = "scheduler.amazonaws.com"
+  source_arn    = "arn:aws:scheduler:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:schedule/*"
 }
 
 module "monitoring" {
