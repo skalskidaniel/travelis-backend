@@ -183,13 +183,19 @@ class DynamoCellsRepository(CellsRepository):
         ts_str = ts.isoformat()
 
         async def _update(cell_id: str) -> None:
-            await self.table.update_item(
-                Key={"cell_id": cell_id},
-                UpdateExpression="SET last_scraped_at = :ts",
-                ExpressionAttributeValues={":ts": ts_str},
-            )
+            try:
+                await self.table.update_item(
+                    Key={"cell_id": cell_id},
+                    UpdateExpression="SET last_scraped_at = :ts",
+                    ExpressionAttributeValues={":ts": ts_str, ":zero": 0},
+                    ConditionExpression=(
+                        "attribute_exists(cell_id) AND activation_count > :zero"
+                    ),
+                )
+            except ClientError as exc:
+                error_code = exc.response.get("Error", {}).get("Code")
+                if error_code == "ConditionalCheckFailedException":
+                    return
+                raise
 
         await asyncio.gather(*[_update(cid) for cid in cell_ids])
-
-
-stream = None

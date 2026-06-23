@@ -36,20 +36,12 @@ async def delete_account(
     """Cascade delete user, preferences, UserOffers, Redis keys, cell activations, and Cognito user."""
     user = await container.users_repo.get(user_id)
 
+    cell_ids_to_deactivate: list[str] = []
     if user is not None:
-        try:
-            cells = generate_required_cells(user.preferences)
-            if cells:
-                await container.cells_repo.decrement_activations(
-                    [c.cell_id for c in cells]
-                )
-        except Exception as exc:
-            logger.error(
-                f"Error decrementing cell activations for deleted user {user_id}: {exc}"
-            )
-            raise AccountDeletionException(
-                "Failed to decrement cell activations during account deletion"
-            ) from exc
+        cells = generate_required_cells(
+            user.preferences, reference_date=user.updated_at.date()
+        )
+        cell_ids_to_deactivate = [c.cell_id for c in cells if c.cell_id]
 
         try:
             user_offers = await container.user_offers_repo.query_by_user(user_id)
@@ -79,6 +71,17 @@ async def delete_account(
             raise AccountDeletionException(
                 "Failed to delete user record during account deletion"
             ) from exc
+
+        if cell_ids_to_deactivate:
+            try:
+                await container.cells_repo.decrement_activations(cell_ids_to_deactivate)
+            except Exception as exc:
+                logger.error(
+                    f"Error decrementing cell activations for deleted user {user_id}: {exc}"
+                )
+                raise AccountDeletionException(
+                    "Failed to decrement cell activations during account deletion"
+                ) from exc
 
     if container.settings.cognito_user_pool_id:
         try:

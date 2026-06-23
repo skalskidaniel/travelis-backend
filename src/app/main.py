@@ -3,12 +3,12 @@ from contextlib import asynccontextmanager
 
 from aws_lambda_powertools import Logger
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from mangum import Mangum
 
 from app.auth.controller import router as auth_router
 from app.exceptions import (
+    AccountDeletionException,
     AuthenticationException,
     MatchSchedulingException,
     RetryableServiceException,
@@ -119,14 +119,13 @@ async def service_configuration_exception_handler(
     return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
-if is_prod:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[container.settings.frontend_url],
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"],
-    )
+@app.exception_handler(AccountDeletionException)
+async def account_deletion_exception_handler(
+    request: Request, exc: AccountDeletionException
+) -> JSONResponse:
+    logger.error(f"Account deletion failed: {exc}", exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
 
 app.include_router(auth_router, prefix="/api/v2/auth")
 app.include_router(health_router, prefix="/api/v2/health")

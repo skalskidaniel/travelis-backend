@@ -100,8 +100,21 @@ async def test_update_cell_activations():
     )
 
     ref = date(2026, 6, 15)
+    call_order = []
+
+    async def record_activate(cells):
+        call_order.append("activate")
+        return {}
+
+    async def record_decrement(cell_ids):
+        call_order.append("decrement")
+
+    cells_repo.activate_cells = AsyncMock(side_effect=record_activate)
+    cells_repo.decrement_activations = AsyncMock(side_effect=record_decrement)
+
     await service.update_cell_activations(new_prefs, old_prefs, ref)
 
+    assert call_order == ["activate", "decrement"]
     cells_repo.decrement_activations.assert_called_once()
     dec_args = cells_repo.decrement_activations.call_args[0][0]
     assert len(dec_args) == 1

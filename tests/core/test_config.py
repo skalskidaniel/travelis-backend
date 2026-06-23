@@ -81,3 +81,13 @@ def test_settings_environment_loading(monkeypatch):
     monkeypatch.setenv("STAGE", "staging")
     settings_alias = Settings(_env_file=None)
     assert settings_alias.environment == "staging"
+
+
+def test_settings_default_attractiveness_threshold_matches_scorer(monkeypatch):
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.delenv("ATTRACTIVENESS_Z_THRESHOLD", raising=False)
+
+    from core.services.scoring.config import StatisticalScorerConfig
+
+    settings = Settings(_env_file=None)
+    assert settings.attractiveness_z_threshold == StatisticalScorerConfig().z_threshold

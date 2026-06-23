@@ -115,11 +115,9 @@ class ActivationService:
         to_activate_ids = new_cell_ids - old_cell_ids
         to_deactivate_ids = old_cell_ids - new_cell_ids
 
-        # 1. Decrement obsolete cells
-        if to_deactivate_ids:
-            await self.cells_repo.decrement_activations(list(to_deactivate_ids))
-
-        # 2. Atomically create or increment new cells
         if to_activate_ids:
             cells_to_activate = [new_cells[cell_id] for cell_id in to_activate_ids]
             await self.cells_repo.activate_cells(cells_to_activate)
+
+        if to_deactivate_ids:
+            await self.cells_repo.decrement_activations(list(to_deactivate_ids))

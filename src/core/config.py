@@ -72,7 +72,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("VAPID_PRIVATE_KEY"),
     )
     attractiveness_z_threshold: float = Field(
-        default=-1.0,
+        default=-1.2,
         validation_alias=AliasChoices("ATTRACTIVENESS_Z_THRESHOLD"),
     )
     lambda_function_arn: str | None = Field(

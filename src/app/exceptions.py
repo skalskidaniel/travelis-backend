@@ -16,7 +16,7 @@ class RetryableServiceException(AppException):
     pass
 
 
-class AccountDeletionException(RetryableServiceException):
+class AccountDeletionException(AppException):
     """Raised when account deletion cannot complete safely."""
 
     pass
