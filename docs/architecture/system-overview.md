@@ -78,7 +78,7 @@ flowchart LR
 | Sign up        | PWA → Cognito               | Hosted UI or Amplify Auth                                 |
 | Sign in        | PWA → Cognito               | Returns JWT                                               |
 | API calls      | PWA → Backend               | `Authorization: Bearer <JWT>`                             |
-| Delete account | PWA → `/api/v2/auth/delete` | Backend deletes Cognito user + DynamoDB data + Redis keys |
+| Delete account | PWA → `/api/v2/auth/account` | Backend deletes Cognito user + DynamoDB data + Redis keys |
 
 Protected routes: `/api/v2/user/*`, `/api/v2/offers/*`.
 

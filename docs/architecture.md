@@ -63,7 +63,8 @@ travelis-backend/
 ├── infra/
 │   ├── modules/          # lambda, dynamodb, cognito, eventbridge, …
 │   └── environments/
-│       └── dev/
+│       ├── dev/
+│       └── prod/
 └── docs/
     ├── architecture/     # This documentation set
     └── providers/        # External API contracts

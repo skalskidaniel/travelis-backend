@@ -161,6 +161,8 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 | `VAPID_PUBLIC_KEY`           | SSM              | Web Push public key                                       |
 | `FRONTEND_URL`               | SSM / env        | e.g. `https://wakacje-travelis.pl` (used for `share_url`) |
 | `RATE_LIMITING_ENABLED`      | SSM / env        | If `False`, rate limiting is bypassed (defaults to `True` if omitted) |
+| `LAMBDA_FUNCTION_ARN`       | Terraform output / SSM | ARN of the Lambdalith function, used by scheduler and coordinator. |
+| `SCHEDULER_ROLE_ARN`        | Terraform output / SSM | ARN of the IAM role assumed by EventBridge Scheduler to invoke the Lambda function. |
 
 Never commit secrets. Use `.env.example` with placeholders for local dev.
 
