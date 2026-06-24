@@ -1,0 +1,74 @@
+# Production Infrastructure Deployment
+
+This directory contains the Terraform configuration to deploy the production infrastructure for the TraveLis backend.
+
+## Prerequisites
+
+Before deploying the production environment, make sure you have:
+
+1. An AWS Account with credentials configured locally (e.g., using the AWS profile `travelis-terraform`).
+2. A production Redis Cloud database (TLS enabled) and its connection URL.
+3. Production Web Push VAPID keys (public and private).
+4. (Optional) Grafana Cloud AWS Account ID and External ID if integrating with Grafana Cloud for monitoring.
+
+## 1. Remote State Management
+
+Production Terraform uses a remote S3 backend configured in [versions.tf](versions.tf):
+
+```terraform
+backend "s3" {
+  bucket         = "travelis-prod-terraform-state"
+  key            = "state/terraform.tfstate"
+  region         = "eu-central-1"
+  dynamodb_table = "travelis-prod-terraform-locks"
+  encrypt        = true
+}
+```
+
+Before the first production deploy, create the backing resources in your AWS account:
+
+1. A private S3 bucket (e.g. `travelis-prod-terraform-state`).
+2. A DynamoDB table for state locking (e.g. `travelis-prod-terraform-locks`) with partition key `LockID` (String).
+
+Then run `terraform init` from this directory to connect to remote state.
+
+If you skip remote state setup, Terraform will keep state locally (`terraform.tfstate`). Do not lose that file.
+
+## 2. Configuration Setup
+
+1. Copy the boilerplate variables file or edit the existing [terraform.tfvars](terraform.tfvars):
+   - Populate `redis_url` with your production Redis database URL.
+   - Populate `vapid_public_key` and `vapid_private_key` with your production keys.
+   - Populate `grafana_cloud_aws_account_id` and `grafana_cloud_external_id` (or leave empty if not using Grafana monitoring).
+   - Verify the `aws_profile` and `aws_region` are correct.
+
+## 3. Initial Deploy
+
+Run the following commands to initialize Terraform, check the plan, and deploy the stack:
+
+```bash
+# Initialize Terraform
+terraform init
+
+# Plan changes to verify what will be created
+terraform plan
+
+# Apply changes to deploy to AWS
+terraform apply
+```
+
+## 4. Seeding the Geo Catalog
+
+Once the deployment completes successfully, the Geo Catalog S3 bucket will be created. You must copy the initial provider geo catalogs into this bucket so that the scraping coordinator knows where to scrape:
+
+```bash
+# Get the name of the bucket from the outputs:
+# terraform output geo_catalog_bucket_name
+
+# Copy the TUI and Wakacjepl geo catalogs to S3:
+aws s3 cp ../../../docs/providers/tui/tui_geo_catalog.json \
+  s3://<geo_catalog_bucket_name>/providers/tui/tui_geo_catalog.json
+
+aws s3 cp ../../../docs/providers/wakacjepl/wakacjepl_geo_catalog.json \
+  s3://<geo_catalog_bucket_name>/providers/wakacjepl/wakacjepl_geo_catalog.json
+```

@@ -1,0 +1,22 @@
+{
+  "plugins": {
+    "databases-on-aws": {
+      "enabled": true
+    },
+    "aws-serverless": {
+      "enabled": true
+    },
+    "redis-development": {
+      "enabled": true
+    },
+    "grafana-cloud-mcp": {
+      "enabled": true
+    },
+    "deploy-on-aws": {
+      "enabled": true
+    },
+    "postman": {
+      "enabled": true
+    }
+  }
+}

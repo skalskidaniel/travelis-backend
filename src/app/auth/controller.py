@@ -1,0 +1,105 @@
+from aws_lambda_powertools import Logger
+from fastapi import APIRouter, Depends, status
+
+from app.auth.dependencies import get_current_user
+from app.dependencies import get_container
+from app.rate_limiter import RateLimiter
+from app.exceptions import AccountDeletionException
+from core.container import Container
+from core.models.cell import MarketCell
+from core.models.user import User
+from core.services.activation import generate_required_cells
+
+logger = Logger(child=True)
+
+
+router = APIRouter(tags=["Authentication"])
+
+
+@router.delete(
+    "/account",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete user account",
+    dependencies=[Depends(RateLimiter(times=3, seconds=60))],
+    responses={
+        204: {
+            "description": "Account and all associated preferences, matched feed, and web push subscriptions were successfully deleted."
+        },
+        401: {"description": "Unauthorized - Invalid or missing Cognito JWT token."},
+        500: {
+            "description": "Internal Server Error - Failed to delete account resources."
+        },
+    },
+)
+async def delete_account(
+    user_id: str = Depends(get_current_user),
+    container: Container = Depends(get_container),
+):
+    """Cascade delete user, preferences, UserOffers, Redis keys, cell activations, and Cognito user."""
+    user: User | None = await container.users_repo.get(user_id)
+
+    cell_ids_to_deactivate: list[str] = []
+    if user is not None:
+        cells: list[MarketCell] = generate_required_cells(
+            user.preferences, reference_date=user.updated_at.date()
+        )
+        cell_ids_to_deactivate = [c.cell_id for c in cells if c.cell_id]
+
+        try:
+            user_offers: list[dict] = await container.user_offers_repo.query_by_user(
+                user_id
+            )
+            if user_offers:
+                keys = [(user_id, item["offer_id"]) for item in user_offers]
+                await container.user_offers_repo.delete_batch(keys)
+        except Exception as exc:
+            logger.error(f"Error deleting UserOffers for deleted user {user_id}: {exc}")
+            raise AccountDeletionException(
+                "Failed to delete user offers during account deletion"
+            ) from exc
+
+        try:
+            await container.feed_repo.clear_user(user_id)
+        except Exception as exc:
+            logger.error(
+                f"Error clearing Redis cache for deleted user {user_id}: {exc}"
+            )
+            raise AccountDeletionException(
+                "Failed to clear user feed cache during account deletion"
+            ) from exc
+
+        try:
+            await container.users_repo.delete(user_id)
+        except Exception as exc:
+            logger.error(f"Error deleting user record for {user_id}: {exc}")
+            raise AccountDeletionException(
+                "Failed to delete user record during account deletion"
+            ) from exc
+
+        if cell_ids_to_deactivate:
+            try:
+                await container.cells_repo.decrement_activations(cell_ids_to_deactivate)
+            except Exception as exc:
+                logger.error(
+                    f"Error decrementing cell activations for deleted user {user_id}: {exc}"
+                )
+                raise AccountDeletionException(
+                    "Failed to decrement cell activations during account deletion"
+                ) from exc
+
+    if container.settings.cognito_user_pool_id:
+        try:
+            await container.cognito_client.admin_delete_user(
+                UserPoolId=container.settings.cognito_user_pool_id,
+                Username=user_id,
+            )
+            logger.info(f"Successfully deleted Cognito user {user_id}")
+        except Exception as exc:
+            logger.error(f"Failed to delete Cognito user {user_id}: {exc}")
+            raise AccountDeletionException(
+                "Failed to delete Cognito user during account deletion"
+            ) from exc
+    else:
+        logger.warning(
+            "COGNITO_USER_POOL_ID not configured. Skipping Cognito user deletion."
+        )

@@ -1,0 +1,268 @@
+{
+  "destinationsCodes": {
+    "any": [],
+    "AE": [
+      "AUH",
+      "DXB",
+      "RKT"
+    ],
+    "AL": [
+      "TIA"
+    ],
+    "AT": [
+      "INN",
+      "VIE"
+    ],
+    "BG": [
+      "BOJ"
+    ],
+    "CV": [
+      "BVC",
+      "SID"
+    ],
+    "CW": [
+      "CUR"
+    ],
+    "CY": [
+      "LCA",
+      "PFO"
+    ],
+    "CZ": [
+      "PRG10"
+    ],
+    "DE": [
+      "BER"
+    ],
+    "DK": [
+      "AAR"
+    ],
+    "DO": [
+      "PUJ"
+    ],
+    "EG": [
+      "HRG",
+      "MUH",
+      "RMF",
+      "SSH"
+    ],
+    "ES": [
+      "AGP",
+      "ALC",
+      "BCN",
+      "FXX",
+      "GRO",
+      "HEV",
+      "IBZ",
+      "LEI",
+      "MAD",
+      "MAH",
+      "PMI",
+      "REU",
+      "SVQ",
+      "XRY"
+    ],
+    "FR": [
+      "NCE",
+      "PAR"
+    ],
+    "GR": [
+      "ATH",
+      "CFU",
+      "CHQ",
+      "EFL",
+      "GPA",
+      "JTR",
+      "KGS",
+      "RHO",
+      "SKG",
+      "SMI",
+      "ZTH"
+    ],
+    "HR": [
+      "DBV",
+      "PUY",
+      "RJK",
+      "SPU",
+      "ZAD"
+    ],
+    "IC": [
+      "ACE",
+      "FUE",
+      "GMZ",
+      "LPA",
+      "TFS"
+    ],
+    "ID": [
+      "DPS"
+    ],
+    "IT": [
+      "BRI",
+      "BZO00",
+      "CTA",
+      "JGA",
+      "MIL",
+      "MXP",
+      "MXPS",
+      "NAP",
+      "OLB",
+      "PSA",
+      "RMI",
+      "ROM",
+      "SUF",
+      "VCE12",
+      "VCE5"
+    ],
+    "JM": [
+      "MBJ"
+    ],
+    "KE": [
+      "MBA"
+    ],
+    "LK": [
+      "CMB"
+    ],
+    "MA": [
+      "AGA",
+      "RAK"
+    ],
+    "ME": [
+      "TGD"
+    ],
+    "MT": [
+      "MLA"
+    ],
+    "MU": [
+      "MRU"
+    ],
+    "MV": [
+      "MLE"
+    ],
+    "MX": [
+      "CUN",
+      "SJD"
+    ],
+    "OM": [
+      "SLL"
+    ],
+    "PT": [
+      "FAO",
+      "FNC",
+      "LIS",
+      "OPO",
+      "PDL"
+    ],
+    "SC": [
+      "PRI",
+      "SEZ"
+    ],
+    "SG": [
+      "SIN"
+    ],
+    "SN": [
+      "DSS"
+    ],
+    "TH": [
+      "BKK",
+      "HKT",
+      "KBV"
+    ],
+    "TN": [
+      "DJE",
+      "NBE"
+    ],
+    "TR": [
+      "ADB",
+      "AYT",
+      "IST"
+    ],
+    "UK": [
+      "LON"
+    ],
+    "US": [
+      "LAX",
+      "MIA",
+      "NYC",
+      "SFO"
+    ],
+    "VN": [
+      "DAD",
+      "PQC",
+      "SGN"
+    ]
+  },
+  "board": {
+    "all-inclusive": "GT06-AI GT06-XX",
+    "full-board": "GT06-FB GT06-FBP",
+    "half-board": "GT06-HB GT06-HBP",
+    "bed-and-breakfast": "GT06-BB",
+    "none": "GT06-AO"
+  },
+  "minHotelCategory": {
+    "5": "5s",
+    "4": "4s",
+    "3": "3s",
+    "2": "2s",
+    "any": "defaultHotelCategory"
+  },
+  "tripAdvisorRating": {
+    "4.5": "4.5t",
+    "4": "4t",
+    "3.5": "3.5t",
+    "3": "3t",
+    "any": "defaultTripAdvisorRating"
+  },
+  "departureAirports": {
+    "BZG": {
+      "code": "BZG",
+      "name": "Bydgoszcz"
+    },
+    "GDN": {
+      "code": "GDN",
+      "name": "Gdańsk"
+    },
+    "KTW": {
+      "code": "KTW",
+      "name": "Katowice"
+    },
+    "KRK": {
+      "code": "KRK",
+      "name": "Kraków"
+    },
+    "LCJ": {
+      "code": "LCJ",
+      "name": "Łódź"
+    },
+    "LUZ": {
+      "code": "LUZ",
+      "name": "Lublin"
+    },
+    "POZ": {
+      "code": "POZ",
+      "name": "Poznań"
+    },
+    "RZE": {
+      "code": "RZE",
+      "name": "Rzeszów"
+    },
+    "SZZ": {
+      "code": "SZZ",
+      "name": "Szczecin"
+    },
+    "WAW": {
+      "code": "WAW",
+      "name": "Warszawa-Chopina"
+    },
+    "WMI": {
+      "code": "WMI",
+      "name": "Warszawa-Modlin"
+    },
+    "RDO": {
+      "code": "RDO",
+      "name": "Warszawa-Radom"
+    },
+    "WRO": {
+      "code": "WRO",
+      "name": "Wrocław"
+    }
+  }
+}

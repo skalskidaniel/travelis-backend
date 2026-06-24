@@ -1,15 +1,15 @@
-# Tui — kontrakt integracji
+# TUI — Integration Contract
 
-## Metadane
+## Metadata
 
-- Źródło: reverse-engineering `www.tui.pl`
-- Ostatnio zweryfikowano: 2026-01-28
+- Source: reverse-engineering `www.tui.pl`
+- Last verified: 2026-01-28
 
-## Auth / identyfikacja klienta
+## Auth / Client Identification
 
-Brak klasycznego OAuth/BasicAuth. API działa jako „publiczne” API wykorzystywane przez frontend TUI.
+No classic OAuth/BasicAuth. The API functions as a "public" API used by the TUI frontend.
 
-Nagłówki:
+Headers:
 
 - `tui-api-key: www`
 - `x-market: pl`
@@ -18,30 +18,30 @@ Nagłówki:
 - `x-app-id: <uuid>`
 - `content-type: application/json;charset=UTF-8`
 
-## Endpointy
+## Endpoints
 
-### Lista ofert
+### Offer List
 
-- Metoda: `POST`
+- Method: `POST`
 - URL: `https://www.tui.pl/api/services/tui-search/api/search/offers`
 
-#### Nagłówki
+#### Headers
 
 ```http
 accept: application/json
 origin: https://www.tui.pl
-referer: <! Zakodowany url z zapytaniem -->
+referer: <! Encoded URL with query -->
 tui-api-key: www
 x-market: pl
 x-market-language: pl
 x-market-currency: PLN
 ```
 
-#### Request body
+#### Request Body
 
-Format dat: `DD.MM.YYYY`.
+Date format: `DD.MM.YYYY`.
 
-Filtry opisane w `filters.json`
+Filters are described in `filters.json`.
 
 ```json
 {
@@ -52,20 +52,18 @@ Filtry opisane w `filters.json`
   "destinationsCodes": ["GR"],
   "durationFrom": 7,
   "durationTo": 10,
-    "occupancies": [
-        {
-            "adultsCount": 2,
-            "childrenBirthDates": [],
-            "participantsCount": 2
-        },
-        {
-            "adultsCount": 1,
-            "childrenBirthDates": [
-                "27.02.2021"
-            ],
-            "participantsCount": 2
-        }
-    ],
+  "occupancies": [
+    {
+      "adultsCount": 2,
+      "childrenBirthDates": [],
+      "participantsCount": 2
+    },
+    {
+      "adultsCount": 1,
+      "childrenBirthDates": ["27.02.2021"],
+      "participantsCount": 2
+    }
+  ],
   "numberOfAdults": 3,
   "offerType": "BY_PLANE",
   "filters": [
@@ -256,26 +254,104 @@ Filtry opisane w `filters.json`
 }
 ```
 
-Uwagi do mapowania pól:
+## Field Mapping & Query Construction Notes
 
-- `offerUrl` musi być prefixowane z `http://tui.pl/`
-- `boardCode` jest mapowane na typ wyżywienia po stronie aplikacji:
-  - `GT06-AI` / `GT06-XX` → `All inclusive`
-  - `GT06-FB` / `GT06-FBP` → `FB`
-  - `GT06-HB` / `GT06-HBP` → `HB`
-  - `GT06-BB` → `BB`
-  - `GT06-AO` → `None`
-- Lokalizacja w aplikacji pochodzi z `breadcrumbs[0].label` (kraj) i `breadcrumbs[1].label` (region).
+### Board Type
 
-### Dostępność oferty
+- **App → TUI (Request)**: The `tui_filters.json` dictionary defines values like `"board": { "all-inclusive": "GT06-AI GT06-XX", ... }`. Values are space-separated. Before sending a request to TUI, split them (by space) into a list of strings and pass them in the `selectedValues` array for the filter with `filterId: "board"`.
+- **TUI → App (Response)**: The `boardCode` field from the TUI response is mapped to the canonical board type in the application:
+  - `GT06-AI` / `GT06-XX` → `all-inclusive`
+  - `GT06-FB` / `GT06-FBP` → `full-board`
+  - `GT06-HB` / `GT06-HBP` → `half-board`
+  - `GT06-BB` → `bed-and-breakfast`
+  - `GT06-AO` → `none`
 
-- `GET https://www.tui.pl/api/www/hotel-cards/offers?offerCode=<offerCode>`
+### Departure Airport Codes
 
-Przykładowa odpowiedź:
+TUI uses standard IATA codes directly in the `departuresCodes` array (e.g., `["POZ", "WAW", "KRK"]`). No lookup mapping is needed.
+
+### Travel Dates vs Market Cell Bounds
+
+Our canonical preference/cell model uses an explicit trip window:
+
+- `departure_date` (trip start, inclusive)
+- `return_date` (trip end, inclusive)
+
+TUI search does not accept an explicit return-date bound. Instead, it accepts a departure window:
+
+- `departureDateFrom`
+- `departureDateTo`
+
+This means a TUI result can have a valid `departureDate` but still have a `returnDate` outside the current market cell's month.
+
+**Required behavior for TUI ingest/matching:** after receiving offers, enforce that the offer's `departure_date` falls within the cell's departure month window. We do **not** restrict the `return_date` to the departure month, as a package departing near the end of the month will naturally return in the following month (up to the maximum package duration of 28 nights).
+
+- `offer.departure_date` must be within `[departure_from, departure_to]` computed from `cell.month`.
+- `offer.return_date` has no upper month boundary enforced, but trip `duration` must be positive.
+
+### Destination Codes / Geo Catalog
+
+TUI exposes the destination tree and departure airports via the search bootstrap endpoint:
+
+- `POST https://www.tui.pl/api/services/tui-search/api/gs/initial`
+  - `filters` entry with `filterType: "REGION"` — countries and nested regions (or leaf single-destination countries such as `MLA` for Malta)
+  - `filters` entry with `filterType: "AIRPORT"` — Polish departure airports
+
+A minimal ID snapshot is checked in at [tui_geo_catalog.json](tui_geo_catalog.json) (~13 KB). Regenerate with:
+
+```bash
+uv run python scripts/fetch_geo_catalog.py --provider tui
+```
+
+Shape:
 
 ```json
 {
-    "message": "Wybrana oferta nie jest już dostępna.",
-    "status": "UNAVAILABLE" // lub "OK" jeśli dostępna
+  "generated_at": "…",
+  "countries": { "GR": { "iso": "GR", "name": "Grecja" } },
+  "regions": { "CHQ": { "country_code": "GR", "name": "Kreta" } },
+  "departure_airports": { "KRK": { "code": "KRK", "name": "Kraków" } }
+}
+```
+
+- `countries` — TUI destination code → ISO + display name (ISO enriched in our catalog pipeline with manual overrides for known TUI code/ISO mismatches, e.g. Mexico `ME` → `MX`)
+- `regions` — TUI destination/region code → `country_code` + name (single-destination countries also appear here with `country_code` equal to their own code)
+- `departure_airports` — IATA code → code + name
+
+Use `destinationsCodes` / `departuresCodes` in search requests; there is no separate city level.
+
+Canonical app country/destination codes live in `src/core/providers/resources/country_registry.json`.
+When regenerating `tui_filters.json`, generated `destinationsCodes` keys must be present in this registry.
+
+### Occupancy & Children
+
+- Child birth date format expected by TUI: `DD.MM.YYYY`.
+- The request includes:
+  - `numberOfAdults`: number of adults from the search dimension.
+  - `childrenBirthdays`: list of children's birth dates (format `DD.MM.YYYY`). When scraping for dimensions with children, use a representative birth date of an 8-year-old child (e.g., `01.01.<current_year-8>`).
+  - `occupancies`: list of objects containing:
+    - `adultsCount`: number of adults.
+    - `childrenBirthDates`: list of children's birth dates (format `DD.MM.YYYY`).
+    - `participantsCount`: `adultsCount` + number of children.
+
+### Other Fields
+
+- `offerUrl` must be prefixed with `https://www.tui.pl` (e.g., `https://www.tui.pl/wypoczynek/...`).
+- Location in the application is normalized to `Country/Region/City`. It is derived from `breadcrumbs[0].label` (country), `breadcrumbs[1].label` (region), and either `breadcrumbs[2].label` (city) if present or the fallback `city` field. All slashes (`/`) in labels are normalized to `-`.
+- Country label consistency caveat: for some destination codes, TUI can return mixed top-level country labels in one result set when the destination/departure combination maps to cross-border inventory. Observed and accepted mixed pairs:
+  - `Portugalia` + `Hiszpania`
+  - `Hiszpania` + `Wyspy Kanaryjskie`
+    Any other mixed top-level country-label combination should be treated as unexpected and investigated.
+
+### Offer Availability
+
+- `GET https://www.tui.pl/api/www/hotel-cards/offers?offerCode=<offerCode>`
+
+Example response:
+
+```json
+{
+  "message": "Wybrana oferta nie jest już dostępna.",
+  "status": "UNAVAILABLE" // or "OK" if available
 }
 ```
