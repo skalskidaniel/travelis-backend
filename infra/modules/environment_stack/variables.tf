@@ -19,6 +19,20 @@ variable "frontend_url" {
   type        = string
 }
 
+variable "google_client_id" {
+  description = "Google OAuth client ID for Cognito social sign-in. Leave empty to skip Google IdP."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth client secret for Cognito social sign-in. Leave empty to skip Google IdP."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "vapid_public_key" {
   description = "Web Push VAPID public key."
   type        = string

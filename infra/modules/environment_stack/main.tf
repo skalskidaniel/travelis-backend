@@ -25,8 +25,11 @@ module "dynamodb" {
 module "cognito" {
   source = "../cognito"
 
-  project     = var.project
-  environment = var.environment
+  project              = var.project
+  environment          = var.environment
+  frontend_url         = var.frontend_url
+  google_client_id     = var.google_client_id
+  google_client_secret = var.google_client_secret
 }
 
 module "eventbridge" {

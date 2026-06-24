@@ -59,4 +59,18 @@ variable "grafana_cloud_external_id" {
   default     = ""
 }
 
+variable "google_client_id" {
+  description = "Google OAuth client ID for Cognito social sign-in. Leave empty to skip Google IdP."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth client secret for Cognito social sign-in. Leave empty to skip Google IdP."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 

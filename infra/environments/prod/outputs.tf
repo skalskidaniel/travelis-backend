@@ -28,6 +28,11 @@ output "cognito_app_client_id" {
   value       = module.environment_stack.cognito_app_client_id
 }
 
+output "cognito_hosted_ui_domain" {
+  description = "Cognito hosted UI domain hostname for Amplify OAuth."
+  value       = module.environment_stack.cognito_hosted_ui_domain
+}
+
 output "dynamodb_users_table" {
   value = module.environment_stack.dynamodb_users_table
 }

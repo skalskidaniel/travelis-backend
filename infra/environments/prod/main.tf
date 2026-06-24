@@ -23,4 +23,6 @@ module "environment_stack" {
   grafana_cloud_aws_account_id = var.grafana_cloud_aws_account_id
   grafana_cloud_external_id    = var.grafana_cloud_external_id
   aws_profile                  = var.aws_profile
+  google_client_id             = var.google_client_id
+  google_client_secret         = var.google_client_secret
 }
