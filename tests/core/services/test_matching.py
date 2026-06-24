@@ -332,12 +332,12 @@ def test_filter_departure_airports():
         notifications_service=MagicMock(),
         activation_service=MagicMock(),
     )
-    prefs = UserPreferences(
+    prefs: UserPreferences = UserPreferences(
         countries=["GR"],
         departure_airports=["WAW"],
         min_rating=4,
     )
-    offers = [
+    offers: list[Offer] = [
         make_offer(offer_id="a" * 32, departure_airport="WAW"),
         make_offer(offer_id="b" * 32, departure_airport="KRK"),
     ]
@@ -356,13 +356,13 @@ def test_filter_duration_bounds():
         notifications_service=MagicMock(),
         activation_service=MagicMock(),
     )
-    prefs = UserPreferences(
+    prefs: UserPreferences = UserPreferences(
         countries=["GR"],
         min_rating=4,
         duration_min=5,
         duration_max=7,
     )
-    offers = [
+    offers: list[Offer] = [
         make_offer(
             offer_id="a" * 32,
             departure_date=date(2026, 7, 1),
@@ -403,13 +403,13 @@ def test_filter_date_range():
         notifications_service=MagicMock(),
         activation_service=MagicMock(),
     )
-    prefs = UserPreferences(
+    prefs: UserPreferences = UserPreferences(
         countries=["GR"],
         min_rating=4,
         date_from=date(2026, 7, 1),
         date_to=date(2026, 7, 31),
     )
-    offers = [
+    offers: list[Offer] = [
         make_offer(
             offer_id="a" * 32,
             departure_date=date(2026, 6, 28),
@@ -508,34 +508,34 @@ def test_filter_empty_returns():
         notifications_service=MagicMock(),
         activation_service=MagicMock(),
     )
-    offers = [make_offer()]
+    offers: list[Offer] = [make_offer()]
 
     # Empty on rating
-    prefs_rating = UserPreferences(min_rating=5)
+    prefs_rating: UserPreferences = UserPreferences(min_rating=5)
     assert service._filter_offers_vectorized(offers, prefs_rating) == []
 
     # Empty on airports
-    prefs_airports = UserPreferences(departure_airports=["XYZ"])
+    prefs_airports: UserPreferences = UserPreferences(departure_airports=["XYZ"])
     assert service._filter_offers_vectorized(offers, prefs_airports) == []
 
     # Empty on duration min
-    prefs_dur_min = UserPreferences(duration_min=14)
+    prefs_dur_min: UserPreferences = UserPreferences(duration_min=14)
     assert service._filter_offers_vectorized(offers, prefs_dur_min) == []
 
     # Empty on duration max
-    prefs_dur_max = UserPreferences(duration_min=2, duration_max=3)
+    prefs_dur_max: UserPreferences = UserPreferences(duration_min=2, duration_max=3)
     assert service._filter_offers_vectorized(offers, prefs_dur_max) == []
 
     # Empty on date_from
-    prefs_date_from = UserPreferences(date_from=date(2027, 1, 1))
+    prefs_date_from: UserPreferences = UserPreferences(date_from=date(2027, 1, 1))
     assert service._filter_offers_vectorized(offers, prefs_date_from) == []
 
     # Empty on date_to
-    prefs_date_to = UserPreferences(date_to=date(2025, 1, 1))
+    prefs_date_to: UserPreferences = UserPreferences(date_to=date(2025, 1, 1))
     assert service._filter_offers_vectorized(offers, prefs_date_to) == []
 
     # Empty on children length
-    prefs_children_len = UserPreferences(children=[date(2015, 1, 1)])
+    prefs_children_len: UserPreferences = UserPreferences(children=[date(2015, 1, 1)])
     assert service._filter_offers_vectorized(offers, prefs_children_len) == []
 
 
@@ -549,15 +549,15 @@ def test_filter_children_ages():
         activation_service=MagicMock(),
     )
 
-    offers = [make_offer(departure_date=date(2026, 7, 10), children=1)]
+    offers: list[Offer] = [make_offer(departure_date=date(2026, 7, 10), children=1)]
 
     # Child is 10 years old (success)
-    prefs_valid = UserPreferences(children=[date(2016, 7, 1)])
+    prefs_valid: UserPreferences = UserPreferences(children=[date(2016, 7, 1)])
     matched = service._filter_offers_vectorized(offers, prefs_valid)
     assert len(matched) == 1
 
     # Child is 18 years old (empty)
-    prefs_invalid = UserPreferences(children=[date(2008, 6, 1)])
+    prefs_invalid: UserPreferences = UserPreferences(children=[date(2008, 6, 1)])
     assert service._filter_offers_vectorized(offers, prefs_invalid) == []
 
 
@@ -570,7 +570,7 @@ def test_filter_availability():
         notifications_service=MagicMock(),
         activation_service=MagicMock(),
     )
-    prefs = UserPreferences(
+    prefs: UserPreferences = UserPreferences(
         countries=["GR"],
         min_rating=4,
     )
@@ -578,7 +578,7 @@ def test_filter_availability():
     offer_unavail = make_offer(offer_id="b" * 32)
     offer_unavail.available = False
 
-    offers = [offer_avail, offer_unavail]
+    offers: list[Offer] = [offer_avail, offer_unavail]
     matched = service._filter_offers_vectorized(offers, prefs)
 
     assert [o.offer_id for o in matched] == ["a" * 32]

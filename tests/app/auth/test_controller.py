@@ -33,7 +33,7 @@ def client(mock_container):
 
 
 def test_delete_account_cascade_success(client, mock_container):
-    existing_user = User(
+    existing_user: User = User(
         user_id="user-123", preferences=UserPreferences(countries=["IT"])
     )
     mock_container.users_repo.get.return_value = existing_user
@@ -81,7 +81,7 @@ def test_delete_account_user_not_found_cleans_cognito(client, mock_container):
 def test_delete_account_no_cognito_pool_skips_cognito(client, mock_container):
     mock_container.settings.cognito_user_pool_id = None
 
-    existing_user = User(user_id="user-123")
+    existing_user: User = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
     mock_container.user_offers_repo.query_by_user.return_value = []
 
@@ -95,7 +95,7 @@ def test_delete_account_no_cognito_pool_skips_cognito(client, mock_container):
 
 
 def test_delete_account_fails_when_user_delete_fails(client, mock_container):
-    existing_user = User(user_id="user-123")
+    existing_user: User = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
     mock_container.user_offers_repo.query_by_user.return_value = []
     mock_container.users_repo.delete.side_effect = RuntimeError("dynamodb error")
@@ -109,7 +109,7 @@ def test_delete_account_fails_when_user_delete_fails(client, mock_container):
 
 
 def test_delete_account_fails_when_cognito_delete_fails(client, mock_container):
-    existing_user = User(user_id="user-123")
+    existing_user: User = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
     mock_container.user_offers_repo.query_by_user.return_value = []
     mock_container.cognito_client.admin_delete_user.side_effect = RuntimeError(
@@ -127,7 +127,7 @@ def test_delete_account_fails_when_cognito_delete_fails(client, mock_container):
 def test_delete_account_fails_when_user_offers_delete_fails_no_cell_decrement(
     client, mock_container
 ):
-    existing_user = User(user_id="user-123")
+    existing_user: User = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
     mock_container.user_offers_repo.query_by_user.return_value = [
         {"user_id": "user-123", "offer_id": "offer-abc"}
@@ -146,7 +146,7 @@ def test_delete_account_fails_when_user_offers_delete_fails_no_cell_decrement(
 
 def test_delete_account_uses_updated_at_reference_date(client, mock_container):
     updated_at = datetime(2025, 3, 15, 12, 0, tzinfo=timezone.utc)
-    existing_user = User(
+    existing_user: User = User(
         user_id="user-123",
         preferences=UserPreferences(countries=["IT"]),
         updated_at=updated_at,

@@ -42,7 +42,7 @@ def test_get_preferences_new_user_lazy_creates(client, mock_container):
 
 
 def test_get_preferences_existing_user(client, mock_container):
-    existing_user = User(
+    existing_user: User = User(
         user_id="user-123", preferences=UserPreferences(min_stars=4, countries=["ES"])
     )
     mock_container.users_repo.get.return_value = existing_user
@@ -59,7 +59,7 @@ def test_get_preferences_existing_user(client, mock_container):
 
 
 def test_update_preferences(client, mock_container):
-    existing_user = User(user_id="user-123")
+    existing_user: User = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
 
     payload = {
@@ -81,7 +81,7 @@ def test_update_preferences(client, mock_container):
 
 
 def test_enable_push(client, mock_container):
-    existing_user = User(user_id="user-123")
+    existing_user: User = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
 
     payload = {
@@ -106,7 +106,7 @@ def test_enable_push(client, mock_container):
 
 
 def test_disable_push(client, mock_container):
-    existing_user = User(user_id="user-123")
+    existing_user: User = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
 
     response = client.post("/api/v2/user/push/disable")

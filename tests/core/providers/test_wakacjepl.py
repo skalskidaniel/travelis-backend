@@ -315,10 +315,10 @@ async def test_search_happy_path(wakacjepl_provider):
             respx.post(SEARCH_URL).mock(
                 return_value=httpx.Response(200, json=mock_response)
             )
-            offers = await wakacjepl_provider.search(cell)
+            offers: list[RawOffer] = await wakacjepl_provider.search(cell)
 
             assert len(offers) == 1
-            offer = offers[0]
+            offer: RawOffer = offers[0]
             assert isinstance(offer, RawOffer)
             assert offer.rating == Decimal("3.8")
             assert offer.board == BoardType.ALL_INCLUSIVE
@@ -405,7 +405,7 @@ async def test_search_maps_missing_photos_to_none_image_url(wakacjepl_provider):
             respx.post(SEARCH_URL).mock(
                 return_value=httpx.Response(200, json=mock_response)
             )
-            offers = await wakacjepl_provider.search(cell)
+            offers: list[RawOffer] = await wakacjepl_provider.search(cell)
 
             assert len(offers) == 1
             assert offers[0].image_url is None
@@ -475,7 +475,7 @@ async def test_search_skips_rows_with_invalid_provider_metadata(wakacjepl_provid
             respx.post(SEARCH_URL).mock(
                 return_value=httpx.Response(200, json=mock_response)
             )
-            offers = await wakacjepl_provider.search(cell)
+            offers: list[RawOffer] = await wakacjepl_provider.search(cell)
 
             assert offers == []
 
@@ -692,7 +692,7 @@ async def test_search_cross_month_dates(wakacjepl_provider):
             route = respx.post(SEARCH_URL).mock(
                 return_value=httpx.Response(200, json=mock_response)
             )
-            offers = await wakacjepl_provider.search(cell)
+            offers: list[RawOffer] = await wakacjepl_provider.search(cell)
 
             # Check that query arrivalDate was extended by 28 days: August 31st + 28 days = Sept 28th
             assert route.called

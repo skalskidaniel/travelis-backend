@@ -34,7 +34,7 @@ class DynamoCellsRepository(CellsRepository):
         client = self.table.meta.client
         table_name = self.table.name
 
-        cells = []
+        cells: list[MarketCell] = []
         for chunk in chunked(cell_ids, BATCH_READ_LIMIT):
             request_items = {
                 table_name: {

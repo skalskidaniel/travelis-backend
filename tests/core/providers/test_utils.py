@@ -68,7 +68,7 @@ def test_departure_city_label_uses_city_before_dash():
 
 
 def test_verify_wakacje_rendered_page_passes_for_matching_text():
-    offer = _sample_raw_offer()
+    offer: RawOffer = _sample_raw_offer()
     page_text = (
         "Jaz Lamaya Resort\n2 dorosłych\n25.07.2026 - 28.07.2026 / 3 nocy\n"
         "Gdańsk\nAll Inclusive\nCena razem\n5000"
@@ -82,7 +82,7 @@ def test_verify_wakacje_rendered_page_passes_for_matching_text():
 
 
 def test_verify_tui_offer_page_parses_offer_code_data():
-    offer = _sample_raw_offer(
+    offer: RawOffer = _sample_raw_offer(
         provider=ProviderName.TUI,
         external_offer_id="OFFER123",
         hotel_name="Hotel Kent",

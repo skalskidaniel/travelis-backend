@@ -56,7 +56,7 @@ async def test_offers_repo_lifecycle(offers_table, test_offer):
     assert fetched.hotel_name == "Test Hotel"
     assert fetched.price_total == Decimal("5000.00")
 
-    cell_offers = await repo.query_by_cell(test_offer.cell_id)
+    cell_offers: list[Offer] = await repo.query_by_cell(test_offer.cell_id)
     assert len(cell_offers) == 1
     assert cell_offers[0].offer_id == test_offer.offer_id
 
@@ -78,7 +78,7 @@ async def test_offers_repo_batch_operations(offers_table, test_offer):
     assert fetched1 is not None
     assert fetched2 is not None
 
-    cell_offers = await repo.query_by_cell(test_offer.cell_id)
+    cell_offers: list[Offer] = await repo.query_by_cell(test_offer.cell_id)
     assert len(cell_offers) == 2
 
     await repo.delete_batch(

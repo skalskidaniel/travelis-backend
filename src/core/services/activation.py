@@ -65,7 +65,7 @@ def generate_required_cells(
     ref = reference_date or date.today()
     months = resolve_months_for_range(preferences.date_from, preferences.date_to, ref)
 
-    cells = []
+    cells: list[MarketCell] = []
     for country in preferences.countries:
         for month in months:
             for board_type in preferences.board:
@@ -100,7 +100,7 @@ class ActivationService:
         new_ref = new_reference_date or date.today()
         old_ref = old_reference_date or new_ref
 
-        new_cells = {
+        new_cells: dict[str, MarketCell] = {
             cell.cell_id: cell for cell in generate_required_cells(new_prefs, new_ref)
         }
 

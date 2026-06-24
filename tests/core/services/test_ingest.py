@@ -131,7 +131,9 @@ def test_normalize_hotel():
 
 
 def test_compute_offer_id():
-    raw_offer = create_test_raw_offer(ProviderName.WAKACJE_PL, "ext-1", 1000.00)
+    raw_offer: RawOffer = create_test_raw_offer(
+        ProviderName.WAKACJE_PL, "ext-1", 1000.00
+    )
     expected_id = compute_offer_id(raw_offer)
     assert len(expected_id) == 32
     int(expected_id, 16)
@@ -184,12 +186,12 @@ def test_merge_existing_and_new_offer_same_provider():
     t_new = datetime(2026, 6, 17, 18, 0, 0, tzinfo=timezone.utc)
 
     raw_existing = create_test_raw_offer(ProviderName.WAKACJE_PL, "ext-1", 1000.00)
-    existing_offer = create_test_offer(
+    existing_offer: Offer = create_test_offer(
         raw_existing, scraped_at=t_existing, updated_at=t_existing
     )
 
     raw_new = create_test_raw_offer(ProviderName.WAKACJE_PL, "ext-1", 1100.00)
-    new_offer = create_test_offer(raw_new, scraped_at=t_new, updated_at=t_new)
+    new_offer: Offer = create_test_offer(raw_new, scraped_at=t_new, updated_at=t_new)
 
     merged = merge_existing_and_new_offer(existing_offer, new_offer)
 
@@ -205,12 +207,12 @@ def test_merge_existing_and_new_offer_cross_provider_new_wins():
     t_new = datetime(2026, 6, 17, 18, 0, 0, tzinfo=timezone.utc)
 
     raw_existing = create_test_raw_offer(ProviderName.TUI, "tui-code", 1200.00)
-    existing_offer = create_test_offer(
+    existing_offer: Offer = create_test_offer(
         raw_existing, scraped_at=t_existing, updated_at=t_existing
     )
 
     raw_new = create_test_raw_offer(ProviderName.WAKACJE_PL, "wakacje-code", 1100.00)
-    new_offer = create_test_offer(raw_new, scraped_at=t_new, updated_at=t_new)
+    new_offer: Offer = create_test_offer(raw_new, scraped_at=t_new, updated_at=t_new)
 
     merged = merge_existing_and_new_offer(existing_offer, new_offer)
 
@@ -240,12 +242,12 @@ def test_merge_existing_and_new_offer_cross_provider_existing_wins():
     t_new = datetime(2026, 6, 17, 18, 0, 0, tzinfo=timezone.utc)
 
     raw_existing = create_test_raw_offer(ProviderName.TUI, "tui-code", 1000.00)
-    existing_offer = create_test_offer(
+    existing_offer: Offer = create_test_offer(
         raw_existing, scraped_at=t_existing, updated_at=t_existing
     )
 
     raw_new = create_test_raw_offer(ProviderName.WAKACJE_PL, "wakacje-code", 1100.00)
-    new_offer = create_test_offer(raw_new, scraped_at=t_new, updated_at=t_new)
+    new_offer: Offer = create_test_offer(raw_new, scraped_at=t_new, updated_at=t_new)
 
     merged = merge_existing_and_new_offer(existing_offer, new_offer)
 
@@ -269,7 +271,7 @@ def test_merge_existing_and_new_offer_pruning():
     raw_existing = create_test_raw_offer(
         ProviderName.WAKACJE_PL, "wakacje-active", 1000.00
     )
-    existing_offer = create_test_offer(
+    existing_offer: Offer = create_test_offer(
         raw_existing, scraped_at=t_existing, updated_at=t_existing
     )
 
@@ -293,7 +295,7 @@ def test_merge_existing_and_new_offer_pruning():
     existing_offer.metadata.tui = TuiMetadata(offer_code="tui-other")
 
     raw_new = create_test_raw_offer(ProviderName.WAKACJE_PL, "wakacje-active", 1050.00)
-    new_offer = create_test_offer(raw_new, scraped_at=t_new, updated_at=t_new)
+    new_offer: Offer = create_test_offer(raw_new, scraped_at=t_new, updated_at=t_new)
     new_offer.metadata.sources = [
         OfferSource(
             provider=ProviderName.WAKACJE_PL,

@@ -36,7 +36,7 @@ def test_resolve_months_for_range():
 
 
 def test_generate_required_cells():
-    prefs = UserPreferences(
+    prefs: UserPreferences = UserPreferences(
         countries=["GR", "IT"],
         adults=2,
         children=[date(2018, 5, 10)],
@@ -46,7 +46,7 @@ def test_generate_required_cells():
         date_to=date(2026, 7, 31),
     )
 
-    cells = generate_required_cells(prefs, date(2026, 6, 15))
+    cells: list[MarketCell] = generate_required_cells(prefs, date(2026, 6, 15))
     assert len(cells) == 2
 
     gr_cell = [c for c in cells if c.country == "GR"][0]
@@ -58,7 +58,7 @@ def test_generate_required_cells():
 
 
 def test_generate_required_cells_multiple_boards():
-    prefs = UserPreferences(
+    prefs: UserPreferences = UserPreferences(
         countries=["GR"],
         adults=2,
         children=[date(2018, 5, 10)],
@@ -68,7 +68,7 @@ def test_generate_required_cells_multiple_boards():
         date_to=date(2026, 7, 31),
     )
 
-    cells = generate_required_cells(prefs, date(2026, 6, 15))
+    cells: list[MarketCell] = generate_required_cells(prefs, date(2026, 6, 15))
     assert len(cells) == 2
 
     ai_cell = [c for c in cells if c.board == BoardType.ALL_INCLUSIVE][0]
@@ -88,12 +88,12 @@ async def test_update_cell_activations():
 
     service = ActivationService(cells_repo)
 
-    old_prefs = UserPreferences(
+    old_prefs: UserPreferences = UserPreferences(
         countries=["GR"],
         date_from=date(2026, 7, 1),
         date_to=date(2026, 7, 31),
     )
-    new_prefs = UserPreferences(
+    new_prefs: UserPreferences = UserPreferences(
         countries=["IT"],
         date_from=date(2026, 7, 1),
         date_to=date(2026, 7, 31),
@@ -132,7 +132,7 @@ async def test_update_cell_activations_creates_missing_cell():
 
     service = ActivationService(cells_repo)
 
-    new_prefs = UserPreferences(
+    new_prefs: UserPreferences = UserPreferences(
         countries=["GR"],
         date_from=date(2026, 7, 1),
         date_to=date(2026, 7, 31),

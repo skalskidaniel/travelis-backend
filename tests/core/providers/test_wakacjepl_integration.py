@@ -110,7 +110,9 @@ async def test_search_filters_consistency(live_provider):
         activation_count=1,
     )
 
-    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+    offers: list[RawOffer] = await _run_with_transient_retry(
+        lambda: live_provider.search(cell)
+    )
 
     if not offers:
         pytest.skip(
@@ -145,7 +147,9 @@ async def test_search_country_consistency(
                 children=0,
                 activation_count=1,
             )
-            offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+            offers: list[RawOffer] = await _run_with_transient_retry(
+                lambda: live_provider.search(cell)
+            )
 
         if not offers:
             return
@@ -195,7 +199,9 @@ async def test_search_board_consistency(
                 children=0,
                 activation_count=1,
             )
-            offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+            offers: list[RawOffer] = await _run_with_transient_retry(
+                lambda: live_provider.search(cell)
+            )
 
         if not offers:
             return
@@ -231,7 +237,9 @@ async def test_hotel_standard_consistency(
                 children=0,
                 activation_count=1,
             )
-            offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+            offers: list[RawOffer] = await _run_with_transient_retry(
+                lambda: live_provider.search(cell)
+            )
 
         if not offers:
             return
@@ -309,7 +317,9 @@ async def test_search_departure_date_bounds(live_provider: WakacjePlProvider):
         children=0,
         activation_count=1,
     )
-    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+    offers: list[RawOffer] = await _run_with_transient_retry(
+        lambda: live_provider.search(cell)
+    )
     if not offers:
         pytest.skip(
             f"No live offers returned for Wakacje.pl next-month cell {month_bucket}."
@@ -338,7 +348,9 @@ async def test_referral_url_matches_offer_page(
         children=0,
         activation_count=1,
     )
-    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+    offers: list[RawOffer] = await _run_with_transient_retry(
+        lambda: live_provider.search(cell)
+    )
     if not offers:
         pytest.skip(
             f"Live Wakacje.pl search returned no offers for next-month cell with board {board.value}."

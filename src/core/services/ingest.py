@@ -8,6 +8,8 @@ from core.models.offer import (
     OfferMetadata,
     OfferSource,
     RawOffer,
+    TuiMetadata,
+    WakacjePlMetadata,
 )
 
 
@@ -184,16 +186,16 @@ def merge_existing_and_new_offer(existing: Offer, new: Offer) -> Offer:
             )
         ]
 
-    merged_sources_list = merge_sources(
+    merged_sources_list: list[OfferSource] = merge_sources(
         existing_sources=existing_srcs,
         new_sources=new_srcs,
         new_provider=new.provider,
     )
 
-    cheapest_source = min(merged_sources_list, key=lambda s: s.price_total)
+    cheapest_source: OfferSource = min(merged_sources_list, key=lambda s: s.price_total)
 
     if cheapest_source.provider == new.provider:
-        winner_offer = new
+        winner_offer: Offer = new
     elif cheapest_source.provider == existing.provider:
         winner_offer = existing
     else:
@@ -204,17 +206,17 @@ def merge_existing_and_new_offer(existing: Offer, new: Offer) -> Offer:
     )
     has_tui = any(src.provider == ProviderName.TUI for src in merged_sources_list)
 
-    merged_wakacje_pl = None
+    merged_wakacje_pl: WakacjePlMetadata | None = None
     if has_wakacje:
         merged_wakacje_pl = new.metadata.wakacje_pl or existing.metadata.wakacje_pl
 
-    merged_tui = None
+    merged_tui: TuiMetadata | None = None
     if has_tui:
         merged_tui = new.metadata.tui or existing.metadata.tui
 
     price_z_score = winner_offer.metadata.price_z_score
 
-    merged_metadata = OfferMetadata(
+    merged_metadata: OfferMetadata = OfferMetadata(
         price_z_score=price_z_score,
         sources=merged_sources_list,
         wakacje_pl=merged_wakacje_pl,

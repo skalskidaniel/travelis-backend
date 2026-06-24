@@ -6,6 +6,8 @@ from app.dependencies import get_container
 from app.rate_limiter import RateLimiter
 from app.exceptions import AccountDeletionException
 from core.container import Container
+from core.models.cell import MarketCell
+from core.models.user import User
 from core.services.activation import generate_required_cells
 
 logger = Logger(child=True)
@@ -34,17 +36,17 @@ async def delete_account(
     container: Container = Depends(get_container),
 ):
     """Cascade delete user, preferences, UserOffers, Redis keys, cell activations, and Cognito user."""
-    user = await container.users_repo.get(user_id)
+    user: User | None = await container.users_repo.get(user_id)
 
     cell_ids_to_deactivate: list[str] = []
     if user is not None:
-        cells = generate_required_cells(
+        cells: list[MarketCell] = generate_required_cells(
             user.preferences, reference_date=user.updated_at.date()
         )
         cell_ids_to_deactivate = [c.cell_id for c in cells if c.cell_id]
 
         try:
-            user_offers = await container.user_offers_repo.query_by_user(user_id)
+            user_offers: list[dict] = await container.user_offers_repo.query_by_user(user_id)
             if user_offers:
                 keys = [(user_id, item["offer_id"]) for item in user_offers]
                 await container.user_offers_repo.delete_batch(keys)

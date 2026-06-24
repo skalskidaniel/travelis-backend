@@ -4,6 +4,7 @@ from decimal import Decimal
 from aws_lambda_powertools import Logger
 
 from core.container import Container
+from core.models.cell import MarketCell
 from core.models.offer import Offer
 from core.models.common import ProviderName
 from core.providers.base import OfferProvider
@@ -18,7 +19,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
     """
     logger.info("Starting daily availability and price check job.")
 
-    cells = await container.cells_repo.scan()
+    cells: list[MarketCell] = await container.cells_repo.scan()
     if not cells:
         logger.info("No active market cells found. Skipping availability check.")
         return {"checked_offers_count": 0, "updated_offers_count": 0}
@@ -26,7 +27,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
     cell_offers_lists = await asyncio.gather(
         *[container.offers_repo.query_by_cell(cell.cell_id) for cell in cells]
     )
-    available_offers = [
+    available_offers: list[Offer] = [
         offer for sublist in cell_offers_lists for offer in sublist if offer.available
     ]
 
@@ -47,8 +48,8 @@ async def run_availability_job(container: Container, context=None) -> dict:
     offers_to_delete = []
     offers_to_update = []
 
-    tui = container.tui_provider
-    wakacje = container.wakacje_provider
+    tui: OfferProvider = container.tui_provider
+    wakacje: OfferProvider = container.wakacje_provider
 
     async def check_single_offer(offer: Offer):
         nonlocal checked_count, updated_count

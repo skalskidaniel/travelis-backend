@@ -9,7 +9,7 @@ from app.jobs.coordinator import run_scrape_job
 from core.container import Container
 from core.models.cell import MarketCell
 from core.models.common import BoardType, ProviderName
-from core.models.offer import Offer, OfferMetadata, RawOffer, TuiMetadata
+from core.models.offer import Offer, OfferMetadata, RawOffer, ScoredOffer, TuiMetadata
 from core.services.ingest import compute_offer_id
 
 
@@ -85,9 +85,9 @@ async def test_run_scrape_job_successful(mock_container):
     # Scorer mock
     with patch("app.jobs.coordinator.get_scorer") as mock_get_scorer:
         mock_scorer = mock_get_scorer.return_value
-        from core.models.offer import ScoredOffer
-
-        scored_offer = ScoredOffer(**raw_tui.model_dump(), attractiveness_score=0.85)
+        scored_offer: ScoredOffer = ScoredOffer(
+            **raw_tui.model_dump(), attractiveness_score=0.85
+        )
         mock_scorer.score.return_value = [scored_offer]
 
         # Database calls mocks
@@ -145,7 +145,7 @@ async def test_run_scrape_job_availability_by_absence(mock_container):
     )
 
     # Existing offer in DB for same cell (no longer present in scrape results)
-    existing_offer = Offer(
+    existing_offer: Offer = Offer(
         **raw_scraped.model_dump(),
         cell_id=cell.cell_id,
         offer_id="b" * 32,
@@ -163,9 +163,8 @@ async def test_run_scrape_job_availability_by_absence(mock_container):
 
     with patch("app.jobs.coordinator.get_scorer") as mock_get_scorer:
         mock_scorer = mock_get_scorer.return_value
-        from core.models.offer import ScoredOffer
 
-        scored_offer = ScoredOffer(
+        scored_offer: ScoredOffer = ScoredOffer(
             **raw_scraped.model_dump(), attractiveness_score=0.85
         )
         mock_scorer.score.return_value = [scored_offer]
@@ -246,9 +245,10 @@ async def test_run_scrape_job_timeout_triggering(mock_container):
 
     with patch("app.jobs.coordinator.get_scorer") as mock_get_scorer:
         mock_scorer = mock_get_scorer.return_value
-        from core.models.offer import ScoredOffer
 
-        scored_offer = ScoredOffer(**raw_tui.model_dump(), attractiveness_score=0.85)
+        scored_offer: ScoredOffer = ScoredOffer(
+            **raw_tui.model_dump(), attractiveness_score=0.85
+        )
         mock_scorer.score.return_value = [scored_offer]
 
         mock_container.offers_repo.query_by_cell.return_value = []
@@ -333,9 +333,10 @@ async def test_run_scrape_job_skips_cell_when_all_scored_offers_fail_validation(
 
     with patch("app.jobs.coordinator.get_scorer") as mock_get_scorer:
         mock_scorer = mock_get_scorer.return_value
-        from core.models.offer import ScoredOffer
 
-        scored_offer = ScoredOffer(**raw_tui.model_dump(), attractiveness_score=0.85)
+        scored_offer: ScoredOffer = ScoredOffer(
+            **raw_tui.model_dump(), attractiveness_score=0.85
+        )
         mock_scorer.score.return_value = [scored_offer]
 
         with patch(
@@ -414,7 +415,7 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
     )
 
     invalid_offer_id = compute_offer_id(invalid_raw)
-    existing_offer = Offer(
+    existing_offer: Offer = Offer(
         **invalid_raw.model_dump(),
         cell_id=cell.cell_id,
         offer_id=invalid_offer_id,
@@ -431,8 +432,6 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
     mock_container.wakacje_provider.search = AsyncMock(return_value=[])
 
     with patch("app.jobs.coordinator.get_scorer") as mock_get_scorer:
-        from core.models.offer import ScoredOffer
-
         mock_scorer = mock_get_scorer.return_value
         mock_scorer.score.return_value = [
             ScoredOffer(**valid_raw.model_dump(), attractiveness_score=0.85),

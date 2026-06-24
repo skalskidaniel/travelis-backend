@@ -5,7 +5,7 @@ from datetime import datetime, time, timezone
 
 from core.container import Container
 from core.models.cell import MarketCell
-from core.models.offer import Offer
+from core.models.offer import Offer, RawOffer, ScoredOffer
 from core.services.ingest import (
     ingest_raw_offers,
     merge_existing_and_new_offer,
@@ -93,7 +93,7 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                     tui_task, wakacje_task, return_exceptions=True
                 )
 
-                raw_offers = []
+                raw_offers: list[RawOffer] = []
                 if isinstance(tui_raw, list):
                     raw_offers.extend(tui_raw)
                 else:
@@ -121,13 +121,13 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                         z_threshold=container.settings.scoring.attractiveness_z_threshold
                     )
                 )
-                scored_offers = await asyncio.to_thread(scorer.score, collapsed_raw)
+                scored_offers: list[ScoredOffer] = await asyncio.to_thread(scorer.score, collapsed_raw)
                 if not scored_offers:
                     continue
 
                 now = datetime.now(timezone.utc)
                 seen_offer_ids = {compute_offer_id(scored) for scored in scored_offers}
-                new_offers_map = {}
+                new_offers_map: dict[str, Offer] = {}
                 for scored in scored_offers:
                     try:
                         oid = compute_offer_id(scored)
@@ -138,7 +138,7 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                                 tzinfo=timezone.utc,
                             ).timestamp()
                         )
-                        offer = Offer(
+                        offer: Offer = Offer(
                             **scored.model_dump(),
                             cell_id=cell.cell_id,
                             offer_id=oid,
@@ -163,10 +163,10 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                     )
                     continue
 
-                existing_offers = await container.offers_repo.query_by_cell(
+                existing_offers: list[Offer] = await container.offers_repo.query_by_cell(
                     cell.cell_id
                 )
-                existing_map = {o.offer_id: o for o in existing_offers}
+                existing_map: dict[str, Offer] = {o.offer_id: o for o in existing_offers}
 
                 offers_to_save = []
 

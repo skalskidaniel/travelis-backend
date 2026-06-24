@@ -89,8 +89,8 @@ class StatisticalOfferScorer(OfferScorer):
 
         results = []
         for idx, composite in zip(passing_indices, composites):
-            offer = offers[idx]
-            scored_offer = ScoredOffer(
+            offer: RawOffer = offers[idx]
+            scored_offer: ScoredOffer = ScoredOffer(
                 **offer.model_dump(), attractiveness_score=float(composite)
             )
             results.append(scored_offer)

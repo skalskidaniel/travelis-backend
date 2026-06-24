@@ -29,7 +29,7 @@ async def test_cells_repo_lifecycle(cells_table):
     assert fetched.country == "MX"
     assert fetched.activation_count == 1
 
-    all_cells = await repo.scan()
+    all_cells: list[MarketCell] = await repo.scan()
     assert len(all_cells) == 1
     assert all_cells[0].cell_id == cell.cell_id
 
@@ -53,7 +53,7 @@ async def test_cells_repo_lifecycle(cells_table):
     fetched = await repo.get(cell.cell_id)
     assert fetched is None
 
-    all_cells = await repo.scan()
+    all_cells: list[MarketCell] = await repo.scan()
     assert len(all_cells) == 0
 
 

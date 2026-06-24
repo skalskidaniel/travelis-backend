@@ -21,9 +21,9 @@ router = APIRouter(tags=["User Preferences & Notifications"])
 
 async def get_or_create_user(user_id: str, container: Container) -> User:
     """Gets the user from the database, or provisions a new user with default preferences if not found."""
-    user = await container.users_repo.get(user_id)
+    user: User | None = await container.users_repo.get(user_id)
     if user is None:
-        user = User(user_id=user_id)
+        user: User = User(user_id=user_id)
         await container.users_repo.put(user)
         await container.activation_service.update_cell_activations(
             new_prefs=user.preferences, old_prefs=None
@@ -54,7 +54,7 @@ async def get_preferences(
     container: Container = Depends(get_container),
 ):
     """Retrieve the current user preferences (lazy provisioning if not exists)."""
-    user = await get_or_create_user(user_id, container)
+    user: User = await get_or_create_user(user_id, container)
     return user.preferences
 
 
@@ -76,14 +76,14 @@ async def update_preferences(
     container: Container = Depends(get_container),
 ):
     """Partially update user preferences, sync cell activations, and schedule matching."""
-    user = await get_or_create_user(user_id, container)
-    old_prefs = user.preferences
+    user: User = await get_or_create_user(user_id, container)
+    old_prefs: UserPreferences = user.preferences
 
     updated_dict = user.preferences.model_dump()
     for field, val in updates.model_dump(exclude_unset=True).items():
         updated_dict[field] = val
 
-    new_prefs = UserPreferences(**updated_dict)
+    new_prefs: UserPreferences = UserPreferences(**updated_dict)
     user.preferences = new_prefs
     user.updated_at = datetime.now(timezone.utc)
 
@@ -123,7 +123,7 @@ async def enable_push(
     """Register or update a Web Push subscription details for the user."""
     await get_or_create_user(user_id, container)
 
-    sub = PushSubscription(
+    sub: PushSubscription = PushSubscription(
         endpoint=req.subscription.endpoint,
         keys=PushSubscriptionKeys(
             p256dh=req.subscription.keys.p256dh,

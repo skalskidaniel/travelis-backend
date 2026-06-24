@@ -48,7 +48,7 @@ async def test_run_availability_job_nothing_available(mock_container):
     metadata = OfferMetadata(
         price_z_score=0.5, sources=[], tui=TuiMetadata(offer_code="ext-123")
     )
-    offer = Offer(
+    offer: Offer = Offer(
         cell_id=cell.cell_id,
         offer_id="a" * 32,
         attractiveness_score=0.9,
@@ -102,7 +102,7 @@ async def test_run_availability_job_becomes_unavailable(mock_container):
     metadata = OfferMetadata(
         price_z_score=0.5, sources=[], tui=TuiMetadata(offer_code="ext-123")
     )
-    offer = Offer(
+    offer: Offer = Offer(
         cell_id=cell.cell_id,
         offer_id="a" * 32,
         attractiveness_score=0.9,
@@ -167,7 +167,7 @@ async def test_run_availability_job_price_updates(mock_container):
     metadata = OfferMetadata(
         price_z_score=0.5, sources=[], tui=TuiMetadata(offer_code="ext-123")
     )
-    offer = Offer(
+    offer: Offer = Offer(
         cell_id=cell.cell_id,
         offer_id="a" * 32,
         attractiveness_score=0.9,
@@ -211,7 +211,7 @@ async def test_run_availability_job_price_updates(mock_container):
     assert result["updated_offers_count"] == 1
 
     mock_container.offers_repo.put_batch.assert_called_once_with([offer])
-    saved_offer = mock_container.offers_repo.put_batch.call_args[0][0][0]
+    saved_offer: Offer = mock_container.offers_repo.put_batch.call_args[0][0][0]
     assert saved_offer.available is True
     assert saved_offer.price_total == Decimal("1200")
     assert saved_offer.price_per_day == Decimal("85.71")

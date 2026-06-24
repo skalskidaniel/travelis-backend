@@ -76,7 +76,7 @@ async def test_users_repo_scan(users_table, test_user):
     assert len(scanned) == 1
     assert scanned[0].user_id == test_user.user_id
 
-    second_user = test_user.model_copy(update={"user_id": "usr_456"})
+    second_user: User = test_user.model_copy(update={"user_id": "usr_456"})
     await repo.put(second_user)
 
     scanned = await repo.scan()

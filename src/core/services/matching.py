@@ -3,6 +3,7 @@ from aws_lambda_powertools import Logger
 from datetime import date, datetime, timezone
 import pandas as pd
 
+from core.models.cell import MarketCell
 from core.models.user import User, UserPreferences
 from core.models.offer import Offer
 from core.repositories.base import (
@@ -44,13 +45,13 @@ class MatchingService:
     ) -> bool:
         """Matches offers for a single user, updates their matches in UserOffers, and invalidates feed."""
         if user is None:
-            user = await self.users_repo.get(user_id)
+            user: User | None = await self.users_repo.get(user_id)
         if not user:
             logger.warning(f"User not found for matching: {user_id}")
             return False
 
         ref = reference_date or date.today()
-        prefs = user.preferences
+        prefs: UserPreferences = user.preferences
 
         # 1. Self-Healing Month Shifting
         if prefs.date_from is None and prefs.date_to is None:
@@ -72,7 +73,7 @@ class MatchingService:
                 )
 
         # 2. Resolve required cell IDs
-        required_cells = generate_required_cells(prefs, ref)
+        required_cells: list[MarketCell] = generate_required_cells(prefs, ref)
         logger.debug(
             "Resolved %d required cells for user %s: %s",
             len(required_cells),
@@ -94,7 +95,7 @@ class MatchingService:
         cell_offers_lists = await asyncio.gather(
             *[self.offers_repo.query_by_cell(cell.cell_id) for cell in required_cells]
         )
-        offers = [offer for sublist in cell_offers_lists for offer in sublist]
+        offers: list[Offer] = [offer for sublist in cell_offers_lists for offer in sublist]
         logger.debug(
             "Queried %d raw offers from %d cells for user %s",
             len(offers),
@@ -103,7 +104,7 @@ class MatchingService:
         )
 
         # 4. Filter offers in Python using Pandas/NumPy
-        matched_offers = await asyncio.to_thread(
+        matched_offers: list[Offer] = await asyncio.to_thread(
             self._filter_offers_vectorized, offers, prefs
         )
         logger.debug(
@@ -119,7 +120,7 @@ class MatchingService:
         new_offer_ids = {o.offer_id for o in matched_offers}
 
         to_delete_ids = existing_offer_ids - new_offer_ids
-        to_insert_offers = [
+        to_insert_offers: list[Offer] = [
             o for o in matched_offers if o.offer_id not in existing_offer_ids
         ]
 
@@ -279,7 +280,7 @@ class MatchingService:
 
         matched_user_ids = []
         for user in users:
-            user_cells = generate_required_cells(user.preferences, reference_date)
+            user_cells: list[MarketCell] = generate_required_cells(user.preferences, reference_date)
             user_cell_ids = {c.cell_id for c in user_cells}
 
             if user_cell_ids & affected_set:

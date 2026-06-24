@@ -28,7 +28,7 @@ def client(mock_container):
 
 
 def test_update_preferences_succeeds_when_scheduler_fails(client, mock_container):
-    existing_user = User(user_id="user-123")
+    existing_user: User = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
     mock_container.scheduler_service.schedule_match.side_effect = (
         ScheduleCreateException("Failed to create match schedule")

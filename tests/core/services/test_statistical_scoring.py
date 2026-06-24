@@ -7,7 +7,7 @@ import pytest
 from pydantic import AnyHttpUrl
 
 from core.models.common import BoardType, ProviderName
-from core.models.offer import OfferMetadata, RawOffer
+from core.models.offer import OfferMetadata, RawOffer, ScoredOffer
 from core.services.scoring import get_scorer, StatisticalScorerConfig
 
 
@@ -60,7 +60,7 @@ def test_small_sample_fallback():
     )
     scorer = get_scorer("statistical", config=config)
 
-    offers = [
+    offers: list[RawOffer] = [
         create_mock_offer(price_total=1000, rating=4.0, review_count=10),
         create_mock_offer(price_total=2000, rating=4.0, review_count=10),
         create_mock_offer(price_total=3000, rating=4.0, review_count=10),
@@ -96,7 +96,7 @@ def test_z_score_gate():
     results = scorer.score(offers)
 
     assert len(results) == 1
-    passed_offer = results[0]
+    passed_offer: ScoredOffer = results[0]
     assert passed_offer.price_total == Decimal(1000)
     assert passed_offer.metadata.price_z_score is not None
     assert passed_offer.metadata.price_z_score <= -1.0
@@ -108,7 +108,7 @@ def test_composite_score_ranking():
     )
     scorer = get_scorer("statistical", config=config)
 
-    offers = [
+    offers: list[RawOffer] = [
         # Offer A: Best price, high rating, medium reviews
         create_mock_offer(price_total=1000, rating=4.5, review_count=500),
         # Offer B: Worst price, best rating, high reviews
@@ -136,7 +136,7 @@ def test_normalization_division_by_zero_handling():
     )
     scorer = get_scorer("statistical", config=config)
 
-    offers = [
+    offers: list[RawOffer] = [
         create_mock_offer(price_total=2000, rating=4.0, review_count=100),
         create_mock_offer(price_total=2000, rating=4.0, review_count=100),
         create_mock_offer(price_total=2000, rating=4.0, review_count=100),
@@ -153,7 +153,7 @@ def test_performance_large_pool():
     config = StatisticalScorerConfig(small_sample_threshold=30, z_threshold=-1.0)
     scorer = get_scorer("statistical", config=config)
 
-    offers = []
+    offers: list[RawOffer] = []
     for i in range(10000):
         price = random.randint(1000, 5000)
         rating = round(random.uniform(2.0, 5.0), 1)

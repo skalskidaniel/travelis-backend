@@ -11,6 +11,7 @@ from core.models.offer import (
     Offer,
     OfferMetadata,
     ProviderName,
+    RawOffer,
     TuiMetadata,
 )
 from core.providers.tui.main import (
@@ -202,7 +203,7 @@ def test_map_search_offer_image_url(tui_provider, tui_search_item, tui_search_ce
 
     with patch("core.providers.tui.main.month_date_bounds") as mock_bounds:
         mock_bounds.return_value = (date(2026, 7, 1), date(2026, 7, 31))
-        offer = tui_provider._map_search_offer(item, cell=tui_search_cell)
+        offer: RawOffer = tui_provider._map_search_offer(item, cell=tui_search_cell)
 
     assert offer is not None
     assert (
@@ -219,7 +220,7 @@ def test_map_search_offer_missing_or_invalid_image_url(
 
     with patch("core.providers.tui.main.month_date_bounds") as mock_bounds:
         mock_bounds.return_value = (date(2026, 7, 1), date(2026, 7, 31))
-        offer = tui_provider._map_search_offer(item, cell=tui_search_cell)
+        offer: RawOffer = tui_provider._map_search_offer(item, cell=tui_search_cell)
 
     assert offer is not None
     assert offer.image_url is None

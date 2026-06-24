@@ -111,7 +111,9 @@ async def test_search_filters_consistency():
 
     async with httpx.AsyncClient(timeout=30.0) as live_client:
         live_provider = TuiProvider(client=live_client)
-        offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+        offers: list[RawOffer] = await _run_with_transient_retry(
+            lambda: live_provider.search(cell)
+        )
 
     assert offers, (
         "Live TUI search returned no offers for the configured next-month cell."
@@ -145,7 +147,9 @@ async def test_search_country_consistency(
                 children=0,
                 activation_count=1,
             )
-            offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+            offers: list[RawOffer] = await _run_with_transient_retry(
+                lambda: live_provider.search(cell)
+            )
 
         if not offers:
             return
@@ -195,7 +199,9 @@ async def test_search_board_consistency(
                 children=0,
                 activation_count=1,
             )
-            offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+            offers: list[RawOffer] = await _run_with_transient_retry(
+                lambda: live_provider.search(cell)
+            )
 
         if not offers:
             return
@@ -229,7 +235,9 @@ async def test_hotel_standard_consistency(live_provider: TuiProvider):
                 children=0,
                 activation_count=1,
             )
-            offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+            offers: list[RawOffer] = await _run_with_transient_retry(
+                lambda: live_provider.search(cell)
+            )
 
         if not offers:
             return
@@ -248,7 +256,7 @@ async def test_hotel_standard_consistency(live_provider: TuiProvider):
 
 @pytest.mark.asyncio
 async def test_check_availability_returns_unavailable(live_provider):
-    offer = Offer(
+    offer: Offer = Offer(
         provider=ProviderName.TUI,
         external_offer_id="KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
         hotel_name="Hotel Kent",
@@ -341,7 +349,9 @@ async def test_search_departure_date_bounds(live_provider: TuiProvider):
         children=0,
         activation_count=1,
     )
-    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+    offers: list[RawOffer] = await _run_with_transient_retry(
+        lambda: live_provider.search(cell)
+    )
     if not offers:
         pytest.skip(f"No live offers returned for TUI next-month cell {month_bucket}.")
 
@@ -367,7 +377,9 @@ async def test_referral_url_matches_offer_page(
         children=0,
         activation_count=1,
     )
-    offers = await _run_with_transient_retry(lambda: live_provider.search(cell))
+    offers: list[RawOffer] = await _run_with_transient_retry(
+        lambda: live_provider.search(cell)
+    )
     if not offers:
         pytest.skip(
             f"Live TUI search returned no offers for next-month cell with board {board.value}."

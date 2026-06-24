@@ -49,7 +49,7 @@ def valid_offer_kwargs():
 
 def test_referral_url_appending_no_query_params(valid_offer_kwargs):
     valid_offer_kwargs["referral_url"] = "https://www.tui.pl/details-gre-123"
-    offer = Offer(**valid_offer_kwargs)
+    offer: Offer = Offer(**valid_offer_kwargs)
 
     expected_url = (
         "https://www.tui.pl/details-gre-123"
@@ -62,7 +62,7 @@ def test_referral_url_appending_with_existing_query_params(valid_offer_kwargs):
     valid_offer_kwargs["referral_url"] = (
         "https://www.tui.pl/details-gre-123?foo=bar&baz=123"
     )
-    offer = Offer(**valid_offer_kwargs)
+    offer: Offer = Offer(**valid_offer_kwargs)
 
     url_str = str(offer.referral_url)
     assert "foo=bar" in url_str
@@ -78,7 +78,7 @@ def test_referral_url_appending_overwrites_existing_referral_params(valid_offer_
     valid_offer_kwargs["referral_url"] = (
         "https://www.tui.pl/details-gre-123?utm_source=wrong&utm_medium=bad&foo=bar"
     )
-    offer = Offer(**valid_offer_kwargs)
+    offer: Offer = Offer(**valid_offer_kwargs)
 
     url_str = str(offer.referral_url)
     assert "foo=bar" in url_str
@@ -93,7 +93,7 @@ def test_referral_url_preserves_wakacje_selector_query(valid_offer_kwargs):
     valid_offer_kwargs["referral_url"] = (
         f"https://www.wakacje.pl/wczasy/grecja/oferta.html?{selector}"
     )
-    offer = Offer(**valid_offer_kwargs)
+    offer: Offer = Offer(**valid_offer_kwargs)
 
     url_str = str(offer.referral_url)
     assert url_str.startswith(
@@ -109,7 +109,7 @@ def test_referral_url_no_modification_when_already_correct(valid_offer_kwargs):
         "?utm_source=travellead&utm_medium=cps&utm_campaign=2933-t-HolidayPicker&a_cid=11111111&a_aid=2933"
     )
     valid_offer_kwargs["referral_url"] = correct_url
-    offer = Offer(**valid_offer_kwargs)
+    offer: Offer = Offer(**valid_offer_kwargs)
 
     assert str(offer.referral_url) == correct_url
 
@@ -123,7 +123,7 @@ def test_share_url_prefix_validation(valid_offer_kwargs):
 
 def test_share_url_is_normalized_to_canonical_offer_route(valid_offer_kwargs):
     valid_offer_kwargs["share_url"] = "https://wakacje-travelis.pl/offer/123"
-    offer = Offer(**valid_offer_kwargs)
+    offer: Offer = Offer(**valid_offer_kwargs)
     assert (
         str(offer.share_url)
         == "https://wakacje-travelis.pl/offer/1234567890abcdef/ad258b057090875a5b049b126e8196b5"

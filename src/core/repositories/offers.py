@@ -36,7 +36,7 @@ class DynamoOffersRepository(OffersRepository):
         client = self.table.meta.client
         table_name = self.table.name
 
-        offers = []
+        offers: list[Offer] = []
         for chunk in chunked(keys, BATCH_READ_LIMIT):
             request_items = {
                 table_name: {
