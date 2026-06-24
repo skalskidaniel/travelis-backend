@@ -163,9 +163,18 @@ class WakacjePlProvider:
             return False
 
         offer_hash, provider_code = live_variant
-        status_data = await self._fetch_live_availability(
-            offer, offer_hash, provider_code
-        )
+        try:
+            status_data = await self._fetch_live_availability(
+                offer, offer_hash, provider_code
+            )
+        except (TooManyRequestsException, ProviderTimeoutException):
+            raise
+        except ProviderAPIException as e:
+            # If the API logically failed with the checkOfferAvailability message (unknown status / 200),
+            # it means the offer/variant is no longer available (sold out or invalid hash).
+            if "checkOfferAvailability" in str(e):
+                return False
+            raise
 
         return (
             status_data.get("availability") is True

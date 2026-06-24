@@ -542,6 +542,20 @@ async def test_check_availability(wakacjepl_provider, sample_wakacje_offer):
     ):
         await wakacjepl_provider.check_availability(sample_wakacje_offer)
 
+    # Test that success: False without an error status (e.g. sold-out variant) returns False
+    respx.get(AVAILABILITY_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "success": False,
+                "msg": "checkOfferAvailability",
+                "data": None,
+            },
+        )
+    )
+    available = await wakacjepl_provider.check_availability(sample_wakacje_offer)
+    assert available is False
+
 
 @pytest.mark.asyncio
 @respx.mock

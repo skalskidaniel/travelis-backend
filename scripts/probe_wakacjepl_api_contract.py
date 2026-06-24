@@ -471,7 +471,7 @@ async def run_probe(args: argparse.Namespace) -> Path:
     async with httpx.AsyncClient(timeout=timeout) as client:
         provider = WakacjePlProvider(client=client)
         cell = MarketCell(
-            cell_id="1111111111111111",
+            cell_id=None,
             country=args.country,
             month=args.month,
             min_stars=args.min_stars,

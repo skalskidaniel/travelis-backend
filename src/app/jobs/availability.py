@@ -6,6 +6,7 @@ from aws_lambda_powertools import Logger
 from core.container import Container
 from core.models.offer import Offer
 from core.models.common import ProviderName
+from core.providers.base import OfferProvider
 
 logger = Logger(child=True)
 
@@ -53,7 +54,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
         nonlocal checked_count, updated_count
         async with sem:
             checked_count += 1
-            provider = tui if offer.provider == ProviderName.TUI else wakacje
+            provider: OfferProvider = tui if offer.provider == ProviderName.TUI else wakacje
             logger.debug(
                 "Checking availability for offer %s (provider=%s, cell_id=%s)",
                 offer.offer_id,
