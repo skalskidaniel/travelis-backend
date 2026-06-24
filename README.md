@@ -8,20 +8,21 @@ Finding a good last-minute deal across multiple tour operators is tedious and sl
 
 ## Technologies
 
-| Layer | Stack |
-|-------|-------|
-| Runtime | Python 3.12+, FastAPI, Mangum (Lambda adapter) |
-| Async | `aioboto3`, `httpx.AsyncClient`, `redis.asyncio` |
-| Data | DynamoDB (4 tables, no GSIs), Redis Cloud (feed ZSETs) |
-| Auth | AWS Cognito + JWT verification |
-| Infra | AWS Lambda (lambdalith), API Gateway HTTP v2, EventBridge, Terraform |
-| Scraping | `asyncio` worker pool, per-provider adapters |
+| Layer    | Stack                                                                |
+| -------- | -------------------------------------------------------------------- |
+| Runtime  | Python 3.12+, FastAPI, Mangum (Lambda adapter)                       |
+| Async    | `aioboto3`, `httpx.AsyncClient`, `redis.asyncio`                     |
+| Data     | DynamoDB (4 tables, no GSIs), Redis Cloud (feed ZSETs)               |
+| Auth     | AWS Cognito + JWT verification                                       |
+| Infra    | AWS Lambda (lambdalith), API Gateway HTTP v2, EventBridge, Terraform |
+| Scraping | `asyncio` worker pool, per-provider adapters                         |
 
 ## Deployment
 
 Two AWS Lambda functions sharing a single artifact ("lambdalith"):
+
 - **API Lambda** — 30s timeout, serves FastAPI routes via Mangum behind API Gateway
-- **Cron Lambda** — 15min timeout, runs scrape jobs (3x daily), availability checks (1x daily), and debounced user matching
+- **Cron Lambda** — 15min timeout, runs scrape jobs, availability checks, and debounced user matching
 
 Provisioned with Terraform under `infra/environments/dev/`. Cognito PostConfirmation triggers auto-provision new users.
 

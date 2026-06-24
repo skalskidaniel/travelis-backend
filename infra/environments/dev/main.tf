@@ -22,4 +22,5 @@ module "environment_stack" {
   vapid_private_key            = var.vapid_private_key
   grafana_cloud_aws_account_id = var.grafana_cloud_aws_account_id
   grafana_cloud_external_id    = var.grafana_cloud_external_id
+  aws_profile                  = var.aws_profile
 }

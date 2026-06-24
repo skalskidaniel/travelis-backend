@@ -172,7 +172,7 @@ resource "aws_secretsmanager_secret" "vapid_private_key" {
 
 resource "aws_secretsmanager_secret_version" "vapid_private_key" {
   secret_id     = aws_secretsmanager_secret.vapid_private_key.id
-  secret_string = var.vapid_private_key
+  secret_string = var.vapid_private_key != "" ? var.vapid_private_key : "PLACEHOLDER_NOT_SET"
 }
 
 resource "aws_iam_role_policy_attachment" "custom_policy_attachment" {
