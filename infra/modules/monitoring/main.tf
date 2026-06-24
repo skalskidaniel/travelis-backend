@@ -1,5 +1,6 @@
 resource "aws_iam_role" "grafana_cloud_read" {
-  name = "${var.project}-${var.environment}-grafana-cloud-role"
+  count = var.grafana_cloud_aws_account_id != "" ? 1 : 0
+  name  = "${var.project}-${var.environment}-grafana-cloud-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -21,6 +22,7 @@ resource "aws_iam_role" "grafana_cloud_read" {
 }
 
 resource "aws_iam_policy" "grafana_cloud_logs_policy" {
+  count       = var.grafana_cloud_aws_account_id != "" ? 1 : 0
   name        = "${var.project}-${var.environment}-grafana-logs-policy"
   description = "Allows Grafana Cloud to pull CloudWatch Logs and Metrics for ${var.project}-${var.environment}"
 
@@ -69,8 +71,9 @@ resource "aws_iam_policy" "grafana_cloud_logs_policy" {
 
 
 resource "aws_iam_role_policy_attachment" "grafana_cloud_logs" {
-  role       = aws_iam_role.grafana_cloud_read.name
-  policy_arn = aws_iam_policy.grafana_cloud_logs_policy.arn
+  count      = var.grafana_cloud_aws_account_id != "" ? 1 : 0
+  role       = aws_iam_role.grafana_cloud_read[0].name
+  policy_arn = aws_iam_policy.grafana_cloud_logs_policy[0].arn
 }
 
 resource "aws_cloudwatch_metric_alarm" "api_lambda_errors" {

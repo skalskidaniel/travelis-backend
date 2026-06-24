@@ -179,8 +179,10 @@ except Exception as e:
     print(f"Error updating User Pool: {e}")
     sys.exit(1)
 PYTHON_SCRIPT
-python3 update_cognito.py
-rm update_cognito.py
+AWS_PROFILE="${var.aws_profile}" uv run python update_cognito.py
+EXIT_CODE=$?
+rm -f update_cognito.py
+exit $EXIT_CODE
 EOF
   }
 }

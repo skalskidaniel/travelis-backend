@@ -47,3 +47,9 @@ variable "attractiveness_z_threshold" {
   type        = number
   default     = -1.2
 }
+
+variable "aws_profile" {
+  description = "AWS shared config profile to pass to local-exec scripts."
+  type        = string
+  default     = ""
+}
