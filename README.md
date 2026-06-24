@@ -11,20 +11,39 @@ flowchart TB
     end
 
     subgraph aws [AWS]
-        APIGW[API Gateway]
-        EB[EventBridge Cron]
-        Cognito[Cognito]
-        Lambda[Lambda Lambdalith]
+        APIGW[API Gateway HTTP v2]
+        EB_Cron[EventBridge Cron]
+        EB_Sched[EventBridge Scheduler]
+        Cognito[AWS Cognito]
+        S3[(S3 Geo Catalog)]
+        CW[CloudWatch / Grafana]
+
+        subgraph lambda [Lambda Lambdalith x2]
+            API_Lambda[API Lambda\n30s timeout]
+            Cron_Lambda[Cron Lambda\n15min timeout]
+        end
     end
 
-    subgraph lambda [app/]
-        API[FastAPI via Mangum]
-        Jobs[jobs: scrape / score / match]
+    subgraph app [app/ entrypoints]
+        API_Layer[FastAPI via Mangum]
+        Jobs_Layer[Jobs]
+    end
+
+    subgraph core [core/ domain]
+        Ingest[Normalize + Dedup]
+        Scoring[Statistical Scoring]
+        Matching[Matching Service]
+        Activation[Activation Service]
+        Notify[Web Push Notifications]
+        SchedulerSvc[Scheduler Service]
     end
 
     subgraph data [Data]
-        DDB[(DynamoDB)]
-        Redis[(Redis Cloud)]
+        DDB_Users[(DynamoDB: Users)]
+        DDB_Cells[(DynamoDB: MarketCells)]
+        DDB_Offers[(DynamoDB: Offers)]
+        DDB_UO[(DynamoDB: UserOffers)]
+        Redis[(Redis Cloud\nFeed ZSETs + Rate Limiting)]
     end
 
     subgraph providers [Providers]
@@ -34,16 +53,46 @@ flowchart TB
 
     PWA -->|Sign in / Sign up| Cognito
     PWA -->|JWT| APIGW
-    APIGW --> Lambda
-    EB -->|scheduled| Lambda
-    Lambda --> API
-    Lambda --> Jobs
+    APIGW --> API_Lambda
+    API_Lambda --> API_Layer
 
-    API -->|auth / user / offers| DDB
-    API -->|paginated feed| Redis
-    Jobs -->|scrape + store| DDB
-    Jobs -->|rebuild feed| Redis
-    Jobs --> WAK
-    Jobs --> TUI
-    Jobs -->|Web Push| PWA
+    Cognito -->|PostConfirmation trigger| API_Lambda
+
+    EB_Cron -->|cron 3x daily| Cron_Lambda
+    EB_Cron -->|cron 1x daily| Cron_Lambda
+    EB_Sched -->|at(now+15s) debounced| Cron_Lambda
+
+    API_Layer -->|auth| Cognito
+    API_Layer -->|user prefs| DDB_Users
+    API_Layer -->|cell activation| DDB_Cells
+    API_Layer -->|paginated feed| DDB_UO
+    API_Layer --> DDB_Offers
+    API_Layer --> Redis
+    API_Layer -->|rate limit| Redis
+
+    Cron_Lambda --> Jobs_Layer
+
+    Jobs_Layer -->|coordinator| Ingest
+    Jobs_Layer -->|coordinator| Scoring
+    Jobs_Layer -->|coordinator| Matching
+    Jobs_Layer -->|availability| DDB_Offers
+    Jobs_Layer -->|match_user| Matching
+
+    Ingest --> DDB_Offers
+    Scoring --> DDB_Offers
+    Matching --> DDB_UO
+    Matching --> Redis
+    Activation --> DDB_Cells
+
+    Cron_Lambda -.->|self-continuation\non timeout| Cron_Lambda
+
+    Cron_Lambda -->|scrape| WAK
+    Cron_Lambda -->|scrape| TUI
+    Cron_Lambda -->|geo catalogs| S3
+
+    Matching --> Notify
+    Notify -->|Web Push| PWA
+
+    API_Lambda --> CW
+    Cron_Lambda --> CW
 ```
