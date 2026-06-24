@@ -235,7 +235,13 @@ async def get_offers_feed(
             json.dumps(next_cursor_data).encode("utf-8")
         ).decode("utf-8")
 
-    feed_items = [OfferFeedItem.from_domain(o) for o in sorted_offers]
+    page_user_offers = await container.user_offers_repo.get_batch(user_id, offer_ids)
+    favorited_map = {item["offer_id"]: item.get("favorited", False) for item in page_user_offers}
+
+    feed_items = [
+        OfferFeedItem.from_domain(o, favorited=favorited_map.get(o.offer_id, False))
+        for o in sorted_offers
+    ]
 
     return PaginatedOffersResponse(
         offers=feed_items,
@@ -243,6 +249,207 @@ async def get_offers_feed(
         feed_version=current_version,
         total_count=total_count,
     )
+
+
+@router.get(
+    "/favorites",
+    response_model=PaginatedOffersResponse,
+    summary="Retrieve favorited offers",
+    dependencies=[Depends(RateLimiter(times=100, seconds=60))],
+    responses={
+        200: {
+            "description": "Successfully retrieved user's favorited offers."
+        },
+        400: {"description": "Invalid pagination cursor provided."},
+        401: {"description": "Unauthorized - Invalid or missing credentials."},
+    },
+)
+async def get_favorites_feed(
+    limit: int = Query(
+        default=20,
+        description="Number of offers to retrieve per page.",
+        ge=1,
+        le=50,
+    ),
+    cursor: str | None = Query(
+        default=None,
+        description="Base64 encoded pagination cursor containing offset.",
+    ),
+    user_id: str = Depends(get_current_user),
+    container: Container = Depends(get_container),
+):
+    """Retrieve a paginated list of favorited travel offers for the authenticated user."""
+    offset = 0
+
+    if cursor:
+        try:
+            cursor_data = json.loads(
+                base64.b64decode(cursor.encode("utf-8")).decode("utf-8")
+            )
+            offset = int(cursor_data.get("offset", 0))
+            if offset < 0:
+                raise ValueError()
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid pagination cursor",
+            )
+
+    user_offers = await container.user_offers_repo.query_by_user(user_id)
+    favorites = [item for item in user_offers if item.get("favorited", False)]
+    total_count = len(favorites)
+
+    if not favorites:
+        return PaginatedOffersResponse(
+            offers=[], next_cursor=None, feed_version=None, total_count=0
+        )
+
+    # Sort favorites by matched_at descending
+    favorites.sort(key=lambda x: x.get("matched_at", ""), reverse=True)
+
+    page_items = favorites[offset : offset + limit]
+
+    if not page_items:
+        return PaginatedOffersResponse(
+            offers=[], next_cursor=None, feed_version=None, total_count=total_count
+        )
+
+    batch_keys = [(item["cell_id"], item["offer_id"]) for item in page_items]
+    hydrated_offers = await container.offers_repo.get_batch(batch_keys)
+
+    # Clean up stale favorites (hydration misses)
+    if await _prune_stale_user_offers(container, user_id, batch_keys, hydrated_offers):
+        user_offers = await container.user_offers_repo.query_by_user(user_id)
+        favorites = [item for item in user_offers if item.get("favorited", False)]
+        favorites.sort(key=lambda x: x.get("matched_at", ""), reverse=True)
+        total_count = len(favorites)
+        page_items = favorites[offset : offset + limit]
+        batch_keys = [(item["cell_id"], item["offer_id"]) for item in page_items]
+        hydrated_offers = await container.offers_repo.get_batch(batch_keys)
+
+    offer_map = {o.offer_id: o for o in hydrated_offers if o is not None}
+    sorted_offers = [
+        offer_map[item["offer_id"]]
+        for item in page_items
+        if item["offer_id"] in offer_map
+    ]
+
+    next_cursor = None
+    if offset + limit < total_count:
+        next_cursor_data = {"offset": offset + limit}
+        next_cursor = base64.b64encode(
+            json.dumps(next_cursor_data).encode("utf-8")
+        ).decode("utf-8")
+
+    feed_items = [OfferFeedItem.from_domain(o, favorited=True) for o in sorted_offers]
+
+    return PaginatedOffersResponse(
+        offers=feed_items,
+        next_cursor=next_cursor,
+        feed_version=None,
+        total_count=total_count,
+    )
+
+
+@router.put(
+    "/{offer_id}/favorite",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Favorite an offer",
+    dependencies=[Depends(RateLimiter(times=50, seconds=60))],
+    responses={
+        204: {"description": "Offer successfully marked as favorite."},
+        400: {"description": "cell_id query parameter missing and offer not in feed."},
+        401: {"description": "Unauthorized - Invalid or missing credentials."},
+        404: {"description": "Offer not found in backend DB."},
+    },
+)
+async def favorite_offer(
+    offer_id: str = Path(
+        description="The 32-character hexadecimal SHA-256 fingerprint identifying the offer.",
+        examples=["4a8b9c1d2e3f4051627384950a1b2c3d"],
+    ),
+    cell_id: str | None = Query(
+        default=None,
+        description="The cell ID of the offer. Required if favoriting a shared offer not in feed.",
+    ),
+    user_id: str = Depends(get_current_user),
+    container: Container = Depends(get_container),
+):
+    """Mark an offer as a favorite. Creates a UserOffers entry if one does not exist."""
+    uo_item = await container.user_offers_repo.get(user_id, offer_id)
+
+    if uo_item:
+        await container.user_offers_repo.set_favorite(user_id, offer_id, True)
+    else:
+        if not cell_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="cell_id is required to favorite an offer not currently in your feed.",
+            )
+
+        # Verify the offer exists in the main Offers table
+        offer = await container.offers_repo.get(cell_id, offer_id)
+        if not offer:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Offer details not found in database.",
+            )
+
+        await container.user_offers_repo.put(
+            user_id=user_id,
+            offer_id=offer_id,
+            cell_id=cell_id,
+            matched_at=datetime.now(timezone.utc),
+            favorited=True,
+        )
+
+
+@router.delete(
+    "/{offer_id}/favorite",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Unfavorite an offer",
+    dependencies=[Depends(RateLimiter(times=50, seconds=60))],
+    responses={
+        204: {"description": "Offer successfully removed from favorites."},
+        401: {"description": "Unauthorized - Invalid or missing credentials."},
+        404: {"description": "Offer not found or not currently favorited."},
+    },
+)
+async def unfavorite_offer(
+    offer_id: str = Path(
+        description="The 32-character hexadecimal SHA-256 fingerprint identifying the offer.",
+        examples=["4a8b9c1d2e3f4051627384950a1b2c3d"],
+    ),
+    user_id: str = Depends(get_current_user),
+    container: Container = Depends(get_container),
+):
+    """Remove an offer from favorites. Deletes UserOffers row if offer doesn't match preferences."""
+    uo_item = await container.user_offers_repo.get(user_id, offer_id)
+    if not uo_item or not uo_item.get("favorited", False):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Offer is not marked as favorite.",
+        )
+
+    user = await container.users_repo.get(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    cell_id = uo_item["cell_id"]
+    offer = await container.offers_repo.get(cell_id, offer_id)
+
+    is_match = False
+    if offer:
+        matches = container.matching_service._filter_offers_vectorized([offer], user.preferences)
+        is_match = len(matches) > 0
+
+    if is_match:
+        await container.user_offers_repo.set_favorite(user_id, offer_id, False)
+    else:
+        await container.user_offers_repo.delete(user_id, offer_id)
 
 
 @router.get(
@@ -282,7 +489,7 @@ async def get_offer_detail(
             detail="Offer details not found",
         )
 
-    return OfferDetailResponse.from_domain(offer)
+    return OfferDetailResponse.from_domain(offer, favorited=uo_item.get("favorited", False))
 
 
 @router.get(

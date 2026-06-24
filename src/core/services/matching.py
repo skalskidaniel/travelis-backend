@@ -119,9 +119,12 @@ class MatchingService:
         # 5. Sync UserOffers rows
         existing_items = await self.user_offers_repo.query_by_user(user_id)
         existing_offer_ids = {item["offer_id"] for item in existing_items}
+        favorited_offer_ids = {
+            item["offer_id"] for item in existing_items if item.get("favorited")
+        }
         new_offer_ids = {o.offer_id for o in matched_offers}
 
-        to_delete_ids = existing_offer_ids - new_offer_ids
+        to_delete_ids = (existing_offer_ids - new_offer_ids) - favorited_offer_ids
         to_insert_offers: list[Offer] = [
             o for o in matched_offers if o.offer_id not in existing_offer_ids
         ]

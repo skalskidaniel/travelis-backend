@@ -137,7 +137,8 @@ Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB
       "price_total": 6148,
       "referral_url": "https://...",
       "image_url": "https://www.wakacje.pl/no-index/hotel/...",
-      "share_url": "https://wakacje-travelis.pl/offer/a1b2c3.../a1b2c3..."
+      "share_url": "https://wakacje-travelis.pl/offer/a1b2c3.../a1b2c3...",
+      "favorited": false
     }
   ],
   "next_cursor": "eyJzY29yZSI6...",
@@ -180,6 +181,7 @@ Single offer detail for an offer in the user's feed.
   "referral_url": "https://...",
   "image_url": "https://www.wakacje.pl/no-index/hotel/...",
   "share_url": "https://wakacje-travelis.pl/offer/cell123/a1b2c3...",
+  "favorited": false,
   "sources": [
     {
       "provider": "wakacje_pl",
@@ -200,6 +202,52 @@ Single offer detail for an offer in the user's feed.
 ```
 
 **Response `404`:** offer not in user's feed or does not exist.
+
+### `GET /api/v2/offers/favorites`
+
+Retrieve a list of the authenticated user's favorited offers.
+
+**Query parameters:**
+
+| Param    | Default          | Values                                                                                   |
+| -------- | ---------------- | ---------------------------------------------------------------------------------------- |
+| `limit`  | `20`             | 1–50                                                                                     |
+| `cursor` | —                | Opaque cursor from previous response                                                     |
+
+**Response `200`:**
+Same response schema as `GET /api/v2/offers` (returns a paginated list of favorited offers).
+
+---
+
+### `PUT /api/v2/offers/{offer_id}/favorite`
+
+Mark an offer as favorited by the authenticated user.
+
+**Query parameters:**
+
+| Param     | Required | Description                                                                                                    |
+| --------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `cell_id` | No       | The market cell ID of the offer. Required if the offer is not currently in the user's matched feed.            |
+
+**Response `204`:** No Content
+
+**Response `400`:** `cell_id` is missing and the offer is not in the user's matched feed (required for shared offer favoriting).
+
+**Response `404`:** Offer detail not found in DB.
+
+---
+
+### `DELETE /api/v2/offers/{offer_id}/favorite`
+
+Remove an offer from the authenticated user's favorites.
+
+**Behavior**: If the offer is still in the user's matched feed, the `favorited` attribute is set to `false`. If the offer is no longer matched by preferences, the `UserOffers` row is deleted immediately.
+
+**Response `204`:** No Content
+
+**Response `404`:** Offer is not favorited or does not exist.
+
+---
 
 ### `GET /api/v2/offers/{cell_id}/{offer_id}`
 
@@ -247,6 +295,8 @@ If a client exceeds their limit, the API returns a `429 Too Many Requests` respo
 | **User Notifications** | `POST /api/v2/user/push/enable`<br>`POST /api/v2/user/push/disable` | 10 / minute | User ID |
 | **Offers Feed** | `GET /api/v2/offers` | 100 / minute | User ID |
 | **Offer Details** | `GET /api/v2/offers/{offer_id}` | 100 / minute | User ID |
+| **Favorites Feed** | `GET /api/v2/offers/favorites` | 100 / minute | User ID |
+| **Favorite Action** | `PUT /api/v2/offers/{offer_id}/favorite`<br>`DELETE /api/v2/offers/{offer_id}/favorite` | 50 / minute | User ID |
 | **Shared Offer Details** | `GET /api/v2/offers/{cell_id}/{offer_id}` | 60 / minute | Client IP |
 | **System** | `GET /api/v2/health` | No Limit | — |
 

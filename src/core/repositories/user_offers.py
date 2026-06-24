@@ -9,8 +9,9 @@ from core.repositories.utils import (
     deserialize_item,
     chunked,
     BATCH_WRITE_LIMIT,
+    BATCH_READ_LIMIT,
 )
-from core.exceptions.repository import WriteException
+from core.exceptions.repository import WriteException, ReadException
 
 
 class DynamoUserOffersRepository(UserOffersRepository):
@@ -28,16 +29,71 @@ class DynamoUserOffersRepository(UserOffersRepository):
             return None
         return deserialize_item(item)
 
+    async def get_batch(self, user_id: str, offer_ids: list[str]) -> list[dict]:
+        if not offer_ids:
+            return []
+
+        client = self.table.meta.client
+        table_name = self.table.name
+
+        items: list[dict] = []
+        for chunk in chunked(offer_ids, BATCH_READ_LIMIT):
+            request_items = {
+                table_name: {
+                    "Keys": [
+                        {"user_id": user_id, "offer_id": offer_id}
+                        for offer_id in chunk
+                    ],
+                    "ConsistentRead": False,
+                }
+            }
+
+            unprocessed = request_items
+            retries = 0
+            while unprocessed and retries < 5:
+                response = await client.batch_get_item(RequestItems=unprocessed)
+
+                responses = response.get("Responses", {}).get(table_name, [])
+                for item in responses:
+                    items.append(deserialize_item(item))
+
+                unprocessed = response.get("UnprocessedKeys", {})
+                if unprocessed:
+                    retries += 1
+                    await asyncio.sleep(0.1 * (2**retries))
+
+            if unprocessed:
+                raise ReadException(
+                    "Failed to read some user offers in batch after retries."
+                )
+
+        return items
+
     async def put(
-        self, user_id: str, offer_id: str, cell_id: str, matched_at: datetime
+        self,
+        user_id: str,
+        offer_id: str,
+        cell_id: str,
+        matched_at: datetime,
+        favorited: bool = False,
     ) -> None:
         item = {
             "user_id": user_id,
             "offer_id": offer_id,
             "cell_id": cell_id,
             "matched_at": matched_at,
+            "favorited": favorited,
         }
         await self.table.put_item(Item=serialize_item(item))
+
+    async def set_favorite(
+        self, user_id: str, offer_id: str, favorited: bool
+    ) -> None:
+        await self.table.update_item(
+            Key={"user_id": user_id, "offer_id": offer_id},
+            UpdateExpression="SET favorited = :f",
+            ExpressionAttributeValues={":f": favorited},
+        )
 
     async def query_by_user(self, user_id: str) -> list[dict]:
         items = []

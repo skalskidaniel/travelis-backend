@@ -102,11 +102,12 @@ User-to-offer matches with denormalized sort fields for Redis rebuild.
 | `offer_id` (SK) | String | References `Offers.offer_id`                                                                           |
 | `cell_id`       | String | The offer's market cell — enables direct `GetItem` on `Offers(cell_id, offer_id)` for detail/hydration |
 | `matched_at`    | String |                                                                                                        |
+| `favorited`     | Boolean| Optional flag (defaults to `false` or absent); `true` if marked as favorite by the user                |
 
 **Primary key:** `PK = user_id`, `SK = offer_id`. Sort/feed values are read from the `Offers` table (joined in Python via numpy/pandas) when rebuilding the feed, so they are not duplicated here beyond `cell_id`.
 
 **Cascading Deletes & Self-Cleaning**: DynamoDB does not support native cascading deletes when offers are removed from the `Offers` table (due to TTL expiration or being marked unavailable). Instead, the system relies on:
-1. **Eventual consistency**: during the periodic 3×-daily scrape and match run, the match job queries the current active offers from `Offers` and syncs them with `UserOffers` (performing writes for new matches and deleting obsolete matches). Any expired or deleted offer is automatically pruned from `UserOffers` and the Redis feed.
+1. **Eventual consistency**: during the periodic 3×-daily scrape and match run, the match job queries the current active offers from `Offers` and syncs them with `UserOffers` (performing writes for new matches and deleting obsolete matches). Obsolete matches are only deleted if `favorited` is not `true`. Any expired or deleted offer is automatically pruned from `UserOffers` and the Redis feed.
 2. **On-the-fly pruning**: when a user fetches their paginated feed via `/api/v2/offers`, the backend attempts to hydrate the batch of offers from the `Offers` table. If any offer is missing (hydration miss), the corresponding stale `UserOffers` row is immediately pruned from DynamoDB and the user's `feed_version` is incremented.
 
 ## Offer identity

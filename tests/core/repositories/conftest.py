@@ -43,6 +43,7 @@ def aws_credentials(monkeypatch):
     monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    monkeypatch.delenv("AWS_PROFILE", raising=False)
 
 
 @pytest.fixture(scope="function")

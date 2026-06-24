@@ -321,3 +321,130 @@ def test_calculate_zset_score_coverage(sample_domain_offer):
     assert calculate_zset_score(sample_domain_offer, "departure_date") > 0
     assert calculate_zset_score(sample_domain_offer, "duration") > 0
     assert calculate_zset_score(sample_domain_offer, "unknown_field") > 0
+
+
+def test_favorite_offer_existing(client, mock_container, auth_headers):
+    # Offer is already in UserOffers table
+    mock_container.user_offers_repo.get.return_value = {
+        "user_id": "user-123",
+        "offer_id": "offer-123",
+        "cell_id": "cell-123",
+        "favorited": False,
+    }
+
+    response = client.put("/api/v2/offers/offer-123/favorite", headers=auth_headers)
+    assert response.status_code == 204
+    mock_container.user_offers_repo.set_favorite.assert_called_once_with("user-123", "offer-123", True)
+
+
+def test_favorite_offer_new_shared_success(client, mock_container, auth_headers, sample_domain_offer):
+    # Offer not in UserOffers table, cell_id provided, exists in Offers table
+    mock_container.user_offers_repo.get.return_value = None
+    mock_container.offers_repo.get.return_value = sample_domain_offer
+
+    response = client.put(
+        "/api/v2/offers/offer-123/favorite?cell_id=cell-123",
+        headers=auth_headers,
+    )
+    assert response.status_code == 204
+    mock_container.offers_repo.get.assert_called_once_with("cell-123", "offer-123")
+    mock_container.user_offers_repo.put.assert_called_once()
+    # verify user_id, offer_id, cell_id, favorited=True are passed
+    kwargs = mock_container.user_offers_repo.put.call_args.kwargs
+    assert kwargs["user_id"] == "user-123"
+    assert kwargs["offer_id"] == "offer-123"
+    assert kwargs["cell_id"] == "cell-123"
+    assert kwargs["favorited"] is True
+
+
+def test_favorite_offer_new_shared_missing_cell_id(client, mock_container, auth_headers):
+    mock_container.user_offers_repo.get.return_value = None
+
+    response = client.put("/api/v2/offers/offer-123/favorite", headers=auth_headers)
+    assert response.status_code == 400
+    assert "cell_id is required" in response.json()["detail"]
+
+
+def test_favorite_offer_new_shared_not_found(client, mock_container, auth_headers):
+    mock_container.user_offers_repo.get.return_value = None
+    mock_container.offers_repo.get.return_value = None
+
+    response = client.put(
+        "/api/v2/offers/offer-123/favorite?cell_id=cell-123",
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+    assert "Offer details not found" in response.json()["detail"]
+
+
+def test_unfavorite_offer_not_favorited(client, mock_container, auth_headers):
+    mock_container.user_offers_repo.get.return_value = None
+
+    response = client.delete("/api/v2/offers/offer-123/favorite", headers=auth_headers)
+    assert response.status_code == 404
+    assert "Offer is not marked as favorite" in response.json()["detail"]
+
+
+def test_unfavorite_offer_still_matched(client, mock_container, auth_headers, sample_domain_offer):
+    from core.models.user import User
+
+    mock_container.user_offers_repo.get.return_value = {
+        "user_id": "user-123",
+        "offer_id": sample_domain_offer.offer_id,
+        "cell_id": sample_domain_offer.cell_id,
+        "favorited": True,
+    }
+    user = User(user_id="user-123")
+    mock_container.users_repo = AsyncMock()
+    mock_container.users_repo.get.return_value = user
+    mock_container.offers_repo.get.return_value = sample_domain_offer
+    # mock matching service filter to return the offer (meaning it matches)
+    mock_container.matching_service = MagicMock()
+    mock_container.matching_service._filter_offers_vectorized.return_value = [sample_domain_offer]
+
+    response = client.delete(f"/api/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers)
+    assert response.status_code == 204
+    mock_container.user_offers_repo.set_favorite.assert_called_once_with("user-123", sample_domain_offer.offer_id, False)
+
+
+def test_unfavorite_offer_no_longer_matched(client, mock_container, auth_headers, sample_domain_offer):
+    from core.models.user import User
+
+    mock_container.user_offers_repo.get.return_value = {
+        "user_id": "user-123",
+        "offer_id": sample_domain_offer.offer_id,
+        "cell_id": sample_domain_offer.cell_id,
+        "favorited": True,
+    }
+    user = User(user_id="user-123")
+    mock_container.users_repo = AsyncMock()
+    mock_container.users_repo.get.return_value = user
+    mock_container.offers_repo.get.return_value = sample_domain_offer
+    # mock matching service filter to return empty list (no match)
+    mock_container.matching_service = MagicMock()
+    mock_container.matching_service._filter_offers_vectorized.return_value = []
+
+    response = client.delete(f"/api/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers)
+    assert response.status_code == 204
+    mock_container.user_offers_repo.delete.assert_called_once_with("user-123", sample_domain_offer.offer_id)
+
+
+def test_get_favorites_feed_success(client, mock_container, auth_headers, sample_domain_offer):
+    mock_container.user_offers_repo.query_by_user.return_value = [
+        {
+            "user_id": "user-123",
+            "offer_id": sample_domain_offer.offer_id,
+            "cell_id": sample_domain_offer.cell_id,
+            "favorited": True,
+            "matched_at": "2026-06-24T12:00:00Z",
+        }
+    ]
+    mock_container.offers_repo.get_batch.return_value = [sample_domain_offer]
+
+    response = client.get("/api/v2/offers/favorites", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["offers"]) == 1
+    assert data["offers"][0]["offer_id"] == sample_domain_offer.offer_id
+    assert data["offers"][0]["favorited"] is True
+    assert data["total_count"] == 1

@@ -127,6 +127,10 @@ In-app, the client can show how many offers are new since last open (client-side
 
 Server does **not** track per-offer seen state.
 
+### Favorited Offers
+
+Users can mark specific offers as "favorited". The server persists this state per user-offer pair. Favorited offers persist even if they no longer match the user's current travel preferences (until the offer itself expires/TTL or is marked unavailable).
+
 ### Offer acquisition
 
 - Sources: wakacje.pl and tui.pl public JSON APIs (see [providers/](../providers/index.md)).

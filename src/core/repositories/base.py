@@ -65,8 +65,21 @@ class UsersRepository(Protocol):
 class UserOffersRepository(Protocol):
     async def get(self, user_id: str, offer_id: str) -> dict | None: ...
 
+    async def get_batch(
+        self, user_id: str, offer_ids: list[str]
+    ) -> list[dict]: ...
+
     async def put(
-        self, user_id: str, offer_id: str, cell_id: str, matched_at: datetime
+        self,
+        user_id: str,
+        offer_id: str,
+        cell_id: str,
+        matched_at: datetime,
+        favorited: bool = False,
+    ) -> None: ...
+
+    async def set_favorite(
+        self, user_id: str, offer_id: str, favorited: bool
     ) -> None: ...
 
     async def query_by_user(self, user_id: str) -> list[dict]: ...

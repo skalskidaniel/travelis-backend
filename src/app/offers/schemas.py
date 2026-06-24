@@ -79,9 +79,13 @@ class OfferFeedItem(BaseModel):
             "https://wakacje-travelis.pl/offer/1f2e3d4c5b6a7f8e/4a8b9c1d2e3f4051627384950a1b2c3d"
         ],
     )
+    favorited: bool = Field(
+        default=False,
+        description="Flag indicating if this offer is favorited by the user.",
+    )
 
     @classmethod
-    def from_domain(cls, offer: Offer) -> "OfferFeedItem":
+    def from_domain(cls, offer: Offer, favorited: bool = False) -> "OfferFeedItem":
         parts = offer.location.split("/")
         country = parts[0] if len(parts) > 0 else ""
 
@@ -102,6 +106,7 @@ class OfferFeedItem(BaseModel):
             referral_url=str(offer.referral_url),
             image_url=str(offer.image_url) if offer.image_url else None,
             share_url=str(offer.share_url),
+            favorited=favorited,
         )
 
 
@@ -204,6 +209,10 @@ class OfferDetailResponse(BaseModel):
             "https://wakacje-travelis.pl/offer/1f2e3d4c5b6a7f8e/4a8b9c1d2e3f4051627384950a1b2c3d"
         ],
     )
+    favorited: bool = Field(
+        default=False,
+        description="Flag indicating if this offer is favorited by the user.",
+    )
     sources: list[OfferSource] = Field(
         description="List of raw source offers that were merged to form this offer."
     )
@@ -217,7 +226,7 @@ class OfferDetailResponse(BaseModel):
     )
 
     @classmethod
-    def from_domain(cls, offer: Offer) -> "OfferDetailResponse":
+    def from_domain(cls, offer: Offer, favorited: bool = False) -> "OfferDetailResponse":
         parts = offer.location.split("/")
         country = parts[0] if len(parts) > 0 else ""
         region = parts[1] if len(parts) > 1 else ""
@@ -248,6 +257,7 @@ class OfferDetailResponse(BaseModel):
             sources=offer.metadata.sources,
             scraped_at=offer.scraped_at,
             updated_at=offer.updated_at,
+            favorited=favorited,
         )
 
 
