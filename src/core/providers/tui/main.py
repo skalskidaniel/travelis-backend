@@ -106,6 +106,7 @@ class TuiProvider:
                     SEARCH_URL,
                     json=payload,
                     headers=self._search_headers(),
+                    timeout=30.0,
                 )
                 response.raise_for_status()
             except httpx.HTTPError as e:
@@ -127,7 +128,8 @@ class TuiProvider:
                 except ValidationError:
                     continue
                 if mapped is not None:
-                    raw_offers.append(mapped)
+                    if mapped.departure_airport in self._departure_airport_codes:
+                        raw_offers.append(mapped)
 
             page += 1
 
@@ -168,7 +170,7 @@ class TuiProvider:
             "childrenBirthdays": children_birthdays,
             "departureDateFrom": format_tui_date(departure_from),
             "departureDateTo": format_tui_date(departure_to),
-            "departuresCodes": self._departure_airport_codes,
+            "departuresCodes": [],
             "destinationsCodes": destination_codes,
             "durationFrom": MIN_DURATION_NIGHTS,
             "durationTo": MAX_DURATION_NIGHTS,
