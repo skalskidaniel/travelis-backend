@@ -142,6 +142,34 @@ def test_lambda_handler_cognito_post_confirmation(lambda_context):
         mock_get_or_create.assert_called_once_with("test-user-id", mock_container)
 
 
+def test_lambda_handler_cognito_post_confirmation_federated(lambda_context):
+    event = {
+        "version": "1",
+        "region": "eu-central-1",
+        "userPoolId": "eu-central-1_xxxxxxxxx",
+        "userName": "Google_113110676533136880527",
+        "triggerSource": "PostConfirmation_ConfirmSignUp",
+        "request": {
+            "userAttributes": {
+                "sub": "83845802-8051-7070-75d9-2912768752bd",
+                "email_verified": "true",
+                "email": "test@example.com",
+            }
+        },
+        "response": {},
+    }
+
+    with (
+        patch("app.user.controller.get_or_create_user") as mock_get_or_create,
+        patch("app.main.container") as mock_container,
+    ):
+        mock_container.exit_stack = MagicMock()
+        mock_container.initialize = AsyncMock()
+        response = handler(event, lambda_context)
+        assert response == event
+        mock_get_or_create.assert_called_once_with("83845802-8051-7070-75d9-2912768752bd", mock_container)
+
+
 def test_lambda_handler_scheduler_match_user(lambda_context):
     event = {"type": "match_user", "user_id": "user-123"}
 

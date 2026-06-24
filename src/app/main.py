@@ -145,9 +145,12 @@ async def handle_non_http(event: dict, context) -> dict:
 
     # A. Cognito post-confirmation trigger
     if trigger_source and trigger_source.startswith("PostConfirmation"):
-        user_id = event.get("userName") or event.get("request", {}).get(
-            "userAttributes", {}
-        ).get("sub")
+        user_id = (
+            event.get("request", {})
+            .get("userAttributes", {})
+            .get("sub")
+            or event.get("userName")
+        )
         if user_id:
             from app.user.controller import get_or_create_user
 
