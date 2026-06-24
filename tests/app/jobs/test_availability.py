@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -19,7 +19,17 @@ def mock_container():
     c.tui_provider = MagicMock()
     c.wakacje_provider = MagicMock()
     c.matching_service = AsyncMock()
+    c.http_client = MagicMock()  # needed by warm_up_session
     return c
+
+
+@pytest.fixture(autouse=True)
+def _auto_mock_warm_up():
+    """Bypass the curl_cffi warm-up in all job unit tests."""
+    with patch(
+        "app.jobs.availability.warm_up_session", new=AsyncMock(return_value=True)
+    ):
+        yield
 
 
 @pytest.mark.asyncio
