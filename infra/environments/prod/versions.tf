@@ -2,11 +2,11 @@ terraform {
   required_version = ">= 1.5"
 
   backend "s3" {
-    bucket         = "travelis-prod-terraform-state"
-    key            = "state/terraform.tfstate"
-    region         = "eu-central-1"
-    dynamodb_table = "travelis-prod-terraform-locks"
-    encrypt        = true
+    bucket       = "travelis-prod-terraform-state"
+    key          = "state/terraform.tfstate"
+    region       = "eu-central-1"
+    use_lockfile = true
+    encrypt      = true
   }
 
   required_providers {

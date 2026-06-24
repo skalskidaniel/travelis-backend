@@ -86,7 +86,7 @@ flowchart TB
     EB --> M
     M --> AUTH & USER & OFFERS & JOBS
     AUTH --> COGNITO
-    CO AUTH --> CO
+    AUTH --> CO
     USER --> CO
     OFFERS --> CO
     JOBS --> CO
