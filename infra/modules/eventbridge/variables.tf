@@ -19,6 +19,6 @@ variable "lambda_name" {
 }
 
 variable "scheduler_invoke_lambda_arns" {
-  description = "Lambda ARNs the EventBridge Scheduler execution role may invoke (e.g. API Lambda for debounced match)."
+  description = "Lambda ARNs the EventBridge Scheduler execution role may invoke (cron Lambda for debounced match jobs)."
   type        = list(string)
 }

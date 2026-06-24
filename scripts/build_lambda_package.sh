@@ -38,7 +38,7 @@ if [ -d "$BUILD_DIR/botocore/data" ]; then
     cd "$BUILD_DIR/botocore/data"
     for d in */; do
       case "$d" in
-        dynamodb/|cognito-idp/|scheduler/|events/|lambda/|s3/|sts/|iam/)
+        dynamodb/|cognito-idp/|scheduler/|events/|lambda/|s3/|sts/|iam/|secretsmanager/)
           # Keep these
           ;;
         *)

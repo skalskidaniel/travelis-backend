@@ -11,10 +11,10 @@ Users configure trip preferences and receive notifications when new matching dea
 | Layer              | Choice                                                                                                                                                                                                                      |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API runtime        | AWS Lambda + Mangum + FastAPI (`async def` handlers)                                                                                                                                                                        |
-| Concurrency        | Async end-to-end; `asyncio` worker pool for scrape fan-out                                                                                                                                                                    |
+| Concurrency        | Async end-to-end; `asyncio` worker pool for scrape fan-out                                                                                                                                                                  |
 | Rate limiting      | FastAPI Limiter (async Redis)                                                                                                                                                                                               |
 | Infrastructure     | Terraform (+ Vault provider for secrets)                                                                                                                                                                                    |
-| Primary database   | DynamoDB (provisioned capacity for cost control)                                                                                                                                                                            |
+| Primary database   | DynamoDB (on-demand capacity for low operational overhead)                                                                                                                                                                  |
 | Offer feed cache   | Redis Cloud                                                                                                                                                                                                                 |
 | Scraping           | HTTP JSON APIs (no browser required for v1)                                                                                                                                                                                 |
 | Statistics         | NumPy or pandas                                                                                                                                                                                                             |
@@ -64,7 +64,7 @@ Users can configure:
 ### Default preferences
 
 | Field              | Default                             | Behavior / Representation                            |
-| ------------------ | ----------------------------------- |------------------------------------------------------|
+| ------------------ | ----------------------------------- | ---------------------------------------------------- |
 | Countries          | Greece, Italy, Spain, Turkey, Egypt | `["GR", "IT", "ES", "TR", "EG"]`                     |
 | Departure airports | Any                                 | Represented as empty list `[]`                       |
 | Travel dates       | Any                                 | Slid window: current month + next 5 months (6 total) |

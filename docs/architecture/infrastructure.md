@@ -8,9 +8,9 @@ Terraform-managed AWS resources with modular layout. Secrets via Terraform Vault
 infra/
 ├── modules/
 │   ├── geo_catalog/      # S3 bucket for provider geo catalogs
-│   ├── lambda/           # Lambdalith function + IAM role
+│   ├── lambda/           # Dual lambdalith functions + IAM role
 │   ├── api_gateway/      # HTTP API → Lambda
-│   ├── dynamodb/         # 4 tables (provisioned)
+│   ├── dynamodb/         # 4 tables (on-demand)
 │   ├── cognito/          # User pool + app client + post-confirmation trigger
 │   ├── eventbridge/      # Cron rules + Scheduler (debounced match) role
 │   └── monitoring/       # CloudWatch, Grafana integration
@@ -31,17 +31,22 @@ infra/
 
 ## AWS resources
 
-### Lambda (lambdalith)
+### Lambda (dual lambdalith functions)
+
+| Function            | Target                                                     | Timeout | Memory  |
+| ------------------- | ---------------------------------------------------------- | ------- | ------- |
+| `*-lambdalith-api`  | API Gateway and Cognito post-confirmation trigger          | 30s     | 1024 MB |
+| `*-lambdalith-cron` | EventBridge cron jobs and EventBridge Scheduler match jobs | 15 min  | 1024 MB |
+
+Both functions use:
 
 | Setting | Value                                                  |
 | ------- | ------------------------------------------------------ |
 | Runtime | Python 3.13 (latest Lambda runtime)                    |
 | Handler | `app.main.handler` (dual entry: Mangum + jobs)         |
-| Timeout | 15 min (max)                                           |
-| Memory  | 1024 MB (tune based on scrape concurrency)             |
 | Package | Contents of `src/` (`app/` + `core/`) at artifact root |
 
-The deployment artifact zips the **contents** of `src/`, so `app` and `core` are top-level importable packages and the handler resolves as `app.main.handler`.
+The deployment artifact zips the **contents** of `src/`, so `app` and `core` are top-level importable packages and the handler resolves as `app.main.handler`. The same artifact is deployed to both Lambda functions; the split exists to keep HTTP requests on a short timeout while letting background jobs use the full Lambda timeout.
 
 **IAM permissions:**
 
@@ -81,7 +86,7 @@ HTTP API (v2) proxying all routes to the Lambda. Routes:
 
 ### DynamoDB
 
-Four tables with **provisioned capacity** (cost control):
+Four tables with **on-demand capacity** (`PAY_PER_REQUEST`) for low operational overhead during early traffic:
 
 | Table         | PK        | SK         | GSI | TTL                                                     |
 | ------------- | --------- | ---------- | --- | ------------------------------------------------------- |
@@ -90,7 +95,7 @@ Four tables with **provisioned capacity** (cost control):
 | `Offers`      | `cell_id` | `offer_id` | —   | `ttl` (epoch of `departure_date`)                       |
 | `UserOffers`  | `user_id` | `offer_id` | —   | Pruned cascadingly by eventual consistency in match job |
 
-Start with low provisioned RCU/WCU; auto-scaling or manual tuning as load grows.
+No capacity units are configured. Revisit provisioned capacity only if traffic becomes predictable enough that it is clearly cheaper than on-demand billing.
 
 ### Cognito
 
@@ -104,10 +109,10 @@ Start with low provisioned RCU/WCU; auto-scaling or manual tuning as load grows.
 
 Only the periodic jobs use fixed schedules. There is **no `match-users` poll** — matching is event-driven (see below).
 
-| Rule                 | Schedule                  | Target          | Job                 |
-| -------------------- | ------------------------- | --------------- | ------------------- |
-| `scrape-offers`      | `cron(0 6,14,22 * * ? *)` | Lambda (direct) | `jobs.coordinator`  |
-| `check-availability` | `cron(0 4 * * ? *)`       | Lambda (direct) | `jobs.availability` |
+| Rule                 | Schedule                  | Target               | Job                 |
+| -------------------- | ------------------------- | -------------------- | ------------------- |
+| `scrape-offers`      | `cron(0 6,14,22 * * ? *)` | Cron Lambda (direct) | `jobs.coordinator`  |
+| `check-availability` | `cron(0 4 * * ? *)`       | Cron Lambda (direct) | `jobs.availability` |
 
 Cron times are UTC; adjust for desired local schedule.
 
@@ -117,20 +122,20 @@ Cron times are UTC; adjust for desired local schedule.
 
 Preference changes and new-account provisioning create **one-time** schedules instead of polling:
 
-| Setting                 | Value                                                                 |
-| ----------------------- | --------------------------------------------------------------------- |
-| Name                    | `match-{user_id}` (deterministic → upsert debounces)                  |
-| Expression              | `at(now + 15s)`                                                       |
-| `ActionAfterCompletion` | `DELETE` (self-cleaning)                                              |
-| Target                  | Lambda (direct), payload `{ "type": "match_user", "user_id": "..." }` |
+| Setting                 | Value                                                                      |
+| ----------------------- | -------------------------------------------------------------------------- |
+| Name                    | `match-{user_id}` (deterministic → upsert debounces)                       |
+| Expression              | `at(now + 15s)`                                                            |
+| `ActionAfterCompletion` | `DELETE` (self-cleaning)                                                   |
+| Target                  | Cron Lambda (direct), payload `{ "type": "match_user", "user_id": "..." }` |
 
 See [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler).
 
 ### Cognito triggers
 
-| Trigger           | Target          | Action                                                                         |
-| ----------------- | --------------- | ------------------------------------------------------------------------------ |
-| Post-confirmation | Lambda (direct) | Create `Users` row with defaults, activate default cells, schedule first match |
+| Trigger           | Target              | Action                                                                         |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------ |
+| Post-confirmation | API Lambda (direct) | Create `Users` row with defaults, activate default cells, schedule first match |
 
 Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A lazy get-or-create on the first authenticated request is the fallback if the trigger ever fails.
 
@@ -139,7 +144,7 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 | Setting    | Value                                                                |
 | ---------- | -------------------------------------------------------------------- |
 | Provider   | [Redis Cloud](https://redis.com/redis-enterprise-cloud/) (free tier) |
-| Purpose    | User offer feed ZSETs, rate limiting, optional offer payload cache |
+| Purpose    | User offer feed ZSETs, rate limiting, optional offer payload cache   |
 | Connection | `REDIS_URL` env var on Lambda                                        |
 | TLS        | Required (Redis Cloud default)                                       |
 
@@ -147,22 +152,22 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 
 ## Environment variables (Lambda)
 
-| Variable                     | Source           | Description                                               |
-| ---------------------------- | ---------------- | --------------------------------------------------------- |
-| `REDIS_URL`                  | SSM / Vault      | Redis Cloud connection string                             |
-| `COGNITO_USER_POOL_ID`       | Terraform output |                                                           |
-| `COGNITO_APP_CLIENT_ID`      | Terraform output |                                                           |
-| `DYNAMODB_USERS_TABLE`       | Terraform output |                                                           |
-| `DYNAMODB_CELLS_TABLE`       | Terraform output |                                                           |
-| `DYNAMODB_OFFERS_TABLE`      | Terraform output |                                                           |
-| `DYNAMODB_USER_OFFERS_TABLE` | Terraform output |                                                           |
-| `ATTRACTIVENESS_Z_THRESHOLD` | SSM              | Default `-1.2`                                            |
-| `VAPID_PRIVATE_KEY`          | Vault            | Web Push signing                                          |
-| `VAPID_PUBLIC_KEY`           | SSM              | Web Push public key                                       |
-| `FRONTEND_URL`               | SSM / env        | e.g. `https://wakacje-travelis.pl` (used for `share_url`) |
-| `RATE_LIMITING_ENABLED`      | SSM / env        | If `False`, rate limiting is bypassed (defaults to `True` if omitted) |
-| `LAMBDA_FUNCTION_ARN`       | Terraform output / SSM | ARN of the Lambdalith function, used by scheduler and coordinator. |
-| `SCHEDULER_ROLE_ARN`        | Terraform output / SSM | ARN of the IAM role assumed by EventBridge Scheduler to invoke the Lambda function. |
+| Variable                     | Source                 | Description                                                                     |
+| ---------------------------- | ---------------------- | ------------------------------------------------------------------------------- |
+| `REDIS_URL`                  | SSM / Vault            | Redis Cloud connection string                                                   |
+| `COGNITO_USER_POOL_ID`       | Terraform output       |                                                                                 |
+| `COGNITO_APP_CLIENT_ID`      | Terraform output       |                                                                                 |
+| `DYNAMODB_USERS_TABLE`       | Terraform output       |                                                                                 |
+| `DYNAMODB_CELLS_TABLE`       | Terraform output       |                                                                                 |
+| `DYNAMODB_OFFERS_TABLE`      | Terraform output       |                                                                                 |
+| `DYNAMODB_USER_OFFERS_TABLE` | Terraform output       |                                                                                 |
+| `ATTRACTIVENESS_Z_THRESHOLD` | SSM                    | Default `-1.2`                                                                  |
+| `VAPID_PRIVATE_KEY`          | Vault                  | Web Push signing                                                                |
+| `VAPID_PUBLIC_KEY`           | SSM                    | Web Push public key                                                             |
+| `FRONTEND_URL`               | SSM / env              | e.g. `https://wakacje-travelis.pl` (used for `share_url`)                       |
+| `RATE_LIMITING_ENABLED`      | SSM / env              | If `False`, rate limiting is bypassed (defaults to `True` if omitted)           |
+| `LAMBDA_FUNCTION_ARN`        | Terraform output / env | ARN of the cron Lambda target used by EventBridge Scheduler.                    |
+| `SCHEDULER_ROLE_ARN`         | Terraform output / env | ARN of the IAM role assumed by EventBridge Scheduler to invoke the cron Lambda. |
 
 Never commit secrets. Use `.env.example` with placeholders for local dev.
 
@@ -218,19 +223,19 @@ terraform plan
 terraform apply
 ```
 
-Lambda deployment artifact: zip or container image built from the contents of `src/` (`app/` + `core/`) plus dependencies (see `pyproject.toml`).
+Lambda deployment artifact: zip built from the contents of `src/` (`app/` + `core/`) plus dependencies (see `pyproject.toml`), then deployed to both the API and cron Lambda functions.
 
 ## Cost notes
 
-- **Provisioned DynamoDB** — predictable cost; tune capacity down when idle.
-- **Single Lambda** — one function bill; no per-cell Lambda charges.
+- **On-demand DynamoDB** — no capacity planning while traffic is low or spiky.
+- **Dual Lambda functions, one artifact** — timeout isolation for HTTP and jobs without duplicating code.
 - **Redis Cloud free tier** — sufficient for early user count.
 - **EventBridge** — negligible cost for 3–4 rules.
 
 ## Future scaling triggers
 
-| Signal                   | Action                                                |
-| ------------------------ | ----------------------------------------------------- |
-| Lambda timeout on scrape | Split `jobs/` into separate Lambdas                   |
-| DynamoDB throttling      | Enable auto-scaling or switch hot tables to on-demand |
-| Redis memory limit       | Upgrade Redis Cloud plan or trim payload cache        |
+| Signal                   | Action                                                  |
+| ------------------------ | ------------------------------------------------------- |
+| Lambda timeout on scrape | Fan out from the cron Lambda to per-cell worker Lambdas |
+| DynamoDB throttling      | Revisit hot partitions or provisioned capacity          |
+| Redis memory limit       | Upgrade Redis Cloud plan or trim payload cache          |

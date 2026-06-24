@@ -13,7 +13,7 @@ The backend follows a **hexagonal (ports & adapters)** layout split across two t
 
 **Dependency rule:** `app` depends on `core`; `core` never imports `app`. Feature modules in `app/` never import each other.
 
-The execution concerns live in `app/` (the `asyncio` fan-out, the Lambda deadline, HTTP status mapping). The pure domain logic (normalize, dedup, fingerprint, scoring, matching) lives in `core/`. This is what makes the "split jobs into a separate Lambda later" change a no-op for the domain, and what makes scoring/matching unit-testable without AWS.
+The execution concerns live in `app/` (the `asyncio` fan-out, the Lambda deadline, HTTP status mapping). The pure domain logic (normalize, dedup, fingerprint, scoring, matching) lives in `core/`. This lets the same deployment artifact run as separate API and cron Lambda functions, and it keeps a future per-cell worker fan-out change isolated from the domain layer.
 
 The stack is **async end-to-end**: `async def` handlers, `aioboto3` repositories, `httpx.AsyncClient` providers, and `redis.asyncio` for the feed.
 
@@ -103,14 +103,15 @@ Centralizing keeps each table's access in one place, lets both the API and jobs 
 
 ## Composition root: `core/container.py`
 
-FastAPI's `Depends` only covers the HTTP path; the EventBridge path never touches it. The container is the single place that constructs `Settings`, the shared `aioboto3` clients, the `redis.asyncio` client, provider adapters, and repositories **once per Lambda cold start** (module scope = reused across warm invocations).
+FastAPI's `Depends` only covers the HTTP path; the EventBridge path never touches it. The container is the single place that constructs `Settings`, the shared `aioboto3` clients, the `redis.asyncio` client, provider adapters, and repositories **once per Lambda cold start** (module scope = reused across warm invocations in each deployed function).
 
-- The **jobs handler** imports the container directly.
+- The **jobs handler** imports the container directly and is invoked through the long-timeout cron Lambda.
 - The **API** wraps container objects in trivial `Depends` providers (e.g. `def get_offers_repo(): return container.offers_repo`), so controllers keep clean injection and tests can override.
 
 `aioboto3` clients are **async context managers**. The container enters them once at cold start via an `AsyncExitStack` and holds the references for the life of the execution environment, reusing them across warm invocations rather than re-entering per request or per task.
 
 ### Event Loop Changes in Lambda
+
 Because AWS Lambda reuses global instances across warm starts, but executes non-HTTP invocations under a fresh event loop using `asyncio.run()`, the event loop changes between invocations. Reusing the same boto3/HTTPX client session without checking the event loop will trigger `Task got Future attached to a different loop` or `Event loop is closed` errors.
 
 To solve this, all entry points (the API dependency `get_container()` and the Lambda router `handle_non_http()`) must call `await container.initialize()` directly. The container's `initialize()` method contains a check that compares the current running event loop with the loop used to initialize the stack. If the loops differ or the loop is closed, it automatically teardowns the old clients and re-initializes them cleanly.

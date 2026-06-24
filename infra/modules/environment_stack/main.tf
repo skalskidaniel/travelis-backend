@@ -36,32 +36,32 @@ module "eventbridge" {
   environment                  = var.environment
   lambda_arn                   = local.cron_lambda_arn
   lambda_name                  = local.cron_lambda_name
-  scheduler_invoke_lambda_arns = [local.api_lambda_arn]
+  scheduler_invoke_lambda_arns = [local.cron_lambda_arn]
 }
 
 module "lambda" {
   source = "../lambda"
 
-  project                 = var.project
-  environment             = var.environment
-  redis_url               = var.redis_url
-  frontend_url            = var.frontend_url
-  users_table_name        = module.dynamodb.users_table_name
-  users_table_arn         = module.dynamodb.users_table_arn
-  cells_table_name        = module.dynamodb.cells_table_name
-  cells_table_arn         = module.dynamodb.cells_table_arn
-  offers_table_name       = module.dynamodb.offers_table_name
-  offers_table_arn        = module.dynamodb.offers_table_arn
-  user_offers_table_name  = module.dynamodb.user_offers_table_name
-  user_offers_table_arn   = module.dynamodb.user_offers_table_arn
-  geo_catalog_bucket_name = module.geo_catalog.bucket_name
-  geo_catalog_bucket_arn  = module.geo_catalog.bucket_arn
-  cognito_user_pool_id    = module.cognito.user_pool_id
-  cognito_user_pool_arn   = module.cognito.user_pool_arn
-  cognito_app_client_id   = module.cognito.app_client_id
-  vapid_public_key        = var.vapid_public_key
-  vapid_private_key       = var.vapid_private_key
-  scheduler_role_arn      = module.eventbridge.scheduler_role_arn
+  project                    = var.project
+  environment                = var.environment
+  redis_url                  = var.redis_url
+  frontend_url               = var.frontend_url
+  users_table_name           = module.dynamodb.users_table_name
+  users_table_arn            = module.dynamodb.users_table_arn
+  cells_table_name           = module.dynamodb.cells_table_name
+  cells_table_arn            = module.dynamodb.cells_table_arn
+  offers_table_name          = module.dynamodb.offers_table_name
+  offers_table_arn           = module.dynamodb.offers_table_arn
+  user_offers_table_name     = module.dynamodb.user_offers_table_name
+  user_offers_table_arn      = module.dynamodb.user_offers_table_arn
+  geo_catalog_bucket_name    = module.geo_catalog.bucket_name
+  geo_catalog_bucket_arn     = module.geo_catalog.bucket_arn
+  cognito_user_pool_id       = module.cognito.user_pool_id
+  cognito_user_pool_arn      = module.cognito.user_pool_arn
+  cognito_app_client_id      = module.cognito.app_client_id
+  vapid_public_key           = var.vapid_public_key
+  vapid_private_key          = var.vapid_private_key
+  scheduler_role_arn         = module.eventbridge.scheduler_role_arn
   attractiveness_z_threshold = var.attractiveness_z_threshold
 }
 
@@ -94,7 +94,7 @@ resource "aws_lambda_permission" "allow_eventbridge_availability" {
 resource "aws_lambda_permission" "allow_scheduler_match" {
   statement_id  = "AllowExecutionFromEventBridgeScheduler"
   action        = "lambda:InvokeFunction"
-  function_name = module.lambda.api_lambda_name
+  function_name = module.lambda.cron_lambda_name
   principal     = "scheduler.amazonaws.com"
   source_arn    = "arn:aws:scheduler:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:schedule/*"
 }

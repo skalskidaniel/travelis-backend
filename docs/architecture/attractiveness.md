@@ -30,7 +30,7 @@ Within the comparison group for the current scrape run:
 z = (price_per_day_per_person - mean) / stddev
 ```
 
-*Edge case handling*: If all offers in the comparison group have the same price, `stddev` will be `0.0`. In this case, set `z = 0.0` for all offers to avoid division by zero.
+_Edge case handling_: If all offers in the comparison group have the same price, `stddev` will be `0.0`. In this case, set `z = 0.0` for all offers to avoid division by zero.
 
 ### Gate rule
 
@@ -56,15 +56,16 @@ For offers passing stage 1, compute a weighted composite within the same compari
 
 ### Signals and weights (v1)
 
-| Signal                   | Weight | Normalization Formula                                  |
-| ------------------------ | ------ | ------------------------------------------------------ |
-| Price per day per person | 0.4    | `price_norm = (max_price - price) / (max_price - min_price)` |
-| Rating                   | 0.4    | `rating_norm = (rating - min_rating) / (max_rating - min_rating)` |
+| Signal                   | Weight | Normalization Formula                                                                  |
+| ------------------------ | ------ | -------------------------------------------------------------------------------------- |
+| Price per day per person | 0.4    | `price_norm = (max_price - price) / (max_price - min_price)`                           |
+| Rating                   | 0.4    | `rating_norm = (rating - min_rating) / (max_rating - min_rating)`                      |
 | Review count             | 0.2    | `reviews_norm = (log_reviews - min_log_reviews) / (max_log_reviews - min_log_reviews)` |
 
-*Note*: `log_reviews` is calculated as `math.log1p(review_count)` (natural log of `review_count + 1`).
+_Note_: `log_reviews` is calculated as `math.log1p(review_count)` (natural log of `review_count + 1`).
 
 #### Normalization Boundary Conditions (Division-by-Zero Handling)
+
 For all three normalization steps, if the denominator evaluates to `0.0` (i.e. `max_value == min_value`), the normalized value must be set to `1.0` (as all offers in the pool are equivalent for that metric).
 
 ```
@@ -114,4 +115,4 @@ Offers A and C are stored. A ranks higher in the user's feed (default sort: `att
 ## Dependencies
 
 - NumPy or pandas for mean, stddev, and normalization within groups.
-- Runs inside the scrape coordinator job (`jobs.coordinator`) in the lambdalith (same Lambda as API).
+- Runs inside the scrape coordinator job (`jobs.coordinator`) in the long-timeout cron lambdalith function.
