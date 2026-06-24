@@ -67,3 +67,9 @@ variable "aws_profile" {
   type        = string
   default     = ""
 }
+
+variable "custom_domain" {
+  description = "Custom API Gateway domain name (e.g., api.wakacje-travelis.pl). Leave empty to skip."
+  type        = string
+  default     = ""
+}

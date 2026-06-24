@@ -18,6 +18,16 @@ output "api_endpoint" {
   value       = module.environment_stack.api_endpoint
 }
 
+output "custom_domain_target" {
+  description = "The target domain name to point DNS CNAME/Alias to."
+  value       = module.environment_stack.custom_domain_target
+}
+
+output "custom_domain_hosted_zone_id" {
+  description = "The hosted zone ID of the custom domain target."
+  value       = module.environment_stack.custom_domain_hosted_zone_id
+}
+
 output "cognito_user_pool_id" {
   description = "The Cognito User Pool ID."
   value       = module.environment_stack.cognito_user_pool_id

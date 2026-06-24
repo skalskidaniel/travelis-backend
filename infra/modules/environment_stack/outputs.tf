@@ -14,6 +14,16 @@ output "api_endpoint" {
   value = module.api_gateway.api_endpoint
 }
 
+output "custom_domain_target" {
+  value       = module.api_gateway.custom_domain_target
+  description = "The target domain name to point DNS CNAME/Alias to."
+}
+
+output "custom_domain_hosted_zone_id" {
+  value       = module.api_gateway.custom_domain_hosted_zone_id
+  description = "The hosted zone ID of the custom domain target."
+}
+
 output "cognito_user_pool_id" {
   value = module.cognito.user_pool_id
 }

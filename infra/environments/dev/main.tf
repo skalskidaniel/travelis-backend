@@ -25,4 +25,5 @@ module "environment_stack" {
   aws_profile                  = var.aws_profile
   google_client_id             = var.google_client_id
   google_client_secret         = var.google_client_secret
+  custom_domain                = var.custom_domain
 }

@@ -71,11 +71,12 @@ module "lambda" {
 module "api_gateway" {
   source = "../api_gateway"
 
-  project      = var.project
-  environment  = var.environment
-  frontend_url = var.frontend_url
-  lambda_arn   = module.lambda.api_lambda_arn
-  lambda_name  = module.lambda.api_lambda_name
+  project       = var.project
+  environment   = var.environment
+  frontend_url  = var.frontend_url
+  lambda_arn    = module.lambda.api_lambda_arn
+  lambda_name   = module.lambda.api_lambda_name
+  custom_domain = var.custom_domain
 }
 
 resource "aws_lambda_permission" "allow_eventbridge_scrape" {

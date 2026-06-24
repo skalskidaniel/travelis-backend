@@ -22,3 +22,9 @@ variable "lambda_name" {
   description = "Name of the Lambdalith function."
   type        = string
 }
+
+variable "custom_domain" {
+  description = "Custom API Gateway domain name (e.g., api.wakacje-travelis.pl). Leave empty to skip."
+  type        = string
+  default     = ""
+}

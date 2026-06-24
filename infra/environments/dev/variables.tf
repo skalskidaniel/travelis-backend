@@ -73,4 +73,10 @@ variable "google_client_secret" {
   sensitive   = true
 }
 
+variable "custom_domain" {
+  description = "Custom API Gateway domain name (e.g., api.wakacje-travelis.pl). Leave empty to skip."
+  type        = string
+  default     = ""
+}
+
 
