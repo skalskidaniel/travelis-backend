@@ -23,14 +23,6 @@ def mock_container():
     return c
 
 
-@pytest.fixture(autouse=True)
-def _auto_mock_warm_up():
-    """Bypass the curl_cffi warm-up in all job unit tests."""
-    with patch(
-        "app.jobs.availability.warm_up_session", new=AsyncMock(return_value=True)
-    ):
-        yield
-
 
 @pytest.mark.asyncio
 async def test_run_availability_job_no_cells(mock_container):

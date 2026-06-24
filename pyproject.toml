@@ -32,6 +32,7 @@ markers = [
 ]
 filterwarnings = [
     "ignore:There is no current event loop:DeprecationWarning:mangum.adapter",
+    "ignore::UserWarning:aws_lambda_powertools",
 ]
 
 [dependency-groups]

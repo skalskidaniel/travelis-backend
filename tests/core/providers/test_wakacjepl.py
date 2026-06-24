@@ -18,7 +18,6 @@ from core.providers.wakacjepl.main import (
     WakacjePlProvider,
     SEARCH_URL,
     CALCULATOR_URL,
-    AVAILABILITY_URL,
 )
 
 from core.exceptions.provider import (
@@ -490,23 +489,9 @@ async def test_check_availability(wakacjepl_provider, sample_wakacje_offer):
             200, json={"data": {"offers": [{"id": "HASH_123", "providerCode": "GRCS"}]}}
         )
     )
-    respx.get(AVAILABILITY_URL).mock(
-        return_value=httpx.Response(
-            200, json={"data": {"availability": True, "status": "OK"}}
-        )
-    )
 
     available = await wakacjepl_provider.check_availability(sample_wakacje_offer)
     assert available is True
-    assert respx.calls.last.request.url.params["offerHash"] == "HASH_123"
-
-    respx.get(AVAILABILITY_URL).mock(
-        return_value=httpx.Response(
-            200, json={"data": {"availability": False, "status": "SOLD_OUT"}}
-        )
-    )
-    available = await wakacjepl_provider.check_availability(sample_wakacje_offer)
-    assert available is False
 
     respx.post(calc_url).mock(
         return_value=httpx.Response(200, json={"data": {"offers": []}})
@@ -521,34 +506,14 @@ async def test_check_availability(wakacjepl_provider, sample_wakacje_offer):
     ):
         await wakacjepl_provider.check_availability(offer_no_meta)
 
+    # Test that success: False in calculator variants returns False
     respx.post(calc_url).mock(
         return_value=httpx.Response(
-            200, json={"data": {"offers": [{"id": "HASH_123", "providerCode": "GRCS"}]}}
-        )
-    )
-    respx.get(AVAILABILITY_URL).mock(
-        return_value=httpx.Response(
             200,
             json={
                 "success": False,
-                "msg": "checkOfferAvailability",
-                "error": {"message": "provider returned error", "status": 400},
-                "data": None,
-            },
-        )
-    )
-    with pytest.raises(
-        ProviderAPIException, match="Wakacje.pl availability API failed"
-    ):
-        await wakacjepl_provider.check_availability(sample_wakacje_offer)
-
-    # Test that success: False without an error status (e.g. sold-out variant) returns False
-    respx.get(AVAILABILITY_URL).mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "success": False,
-                "msg": "checkOfferAvailability",
+                "msg": "getCalculatorOfferVariants",
+                "error": {"message": "variant lookup failed", "status": 400},
                 "data": None,
             },
         )
@@ -564,26 +529,21 @@ async def test_check_price(wakacjepl_provider, sample_wakacje_offer):
 
     respx.post(calc_url).mock(
         return_value=httpx.Response(
-            200, json={"data": {"offers": [{"id": "HASH_123", "providerCode": "GRCS"}]}}
-        )
-    )
-    respx.get(AVAILABILITY_URL).mock(
-        return_value=httpx.Response(
-            200, json={"data": {"availability": True, "status": "OK", "price": 6500}}
+            200, json={"data": {"offers": [{"id": "HASH_123", "providerCode": "GRCS", "totalPrice": 6500}]}}
         )
     )
 
     price = await wakacjepl_provider.check_price(sample_wakacje_offer)
     assert price == Decimal("6500")
 
-    respx.get(AVAILABILITY_URL).mock(
-        return_value=httpx.Response(
-            200, json={"data": {"availability": True, "status": "OK"}}
-        )
+    # Fallback to original price if calculator variants returns empty list
+    respx.post(calc_url).mock(
+        return_value=httpx.Response(200, json={"data": {"offers": []}})
     )
     price = await wakacjepl_provider.check_price(sample_wakacje_offer)
     assert price == Decimal("6148.00")  # Fallback to original
 
+    # Fallback to original price if calculator fails
     respx.post(calc_url).mock(
         return_value=httpx.Response(
             200,
@@ -595,8 +555,8 @@ async def test_check_price(wakacjepl_provider, sample_wakacje_offer):
             },
         )
     )
-    with pytest.raises(ProviderAPIException, match="Wakacje.pl calculator API failed"):
-        await wakacjepl_provider.check_price(sample_wakacje_offer)
+    price = await wakacjepl_provider.check_price(sample_wakacje_offer)
+    assert price == Decimal("6148.00")
 
 
 @pytest.mark.asyncio

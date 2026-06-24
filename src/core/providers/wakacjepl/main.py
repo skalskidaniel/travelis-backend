@@ -40,7 +40,6 @@ from core.providers.wakacjepl.utils import (
 
 SEARCH_URL = "https://www.wakacje.pl/v2/api/offers"
 CALCULATOR_URL = "https://www.wakacje.pl/v2/api/getCalculatorOfferVariants/{offer_id}"
-AVAILABILITY_URL = "https://www.wakacje.pl/v2/api/checkOfferAvailability"
 WAKACJE_ORIGIN = "https://www.wakacje.pl"
 PAGE_SIZE = 500
 MIN_DURATION_NIGHTS = 2
@@ -154,51 +153,37 @@ class WakacjePlProvider:
     async def check_availability(self, offer: Offer) -> bool:
         """Return whether a persisted offer is still bookable on Wakacje.pl.
 
-        Uses a two-step process: first, calling the calculator variants API to
-        retrieve a fresh offerHash, and then hitting the hotel-cards availability
-        API to confirm whether it is bookable.
+        Uses the calculator variants API to verify if there is at least one active
+        variant for the offer configuration.
         """
-        live_variant = await self._resolve_live_variant(offer)
-        if live_variant is None:
-            return False
-
-        offer_hash, provider_code = live_variant
         try:
-            status_data = await self._fetch_live_availability(
-                offer, offer_hash, provider_code
-            )
-        except (TooManyRequestsException, ProviderTimeoutException):
-            raise
+            live_variant = await self._resolve_live_variant(offer)
+            return live_variant is not None
         except ProviderAPIException as e:
-            # If the API logically failed with the checkOfferAvailability message (unknown status / 200),
-            # it means the offer/variant is no longer available (sold out or invalid hash).
-            if "checkOfferAvailability" in str(e):
+            # If the calculator API failed logically (status 400), it means
+            # the offer is no longer available/valid.
+            if "calculator" in str(e) or "400" in str(e):
                 return False
             raise
-
-        return (
-            status_data.get("availability") is True
-            and status_data.get("status") == "OK"
-        )
 
     async def check_price(self, offer: Offer) -> Decimal:
         """Fetch the current live price for the given offer on Wakacje.pl.
 
-        Similar to `check_availability`, this executes the full two-step booking
-        flow check to retrieve the most up-to-date total price for the offer.
+        Queries the calculator variants API to retrieve the most up-to-date total price.
         """
-        live_variant = await self._resolve_live_variant(offer)
-        if live_variant is None:
-            return offer.price_total
+        try:
+            variants = await self._fetch_calculator_variants(offer)
+            if not variants:
+                return offer.price_total
 
-        offer_hash, provider_code = live_variant
-        status_data = await self._fetch_live_availability(
-            offer, offer_hash, provider_code
-        )
-
-        price = status_data.get("price")
-        if price is not None:
-            return Decimal(str(price))
+            variant = variants[0]
+            price = variant.get("totalPrice")
+            if price is not None:
+                return Decimal(str(price))
+        except ProviderAPIException as e:
+            if "calculator" in str(e) or "400" in str(e):
+                return offer.price_total
+            raise
 
         return offer.price_total
 
@@ -389,81 +374,7 @@ class WakacjePlProvider:
 
         return (data.get("data") or {}).get("offers") or []
 
-    async def _fetch_live_availability(
-        self, offer: Offer, offer_hash: str, provider_code: str
-    ) -> dict[str, Any]:
-        """Check live booking availability using the final offerHash.
 
-        This calls the `checkOfferAvailability` endpoint with a complex
-        customHeaders structure and detailed participant mapping to simulate
-        a booking verification.
-        """
-        meta = self._metadata_for_offer(offer)
-
-        custom_headers = json.dumps(
-            {
-                "Page-Source": "PO",
-                "Tour-Operator-Code": provider_code,
-                "Tour-Operator-Id": str(meta.tour_operator_id),
-                "Object-Id": str(meta.hotel_id),
-            }
-        )
-
-        headers = {
-            "accept": "application/json",
-            "referer": f"{WAKACJE_ORIGIN}{meta.offer_page_path}",
-            "customHeaders": custom_headers,
-        }
-
-        params = {
-            "providerCode": provider_code,
-            "offerHash": offer_hash,
-            "offerType": "tour",
-            "includeTfgService": "true",
-            "isAlternativeRoom": "false",
-            "cityId": meta.city_id,
-            "countryId": meta.country_id,
-            "regionId": meta.region_id,
-        }
-
-        for i in range(meta.adults):
-            params[f"participantsObject[participants][{i}][birthDate]"] = "1988-01-01"
-            params[f"participantsObject[participants][{i}][type]"] = "adult"
-            params[f"participantsObject[participants][{i}][userAllocateId]"] = i + 1
-
-        idx = meta.adults
-        child_birthday_fmt = representative_child_birthday()
-        child_iso = f"{child_birthday_fmt[:4]}-{child_birthday_fmt[4:6]}-{child_birthday_fmt[6:]}"
-
-        for i in range(meta.children):
-            params[f"participantsObject[participants][{idx}][birthDate]"] = child_iso
-            params[f"participantsObject[participants][{idx}][type]"] = "child"
-            params[f"participantsObject[participants][{idx}][userAllocateId]"] = idx + 1
-            idx += 1
-
-        try:
-            response = await self._client.get(
-                AVAILABILITY_URL, params=params, headers=headers
-            )
-            response.raise_for_status()
-        except httpx.HTTPError as e:
-            self._raise_request_exception("availability", e)
-
-        try:
-            # noinspection PyUnboundLocalVariable
-            data = response.json()
-        except (json.JSONDecodeError, ValueError) as e:
-            raise ProviderAPIException(
-                f"Wakacje.pl availability API returned invalid JSON: {e}"
-            ) from e
-        if not isinstance(data, dict):
-            msg = f"unexpected Wakacje.pl availability response shape: expected dict, got {type(data).__name__}"
-            raise ProviderAPIException(msg)
-
-        if data.get("success") is False:
-            self._raise_api_response_exception("availability", data)
-
-        return data.get("data") or {}
 
     @staticmethod
     def _status_code_from_error(payload: dict[str, Any]) -> int | None:

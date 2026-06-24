@@ -8,7 +8,6 @@ from core.models.cell import MarketCell
 from core.models.offer import Offer
 from core.models.common import ProviderName
 from core.providers.base import OfferProvider
-from core.providers.wakacjepl.session import warm_up_session
 
 logger = Logger(child=True)
 
@@ -19,17 +18,6 @@ async def run_availability_job(container: Container, context=None) -> dict:
     and persist updates to DynamoDB.
     """
     logger.info("Starting daily availability and price check job.")
-
-    # Establish a bot-detection-trusted Wakacje.pl session once per job run.
-    # curl_cffi impersonates Chrome's TLS fingerprint so the server marks the
-    # session as trusted; the resulting cookies are injected into the shared
-    # http_client and reused by all concurrent availability checks below.
-    warmed_up = await warm_up_session(container.http_client)
-    if not warmed_up:
-        logger.warning(
-            "Wakacje.pl session warm-up failed — "
-            "availability checks may return false negatives."
-        )
 
     cells: list[MarketCell] = await container.cells_repo.scan()
     if not cells:
