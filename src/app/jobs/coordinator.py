@@ -121,7 +121,9 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                         z_threshold=container.settings.scoring.attractiveness_z_threshold
                     )
                 )
-                scored_offers: list[ScoredOffer] = await asyncio.to_thread(scorer.score, collapsed_raw)
+                scored_offers: list[ScoredOffer] = await asyncio.to_thread(
+                    scorer.score, collapsed_raw
+                )
                 if not scored_offers:
                     continue
 
@@ -163,10 +165,12 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                     )
                     continue
 
-                existing_offers: list[Offer] = await container.offers_repo.query_by_cell(
-                    cell.cell_id
-                )
-                existing_map: dict[str, Offer] = {o.offer_id: o for o in existing_offers}
+                existing_offers: list[
+                    Offer
+                ] = await container.offers_repo.query_by_cell(cell.cell_id)
+                existing_map: dict[str, Offer] = {
+                    o.offer_id: o for o in existing_offers
+                }
 
                 offers_to_save = []
 

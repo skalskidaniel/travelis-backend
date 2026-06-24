@@ -119,6 +119,24 @@ class DynamoOffersRepository(OffersRepository):
 
         return [Offer(**deserialize_item(item)) for item in items]
 
+    async def scan(self) -> list[Offer]:
+        items = []
+        exclusive_start_key = None
+        # noinspection DuplicatedCode
+        while True:
+            kwargs = {}
+            if exclusive_start_key:
+                kwargs["ExclusiveStartKey"] = exclusive_start_key
+
+            response = await self.table.scan(**kwargs)
+            items.extend(response.get("Items", []))
+
+            exclusive_start_key = response.get("LastEvaluatedKey")
+            if not exclusive_start_key:
+                break
+
+        return [Offer(**deserialize_item(item)) for item in items]
+
     async def delete(self, cell_id: str, offer_id: str) -> None:
         await self.table.delete_item(Key={"cell_id": cell_id, "offer_id": offer_id})
 

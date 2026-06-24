@@ -36,11 +36,12 @@ async def run_availability_job(container: Container, context=None) -> dict:
         logger.info("No active market cells found. Skipping availability check.")
         return {"checked_offers_count": 0, "updated_offers_count": 0}
 
-    cell_offers_lists = await asyncio.gather(
-        *[container.offers_repo.query_by_cell(cell.cell_id) for cell in cells]
-    )
+    active_cell_ids = {cell.cell_id for cell in cells}
+    all_offers = await container.offers_repo.scan()
     available_offers: list[Offer] = [
-        offer for sublist in cell_offers_lists for offer in sublist if offer.available
+        offer
+        for offer in all_offers
+        if offer.available and offer.cell_id in active_cell_ids
     ]
 
     if not available_offers:
@@ -67,7 +68,9 @@ async def run_availability_job(container: Container, context=None) -> dict:
         nonlocal checked_count, updated_count
         async with sem:
             checked_count += 1
-            provider: OfferProvider = tui if offer.provider == ProviderName.TUI else wakacje
+            provider: OfferProvider = (
+                tui if offer.provider == ProviderName.TUI else wakacje
+            )
             logger.debug(
                 "Checking availability for offer %s (provider=%s, cell_id=%s)",
                 offer.offer_id,

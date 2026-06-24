@@ -6,6 +6,7 @@ sessions initiated by plain HTTP clients (httpx) as untrusted bots.  All
 subsequent availability API calls under such sessions return ``success: false``
 regardless of the offer hash.
 """
+
 from __future__ import annotations
 
 import httpx

@@ -87,7 +87,7 @@ async def test_run_availability_job_nothing_available(mock_container):
         updated_at=datetime.now(timezone.utc),
         ttl=1783641600,
     )
-    mock_container.offers_repo.query_by_cell.return_value = [offer]
+    mock_container.offers_repo.scan.return_value = [offer]
 
     result = await run_availability_job(mock_container)
     assert result["checked_offers_count"] == 0
@@ -141,7 +141,7 @@ async def test_run_availability_job_becomes_unavailable(mock_container):
         updated_at=datetime.now(timezone.utc),
         ttl=1783641600,
     )
-    mock_container.offers_repo.query_by_cell.return_value = [offer]
+    mock_container.offers_repo.scan.return_value = [offer]
 
     mock_container.tui_provider.check_availability = AsyncMock(
         return_value=False
@@ -206,7 +206,7 @@ async def test_run_availability_job_price_updates(mock_container):
         updated_at=datetime.now(timezone.utc),
         ttl=1783641600,
     )
-    mock_container.offers_repo.query_by_cell.return_value = [offer]
+    mock_container.offers_repo.scan.return_value = [offer]
 
     mock_container.tui_provider.check_availability = AsyncMock(
         return_value=True

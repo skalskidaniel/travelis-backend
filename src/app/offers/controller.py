@@ -158,7 +158,9 @@ async def get_offers_feed(
         logger.info(
             f"ZSET not cached for user {user_id}, sort {sort}, order {order}, v{current_version}. Building..."
         )
-        user_offers: list[dict] = await container.user_offers_repo.query_by_user(user_id)
+        user_offers: list[dict] = await container.user_offers_repo.query_by_user(
+            user_id
+        )
         if not user_offers:
             return PaginatedOffersResponse(
                 offers=[], next_cursor=None, feed_version=current_version, total_count=0
@@ -219,7 +221,9 @@ async def get_offers_feed(
 
     offer_ids = [oid for oid, _ in offer_keys]
     offer_map = {o.offer_id: o for o in hydrated_offers if o is not None}
-    sorted_offers: list[Offer] = [offer_map[oid] for oid in offer_ids if oid in offer_map]
+    sorted_offers: list[Offer] = [
+        offer_map[oid] for oid in offer_ids if oid in offer_map
+    ]
 
     next_cursor = None
     if len(offer_keys) == limit:

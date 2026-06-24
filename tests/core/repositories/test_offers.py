@@ -60,6 +60,11 @@ async def test_offers_repo_lifecycle(offers_table, test_offer):
     assert len(cell_offers) == 1
     assert cell_offers[0].offer_id == test_offer.offer_id
 
+    # We can also test the new scan method
+    all_offers = await repo.scan()
+    assert len(all_offers) >= 1
+    assert any(o.offer_id == test_offer.offer_id for o in all_offers)
+
     await repo.delete(test_offer.cell_id, test_offer.offer_id)
     assert await repo.get(test_offer.cell_id, test_offer.offer_id) is None
 

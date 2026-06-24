@@ -95,7 +95,9 @@ class MatchingService:
         cell_offers_lists = await asyncio.gather(
             *[self.offers_repo.query_by_cell(cell.cell_id) for cell in required_cells]
         )
-        offers: list[Offer] = [offer for sublist in cell_offers_lists for offer in sublist]
+        offers: list[Offer] = [
+            offer for sublist in cell_offers_lists for offer in sublist
+        ]
         logger.debug(
             "Queried %d raw offers from %d cells for user %s",
             len(offers),
@@ -280,7 +282,9 @@ class MatchingService:
 
         matched_user_ids = []
         for user in users:
-            user_cells: list[MarketCell] = generate_required_cells(user.preferences, reference_date)
+            user_cells: list[MarketCell] = generate_required_cells(
+                user.preferences, reference_date
+            )
             user_cell_ids = {c.cell_id for c in user_cells}
 
             if user_cell_ids & affected_set:

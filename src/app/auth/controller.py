@@ -46,7 +46,9 @@ async def delete_account(
         cell_ids_to_deactivate = [c.cell_id for c in cells if c.cell_id]
 
         try:
-            user_offers: list[dict] = await container.user_offers_repo.query_by_user(user_id)
+            user_offers: list[dict] = await container.user_offers_repo.query_by_user(
+                user_id
+            )
             if user_offers:
                 keys = [(user_id, item["offer_id"]) for item in user_offers]
                 await container.user_offers_repo.delete_batch(keys)

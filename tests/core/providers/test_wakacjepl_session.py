@@ -1,4 +1,5 @@
 """Unit tests for core.providers.wakacjepl.session.warm_up_session."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,6 +8,7 @@ import httpx
 import pytest
 
 from core.providers.wakacjepl.session import warm_up_session, _TRUSTED_COOKIE_NAMES
+
 
 def _make_http_client() -> httpx.AsyncClient:
     """Return a real AsyncClient so we can inspect its cookie jar."""
