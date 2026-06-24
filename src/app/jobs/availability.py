@@ -34,7 +34,12 @@ async def run_availability_job(container: Container, context=None) -> dict:
     cells: list[MarketCell] = await container.cells_repo.scan()
     if not cells:
         logger.info("No active market cells found. Skipping availability check.")
-        return {"checked_offers_count": 0, "updated_offers_count": 0}
+        return {
+            "checked_offers_count": 0,
+            "updated_offers_count": 0,
+            "deleted_offers_count": 0,
+            "remain_available_count": 0,
+        }
 
     active_cell_ids = {cell.cell_id for cell in cells}
     all_offers = await container.offers_repo.scan()
@@ -46,7 +51,12 @@ async def run_availability_job(container: Container, context=None) -> dict:
 
     if not available_offers:
         logger.info("No available offers found in database to check.")
-        return {"checked_offers_count": 0, "updated_offers_count": 0}
+        return {
+            "checked_offers_count": 0,
+            "updated_offers_count": 0,
+            "deleted_offers_count": 0,
+            "remain_available_count": 0,
+        }
 
     logger.debug(
         "Scanning database: found %d available offers across %d cells to verify",
@@ -135,10 +145,16 @@ async def run_availability_job(container: Container, context=None) -> dict:
         )
         await container.matching_service.bulk_match_users(list(deleted_cell_ids))
 
+    deleted_count = len(offers_to_delete)
+    remain_available_count = checked_count - deleted_count
     logger.info(
-        f"Availability check complete. Checked: {checked_count}, Updated: {updated_count}"
+        f"Availability check complete. Checked: {checked_count}, "
+        f"Remain Available: {remain_available_count}, Deleted: {deleted_count}, "
+        f"Price Updates: {updated_count}"
     )
     return {
         "checked_offers_count": checked_count,
         "updated_offers_count": updated_count,
+        "deleted_offers_count": deleted_count,
+        "remain_available_count": remain_available_count,
     }
