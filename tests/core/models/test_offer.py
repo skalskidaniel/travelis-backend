@@ -103,6 +103,22 @@ def test_referral_url_preserves_wakacje_selector_query(valid_offer_kwargs):
     assert f"{selector}=" not in url_str
 
 
+def test_referral_url_wakacje_preserves_commas_on_multiple_validations(
+    valid_offer_kwargs,
+):
+    # Test that validating/re-instantiating an offer with an already decorated wakacje url
+    # does not url-encode the commas or append a '=' to the opaque selector.
+    selector = "od-2026-08-26,7-dni,all-inclusive"
+    decorated_url = (
+        f"https://www.wakacje.pl/wczasy/grecja/oferta.html?{selector}"
+        "&utm_source=travellead&utm_medium=cps&utm_campaign=2933-t-HolidayPicker&a_cid=11111111&a_aid=2933"
+    )
+    valid_offer_kwargs["referral_url"] = decorated_url
+    offer: Offer = Offer(**valid_offer_kwargs)
+
+    assert str(offer.referral_url) == decorated_url
+
+
 def test_referral_url_no_modification_when_already_correct(valid_offer_kwargs):
     correct_url = (
         "https://www.tui.pl/details-gre-123"

@@ -374,8 +374,6 @@ class WakacjePlProvider:
 
         return (data.get("data") or {}).get("offers") or []
 
-
-
     @staticmethod
     def _status_code_from_error(payload: dict[str, Any]) -> int | None:
         error_info = payload.get("error")

@@ -236,7 +236,9 @@ async def get_offers_feed(
         ).decode("utf-8")
 
     page_user_offers = await container.user_offers_repo.get_batch(user_id, offer_ids)
-    favorited_map = {item["offer_id"]: item.get("favorited", False) for item in page_user_offers}
+    favorited_map = {
+        item["offer_id"]: item.get("favorited", False) for item in page_user_offers
+    }
 
     feed_items = [
         OfferFeedItem.from_domain(o, favorited=favorited_map.get(o.offer_id, False))
@@ -257,9 +259,7 @@ async def get_offers_feed(
     summary="Retrieve favorited offers",
     dependencies=[Depends(RateLimiter(times=100, seconds=60))],
     responses={
-        200: {
-            "description": "Successfully retrieved user's favorited offers."
-        },
+        200: {"description": "Successfully retrieved user's favorited offers."},
         400: {"description": "Invalid pagination cursor provided."},
         401: {"description": "Unauthorized - Invalid or missing credentials."},
     },
@@ -443,7 +443,9 @@ async def unfavorite_offer(
 
     is_match = False
     if offer:
-        matches = container.matching_service._filter_offers_vectorized([offer], user.preferences)
+        matches = container.matching_service._filter_offers_vectorized(
+            [offer], user.preferences
+        )
         is_match = len(matches) > 0
 
     if is_match:
@@ -489,7 +491,9 @@ async def get_offer_detail(
             detail="Offer details not found",
         )
 
-    return OfferDetailResponse.from_domain(offer, favorited=uo_item.get("favorited", False))
+    return OfferDetailResponse.from_domain(
+        offer, favorited=uo_item.get("favorited", False)
+    )
 
 
 @router.get(

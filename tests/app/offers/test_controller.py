@@ -334,10 +334,14 @@ def test_favorite_offer_existing(client, mock_container, auth_headers):
 
     response = client.put("/api/v2/offers/offer-123/favorite", headers=auth_headers)
     assert response.status_code == 204
-    mock_container.user_offers_repo.set_favorite.assert_called_once_with("user-123", "offer-123", True)
+    mock_container.user_offers_repo.set_favorite.assert_called_once_with(
+        "user-123", "offer-123", True
+    )
 
 
-def test_favorite_offer_new_shared_success(client, mock_container, auth_headers, sample_domain_offer):
+def test_favorite_offer_new_shared_success(
+    client, mock_container, auth_headers, sample_domain_offer
+):
     # Offer not in UserOffers table, cell_id provided, exists in Offers table
     mock_container.user_offers_repo.get.return_value = None
     mock_container.offers_repo.get.return_value = sample_domain_offer
@@ -357,7 +361,9 @@ def test_favorite_offer_new_shared_success(client, mock_container, auth_headers,
     assert kwargs["favorited"] is True
 
 
-def test_favorite_offer_new_shared_missing_cell_id(client, mock_container, auth_headers):
+def test_favorite_offer_new_shared_missing_cell_id(
+    client, mock_container, auth_headers
+):
     mock_container.user_offers_repo.get.return_value = None
 
     response = client.put("/api/v2/offers/offer-123/favorite", headers=auth_headers)
@@ -385,7 +391,9 @@ def test_unfavorite_offer_not_favorited(client, mock_container, auth_headers):
     assert "Offer is not marked as favorite" in response.json()["detail"]
 
 
-def test_unfavorite_offer_still_matched(client, mock_container, auth_headers, sample_domain_offer):
+def test_unfavorite_offer_still_matched(
+    client, mock_container, auth_headers, sample_domain_offer
+):
     from core.models.user import User
 
     mock_container.user_offers_repo.get.return_value = {
@@ -400,14 +408,22 @@ def test_unfavorite_offer_still_matched(client, mock_container, auth_headers, sa
     mock_container.offers_repo.get.return_value = sample_domain_offer
     # mock matching service filter to return the offer (meaning it matches)
     mock_container.matching_service = MagicMock()
-    mock_container.matching_service._filter_offers_vectorized.return_value = [sample_domain_offer]
+    mock_container.matching_service._filter_offers_vectorized.return_value = [
+        sample_domain_offer
+    ]
 
-    response = client.delete(f"/api/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers)
+    response = client.delete(
+        f"/api/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers
+    )
     assert response.status_code == 204
-    mock_container.user_offers_repo.set_favorite.assert_called_once_with("user-123", sample_domain_offer.offer_id, False)
+    mock_container.user_offers_repo.set_favorite.assert_called_once_with(
+        "user-123", sample_domain_offer.offer_id, False
+    )
 
 
-def test_unfavorite_offer_no_longer_matched(client, mock_container, auth_headers, sample_domain_offer):
+def test_unfavorite_offer_no_longer_matched(
+    client, mock_container, auth_headers, sample_domain_offer
+):
     from core.models.user import User
 
     mock_container.user_offers_repo.get.return_value = {
@@ -424,12 +440,18 @@ def test_unfavorite_offer_no_longer_matched(client, mock_container, auth_headers
     mock_container.matching_service = MagicMock()
     mock_container.matching_service._filter_offers_vectorized.return_value = []
 
-    response = client.delete(f"/api/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers)
+    response = client.delete(
+        f"/api/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers
+    )
     assert response.status_code == 204
-    mock_container.user_offers_repo.delete.assert_called_once_with("user-123", sample_domain_offer.offer_id)
+    mock_container.user_offers_repo.delete.assert_called_once_with(
+        "user-123", sample_domain_offer.offer_id
+    )
 
 
-def test_get_favorites_feed_success(client, mock_container, auth_headers, sample_domain_offer):
+def test_get_favorites_feed_success(
+    client, mock_container, auth_headers, sample_domain_offer
+):
     mock_container.user_offers_repo.query_by_user.return_value = [
         {
             "user_id": "user-123",

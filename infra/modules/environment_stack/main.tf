@@ -140,32 +140,37 @@ try:
     response = client.describe_user_pool(UserPoolId=pool_id)
     pool = response['UserPool']
     
-    kwargs = {
-        'UserPoolId': pool_id,
-        'Policies': pool.get('Policies', {}),
-        'LambdaConfig': pool.get('LambdaConfig', {}),
-        'AutoVerifiedAttributes': pool.get('AutoVerifiedAttributes', []),
-        'UsernameAttributes': pool.get('UsernameAttributes', []),
-        'SmsVerificationMessage': pool.get('SmsVerificationMessage', ''),
-        'EmailVerificationMessage': pool.get('EmailVerificationMessage', ''),
-        'EmailVerificationSubject': pool.get('EmailVerificationSubject', ''),
-        'VerificationMessageTemplate': pool.get('VerificationMessageTemplate', {}),
-        'SmsAuthenticationMessage': pool.get('SmsAuthenticationMessage', ''),
-        'MfaConfiguration': pool.get('MfaConfiguration', 'OFF'),
-        'DeviceConfiguration': pool.get('DeviceConfiguration', {}),
-        'EmailConfiguration': pool.get('EmailConfiguration', {}),
-        'SmsConfiguration': pool.get('SmsConfiguration', {}),
-        'UserPoolTags': pool.get('UserPoolTags', {}),
-        'AdminCreateUserConfig': pool.get('AdminCreateUserConfig', {}),
-        'UserPoolAddOns': pool.get('UserPoolAddOns', {}),
-        'AccountRecoverySetting': pool.get('AccountRecoverySetting', {})
+    ALLOWED_KEYS = {
+        'UserPoolId', 'Policies', 'DeletionProtection', 'LambdaConfig',
+        'AutoVerifiedAttributes', 'SmsVerificationMessage', 'EmailVerificationMessage',
+        'EmailVerificationSubject', 'VerificationMessageTemplate', 'SmsAuthenticationMessage',
+        'UserAttributeUpdateSettings', 'MfaConfiguration', 'DeviceConfiguration',
+        'EmailConfiguration', 'SmsConfiguration', 'UserPoolTags', 'AdminCreateUserConfig',
+        'UserPoolAddOns', 'AccountRecoverySetting', 'PoolName', 'UserPoolTier'
     }
-    
-    # Remove empty dictionaries/lists that cause validation errors if passed back blindly
-    kwargs = {k: v for k, v in kwargs.items() if v}
-    kwargs['UserPoolId'] = pool_id # Put it back in case it was falsey
 
-    # Update the PostConfirmation trigger
+    kwargs = {}
+    for key in ALLOWED_KEYS:
+        if key in pool:
+            kwargs[key] = pool[key]
+            
+    # Clean up empty strings or values that fail validation if empty
+    for k in list(kwargs.keys()):
+        val = kwargs[k]
+        if val is None:
+            del kwargs[k]
+        elif isinstance(val, str) and not val.strip():
+            del kwargs[k]
+        elif isinstance(val, dict) and not val:
+            del kwargs[k]
+        elif isinstance(val, list) and not val:
+            del kwargs[k]
+
+    kwargs['UserPoolId'] = pool_id
+
+    if 'LambdaConfig' not in kwargs:
+        kwargs['LambdaConfig'] = {}
+
     kwargs['LambdaConfig']['PostConfirmation'] = lambda_arn
 
     client.update_user_pool(**kwargs)

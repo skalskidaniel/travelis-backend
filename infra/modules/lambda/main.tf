@@ -80,7 +80,8 @@ resource "aws_iam_policy" "lambda_custom_policy" {
           "dynamodb:Query",
           "dynamodb:Scan",
           "dynamodb:BatchWriteItem",
-          "dynamodb:BatchGetItem"
+          "dynamodb:BatchGetItem",
+          "dynamodb:DescribeTable"
         ]
         Resource = [
           var.users_table_arn,

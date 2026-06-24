@@ -529,7 +529,14 @@ async def test_check_price(wakacjepl_provider, sample_wakacje_offer):
 
     respx.post(calc_url).mock(
         return_value=httpx.Response(
-            200, json={"data": {"offers": [{"id": "HASH_123", "providerCode": "GRCS", "totalPrice": 6500}]}}
+            200,
+            json={
+                "data": {
+                    "offers": [
+                        {"id": "HASH_123", "providerCode": "GRCS", "totalPrice": 6500}
+                    ]
+                }
+            },
         )
     )
 

@@ -65,9 +65,7 @@ class UsersRepository(Protocol):
 class UserOffersRepository(Protocol):
     async def get(self, user_id: str, offer_id: str) -> dict | None: ...
 
-    async def get_batch(
-        self, user_id: str, offer_ids: list[str]
-    ) -> list[dict]: ...
+    async def get_batch(self, user_id: str, offer_ids: list[str]) -> list[dict]: ...
 
     async def put(
         self,

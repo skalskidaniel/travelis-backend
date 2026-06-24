@@ -1,6 +1,6 @@
 from datetime import date, datetime, time, timezone
 from typing import Self
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from pydantic import (
     AnyHttpUrl,
@@ -250,17 +250,24 @@ class Offer(ScoredOffer):
 
         referral_qs = urlencode(REFERRAL_PARAMS, doseq=True)
 
-        if parts.query and "=" not in parts.query:
-            # Opaque wakacje.pl selector (e.g. "od-2026-08-26,7-dni,all-inclusive") —
-            # parse_qsl cannot represent it, so keep it verbatim as the base.
-            base_query = parts.query
+        if parts.query:
+            # Reconstruct the base query without referral parameters.
+            # We split the query string by '&' to preserve any opaque, non-standard key-value
+            # structures (like Wakacje.pl's "od-2026-08-26,7-dni,all-inclusive") verbatim.
+            filtered_params = []
+            for param in parts.query.split("&"):
+                if not param:
+                    continue
+                if "=" not in param:
+                    # Keep opaque parameters verbatim (preserving commas, and avoiding trailing '=')
+                    filtered_params.append(param)
+                else:
+                    key, _ = param.split("=", 1)
+                    if key not in REFERRAL_PARAMS:
+                        filtered_params.append(param)
+            base_query = "&".join(filtered_params)
         else:
-            pairs = [
-                (k, v)
-                for k, v in parse_qsl(parts.query, keep_blank_values=True)
-                if k not in REFERRAL_PARAMS
-            ]
-            base_query = urlencode(pairs, doseq=True)
+            base_query = ""
 
         new_query = f"{base_query}&{referral_qs}" if base_query else referral_qs
         new_url = urlunsplit(

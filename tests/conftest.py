@@ -16,6 +16,7 @@ from core.container import container
 container.settings.aws_profile = None
 container.settings.aws_region = "us-east-1"
 
+
 @pytest.fixture(scope="session", autouse=True)
 def clean_aws_env():
     os.environ.pop("AWS_PROFILE", None)

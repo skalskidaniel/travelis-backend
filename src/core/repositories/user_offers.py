@@ -41,8 +41,7 @@ class DynamoUserOffersRepository(UserOffersRepository):
             request_items = {
                 table_name: {
                     "Keys": [
-                        {"user_id": user_id, "offer_id": offer_id}
-                        for offer_id in chunk
+                        {"user_id": user_id, "offer_id": offer_id} for offer_id in chunk
                     ],
                     "ConsistentRead": False,
                 }
@@ -86,9 +85,7 @@ class DynamoUserOffersRepository(UserOffersRepository):
         }
         await self.table.put_item(Item=serialize_item(item))
 
-    async def set_favorite(
-        self, user_id: str, offer_id: str, favorited: bool
-    ) -> None:
+    async def set_favorite(self, user_id: str, offer_id: str, favorited: bool) -> None:
         await self.table.update_item(
             Key={"user_id": user_id, "offer_id": offer_id},
             UpdateExpression="SET favorited = :f",

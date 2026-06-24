@@ -226,7 +226,9 @@ class OfferDetailResponse(BaseModel):
     )
 
     @classmethod
-    def from_domain(cls, offer: Offer, favorited: bool = False) -> "OfferDetailResponse":
+    def from_domain(
+        cls, offer: Offer, favorited: bool = False
+    ) -> "OfferDetailResponse":
         parts = offer.location.split("/")
         country = parts[0] if len(parts) > 0 else ""
         region = parts[1] if len(parts) > 1 else ""

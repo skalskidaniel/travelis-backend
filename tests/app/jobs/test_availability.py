@@ -23,7 +23,6 @@ def mock_container():
     return c
 
 
-
 @pytest.mark.asyncio
 async def test_run_availability_job_no_cells(mock_container):
     mock_container.cells_repo.scan.return_value = []
