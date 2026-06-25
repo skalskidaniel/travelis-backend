@@ -167,7 +167,9 @@ def test_lambda_handler_cognito_post_confirmation_federated(lambda_context):
         mock_container.initialize = AsyncMock()
         response = handler(event, lambda_context)
         assert response == event
-        mock_get_or_create.assert_called_once_with("83845802-8051-7070-75d9-2912768752bd", mock_container)
+        mock_get_or_create.assert_called_once_with(
+            "83845802-8051-7070-75d9-2912768752bd", mock_container
+        )
 
 
 def test_lambda_handler_scheduler_match_user(lambda_context):

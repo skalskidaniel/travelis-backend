@@ -1,6 +1,5 @@
 import math
 from typing import Sequence
-import numpy as np
 
 from core.models.offer import RawOffer, ScoredOffer
 from core.services.scoring.base import OfferScorer
@@ -14,6 +13,8 @@ class StatisticalOfferScorer(OfferScorer):
     def score(self, offers: Sequence[RawOffer]) -> list[ScoredOffer]:
         if not offers:
             return []
+
+        import numpy as np
 
         n = len(offers)
 

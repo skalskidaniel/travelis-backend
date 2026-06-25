@@ -1,7 +1,6 @@
 import asyncio
 from aws_lambda_powertools import Logger
 from datetime import date, datetime, timezone
-import pandas as pd
 
 from core.models.cell import MarketCell
 from core.models.user import User, UserPreferences
@@ -176,6 +175,8 @@ class MatchingService:
         """Apply vectorized NumPy/Pandas filtering on a list of Offer objects."""
         if not offers:
             return []
+
+        import pandas as pd
 
         offers_data = [
             {
