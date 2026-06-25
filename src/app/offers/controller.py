@@ -27,7 +27,11 @@ async def _prune_stale_user_offers(
     requested_keys: list[tuple[str, str]],
     hydrated_offers: list[Offer],
 ) -> bool:
-    """Remove UserOffers rows whose offers no longer exist and bump feed version."""
+    """Remove UserOffers rows whose offers no longer exist and bump feed version.
+
+    Favorited offers are pruned identically to non-favorited ones; the
+    `favorited` flag does not grant any persistence contract here.
+    """
     returned_keys = {(offer.cell_id, offer.offer_id) for offer in hydrated_offers}
     stale_keys = [key for key in requested_keys if key not in returned_keys]
     if not stale_keys:

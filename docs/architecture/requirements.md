@@ -129,7 +129,7 @@ Server does **not** track per-offer seen state.
 
 ### Favorited Offers
 
-Users can mark specific offers as "favorited". The server persists this state per user-offer pair. Favorited offers persist even if they no longer match the user's current travel preferences (until the offer itself expires/TTL or is marked unavailable).
+Users can mark specific offers as "favorited". The server persists this state per user-offer pair as long as the underlying offer is still present in the `Offers` table. Favorited offers are **not** treated specially during matching or pruning: when an offer is removed from `Offers` (TTL expiry, marked unavailable, or hydration miss during a feed read), the corresponding `UserOffers` row — including its `favorited` flag — is deleted.
 
 ### Offer acquisition
 
