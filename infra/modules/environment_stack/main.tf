@@ -95,6 +95,14 @@ resource "aws_lambda_permission" "allow_eventbridge_availability" {
   source_arn    = module.eventbridge.check_availability_rule_arn
 }
 
+resource "aws_lambda_permission" "allow_eventbridge_sweep_inactive_users" {
+  statement_id  = "AllowExecutionFromEventBridgeSweepInactiveUsers"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda.cron_lambda_name
+  principal     = "events.amazonaws.com"
+  source_arn    = module.eventbridge.sweep_inactive_users_rule_arn
+}
+
 resource "aws_lambda_permission" "allow_scheduler_match" {
   statement_id  = "AllowExecutionFromEventBridgeScheduler"
   action        = "lambda:InvokeFunction"

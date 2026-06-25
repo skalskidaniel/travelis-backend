@@ -15,6 +15,8 @@ def mock_container():
     c.users_repo = AsyncMock()
     c.activation_service = AsyncMock()
     c.scheduler_service = AsyncMock()
+    c.user_activity_service = MagicMock()
+    c.user_activity_service.ensure_active = AsyncMock(return_value=False)
     return c
 
 

@@ -103,6 +103,11 @@ class Settings(BaseSettings):
         default=True,
         validation_alias=AliasChoices("RATE_LIMITING_ENABLED"),
     )
+    inactivity_threshold_days: int = Field(
+        default=7,
+        validation_alias=AliasChoices("INACTIVITY_THRESHOLD_DAYS"),
+        ge=1,
+    )
 
     db: DatabaseSettings | None = None
     push: PushSettings | None = None

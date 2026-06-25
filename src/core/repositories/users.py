@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+import asyncio
+from datetime import date, datetime, timezone
 from typing import Any
 from botocore.exceptions import ClientError
 
@@ -56,6 +57,96 @@ class DynamoUsersRepository(UsersRepository):
         # noinspection DuplicatedCode
         while True:
             kwargs = {}
+            if exclusive_start_key:
+                kwargs["ExclusiveStartKey"] = exclusive_start_key
+
+            response = await self.table.scan(**kwargs)
+            items.extend(response.get("Items", []))
+
+            exclusive_start_key = response.get("LastEvaluatedKey")
+            if not exclusive_start_key:
+                break
+
+        return [User(**deserialize_item(item)) for item in items]
+
+    async def touch_last_seen(self, user_id: str, seen_date: date) -> None:
+        seen_str = seen_date.isoformat()
+        try:
+            await self.table.update_item(
+                Key={"user_id": user_id},
+                UpdateExpression="SET last_seen_date = :d",
+                ExpressionAttributeValues={":d": seen_str},
+                ConditionExpression=(
+                    "attribute_exists(user_id) AND "
+                    "(attribute_not_exists(last_seen_date) OR last_seen_date < :d)"
+                ),
+            )
+        except ClientError as exc:
+            error_code = exc.response.get("Error", {}).get("Code")
+            if error_code == "ConditionalCheckFailedException":
+                return
+            raise
+
+    async def mark_inactive(self, user_ids: list[str]) -> int:
+        if not user_ids:
+            return 0
+
+        async def _update(user_id: str) -> bool:
+            try:
+                await self.table.update_item(
+                    Key={"user_id": user_id},
+                    UpdateExpression="SET is_active = :v",
+                    ExpressionAttributeValues={":v": False},
+                    ConditionExpression=(
+                        "attribute_exists(user_id) AND is_active = :true"
+                    ),
+                )
+                return True
+            except ClientError as exc:
+                error_code = exc.response.get("Error", {}).get("Code")
+                if error_code == "ConditionalCheckFailedException":
+                    return False
+                raise
+
+        results = await asyncio.gather(*[_update(uid) for uid in user_ids])
+        return sum(1 for r in results if r)
+
+    async def clear_inactive(self, user_ids: list[str]) -> int:
+        if not user_ids:
+            return 0
+
+        async def _update(user_id: str) -> bool:
+            try:
+                await self.table.update_item(
+                    Key={"user_id": user_id},
+                    UpdateExpression="SET is_active = :v",
+                    ExpressionAttributeValues={":v": True},
+                    ConditionExpression=(
+                        "attribute_exists(user_id) AND is_active = :false"
+                    ),
+                )
+                return True
+            except ClientError as exc:
+                error_code = exc.response.get("Error", {}).get("Code")
+                if error_code == "ConditionalCheckFailedException":
+                    return False
+                raise
+
+        results = await asyncio.gather(*[_update(uid) for uid in user_ids])
+        return sum(1 for r in results if r)
+
+    async def list_users_inactive_since(self, cutoff: date) -> list[User]:
+        cutoff_str = cutoff.isoformat()
+        items: list[User] = []
+        exclusive_start_key = None
+        while True:
+            kwargs: dict = {
+                "FilterExpression": ("last_seen_date < :cutoff AND is_active = :true"),
+                "ExpressionAttributeValues": {
+                    ":cutoff": cutoff_str,
+                    ":true": True,
+                },
+            }
             if exclusive_start_key:
                 kwargs["ExclusiveStartKey"] = exclusive_start_key
 

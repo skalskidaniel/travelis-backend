@@ -37,6 +37,16 @@ async def get_or_create_user(user_id: str, container: Container) -> User:
             logger.warning(
                 f"Failed to schedule match for new user {user_id} (ignoring): {exc}"
             )
+        return user
+
+    reactivated = await container.user_activity_service.ensure_active(user)
+    if reactivated:
+        try:
+            await container.scheduler_service.schedule_match(user_id)
+        except SchedulerException as exc:
+            logger.warning(
+                f"Failed to schedule match after reactivating user {user_id} (ignoring): {exc}"
+            )
     return user
 
 

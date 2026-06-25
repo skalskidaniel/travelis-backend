@@ -18,6 +18,7 @@ from app.exceptions import (
 from app.health.controller import router as health_router
 from app.jobs.availability import run_availability_job
 from app.jobs.coordinator import run_scrape_job
+from app.jobs.user_inactivity_sweep import run_user_inactivity_sweep
 from app.offers.controller import router as offers_router
 from app.user.controller import router as user_router
 from core.container import container
@@ -193,7 +194,18 @@ async def handle_non_http(event: dict, context) -> dict:
             "results": results,
         }
 
-    # E. Unrecognized non-HTTP events
+    # E. EventBridge weekly user inactivity sweep
+    elif event_type == "sweep_inactive_users":
+        logger.info("EventBridge: Starting sweep_inactive_users job")
+
+        results = await run_user_inactivity_sweep(container, context, payload=event)
+        return {
+            "status": "success",
+            "message": "User inactivity sweep completed",
+            "results": results,
+        }
+
+    # F. Unrecognized non-HTTP events
     else:
         logger.error(
             "Unrecognized non-HTTP event: triggerSource=%s, type=%s",

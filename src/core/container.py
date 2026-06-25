@@ -45,6 +45,7 @@ class Container:
         self.notifications_service: Any = None
         self.scheduler_service: Any = None
         self.cognito_jwt_verifier: Any = None
+        self.user_activity_service: Any = None
 
     async def initialize(self) -> None:
         """Initialize all shared resources once per cold start."""
@@ -115,6 +116,7 @@ class Container:
         from core.services.matching import MatchingService
         from core.services.scheduler import SchedulerService
         from core.services.cognito_jwt import CognitoJwtVerifier
+        from core.services.user_activity import UserActivityService
 
         vapid_private_key = self.settings.vapid_private_key
         if self.settings.vapid_private_key_secret_arn:
@@ -149,6 +151,12 @@ class Container:
             settings=self.settings,
             http_client=self.http_client,
         )
+        self.user_activity_service = UserActivityService(
+            users_repo=self.users_repo,
+            cells_repo=self.cells_repo,
+            redis_client=self.redis_client,
+            inactivity_threshold_days=self.settings.inactivity_threshold_days,
+        )
 
     async def cleanup(self) -> None:
         """Close and release all resources cleanly."""
@@ -176,6 +184,7 @@ class Container:
             self.notifications_service = None
             self.scheduler_service = None
             self.cognito_jwt_verifier = None
+            self.user_activity_service = None
             self._loop = None
 
 

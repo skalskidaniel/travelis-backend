@@ -19,8 +19,15 @@ async def get_current_user(
     """Extract and validate the Cognito JWT from the Authorization header."""
     token = credentials.credentials
     try:
-        return await container.cognito_jwt_verifier.verify_token(token)
+        user_id = await container.cognito_jwt_verifier.verify_token(token)
     except CognitoJwtConfigurationException as exc:
         raise ServiceConfigurationException(str(exc)) from exc
     except CognitoJwtValidationException as exc:
         raise AuthenticationException(str(exc)) from exc
+
+    if container.user_activity_service is not None:
+        import asyncio
+
+        asyncio.create_task(container.user_activity_service.touch_daily(user_id))
+
+    return user_id

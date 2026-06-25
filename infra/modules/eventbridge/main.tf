@@ -26,6 +26,20 @@ resource "aws_cloudwatch_event_target" "check_availability_target" {
   input     = jsonencode({ "type" : "check_availability" })
 }
 
+# 3. User Inactivity Sweep Cron Rule (weekly, Mondays 03:00 UTC)
+resource "aws_cloudwatch_event_rule" "sweep_inactive_users" {
+  name                = "${var.project}-${var.environment}-sweep-inactive-users-rule"
+  description         = "Triggers weekly user inactivity sweep job"
+  schedule_expression = "cron(0 3 ? * MON *)"
+}
+
+resource "aws_cloudwatch_event_target" "sweep_inactive_users_target" {
+  rule      = aws_cloudwatch_event_rule.sweep_inactive_users.name
+  target_id = "SweepInactiveUsersTarget"
+  arn       = var.lambda_arn
+  input     = jsonencode({ "type" : "sweep_inactive_users" })
+}
+
 
 # 3. EventBridge Scheduler IAM Role
 # This is the role assumed by the one-time matching schedules created dynamically by the application.

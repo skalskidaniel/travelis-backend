@@ -1,5 +1,5 @@
 from typing import Protocol, runtime_checkable
-from datetime import datetime
+from datetime import date, datetime
 
 from core.models.cell import MarketCell
 from core.models.offer import Offer
@@ -59,6 +59,14 @@ class UsersRepository(Protocol):
     ) -> None: ...
 
     async def scan(self) -> list[User]: ...
+
+    async def touch_last_seen(self, user_id: str, seen_date: date) -> None: ...
+
+    async def mark_inactive(self, user_ids: list[str]) -> int: ...
+
+    async def clear_inactive(self, user_ids: list[str]) -> int: ...
+
+    async def list_users_inactive_since(self, cutoff: date) -> list[User]: ...
 
 
 @runtime_checkable

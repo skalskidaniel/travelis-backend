@@ -140,7 +140,7 @@ class PushSubscription(BaseModel):
 
 
 class User(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
+    model_config = ConfigDict(strict=True, extra="ignore")
 
     user_id: str = Field(description="Cognito sub identifier.")
     preferences: UserPreferences = Field(default_factory=UserPreferences)
@@ -148,3 +148,5 @@ class User(BaseModel):
     push_subscription: PushSubscription | None = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_seen_date: date = Field(default_factory=date.today)
+    is_active: bool = Field(default=True)

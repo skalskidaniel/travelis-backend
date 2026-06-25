@@ -10,5 +10,8 @@ output "scrape_offers_rule_arn" {
 
 output "check_availability_rule_arn" {
   value       = aws_cloudwatch_event_rule.check_availability.arn
-  description = "The ARN of the EventBridge check availability rule."
+}
+
+output "sweep_inactive_users_rule_arn" {
+  value       = aws_cloudwatch_event_rule.sweep_inactive_users.arn
 }
