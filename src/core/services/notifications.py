@@ -12,16 +12,16 @@ logger = Logger(child=True)
 
 NOTIFICATION_TEMPLATES = [
     {
-        "title": "Nowe oferty są dostępne!",
-        "body": "Znaleźliśmy nowe oferty turystyczne odpowiadające Twoim preferencjom. Sprawdź aplikację!",
+        "title": "Nowe oferty!",
+        "body": "Sprawdź aplikację!",
     },
     {
-        "title": "Mamy dla Ciebie nowe okazje!",
-        "body": "Zaktualizowaliśmy Twoje dopasowania. Zobacz najtańsze wycieczki już teraz!",
+        "title": "Nowe wycieczki!",
+        "body": "Zobacz najatrakcyjniejsze opcje!",
     },
     {
-        "title": "Pojawiły się nowe okazje wakacyjne!",
-        "body": "Zobacz najnowsze oferty dopasowane do Twoich kryteriów zanim znikną!",
+        "title": "Nowe okazje!",
+        "body": "Zobacz zanim znikną!",
     },
 ]
 
