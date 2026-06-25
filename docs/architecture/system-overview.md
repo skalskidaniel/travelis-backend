@@ -29,7 +29,7 @@ The scheduled job router (`handle_non_http(event, context)`) dispatches tasks ba
 
 | Event Source                  | Payload / Structure                              | Handler Path                                                           | Description                                       |
 | :---------------------------- | :----------------------------------------------- | :--------------------------------------------------------------------- | :------------------------------------------------ |
-| **API Gateway**               | HTTP request                                     | API Lambda → Mangum → FastAPI routers (async)                          | All `/api/v2/*` HTTP traffic                      |
+| **API Gateway**               | HTTP request                                     | API Lambda → Mangum → FastAPI routers (async)                          | All `/v2/*` HTTP traffic                          |
 | **EventBridge Cron (Scrape)** | `{ "type": "scrape_offers" }`                    | Cron Lambda → `handle_non_http` → `app.jobs.coordinator`               | Orchestrates cell scraping (3× daily)             |
 | **EventBridge Cron (Avail)**  | `{ "type": "check_availability" }`               | Cron Lambda → `handle_non_http` → `app.jobs.availability`              | Checks active offer availability (1× daily)       |
 | **EventBridge Scheduler**     | `{ "type": "match_user", "user_id": "usr_123" }` | Cron Lambda → `handle_non_http` → `matching_service.match_user_offers` | Debounced per-user re-match (one-time schedule)   |
@@ -39,13 +39,13 @@ The scheduled job router (`handle_non_http(event, context)`) dispatches tasks ba
 
 `src/app/` holds **entrypoints only** — controllers and job orchestrators. Aligned with `src/app/main.py`:
 
-| Module   | Prefix           | Responsibility                          |
-| -------- | ---------------- | --------------------------------------- |
-| `auth`   | `/api/v2/auth`   | Delete account (Cognito + data cascade) |
-| `health` | `/api/v2/health` | System health check and telemetry       |
-| `user`   | `/api/v2/user`   | Preferences, push notification settings |
-| `offers` | `/api/v2/offers` | Read-only paginated offer feed          |
-| `jobs`   | _(no HTTP)_      | Orchestrate scrape, match, availability |
+| Module   | Prefix       | Responsibility                          |
+| -------- | ------------ | --------------------------------------- |
+| `auth`   | `/v2/auth`   | Delete account (Cognito + data cascade) |
+| `health` | `/v2/health` | System health check and telemetry       |
+| `user`   | `/v2/user`   | Preferences, push notification settings |
+| `offers` | `/v2/offers` | Read-only paginated offer feed          |
+| `jobs`   | _(no HTTP)_  | Orchestrate scrape, match, availability |
 
 ### `core/` package
 
@@ -79,14 +79,14 @@ flowchart LR
 
 ## Authentication flow
 
-| Operation      | Where                        | Notes                                                     |
-| -------------- | ---------------------------- | --------------------------------------------------------- |
-| Sign up        | PWA → Cognito                | Hosted UI or Amplify Auth                                 |
-| Sign in        | PWA → Cognito                | Returns JWT                                               |
-| API calls      | PWA → Backend                | `Authorization: Bearer <JWT>`                             |
-| Delete account | PWA → `/api/v2/auth/account` | Backend deletes Cognito user + DynamoDB data + Redis keys |
+| Operation      | Where                    | Notes                                                     |
+| -------------- | ------------------------ | --------------------------------------------------------- |
+| Sign up        | PWA → Cognito            | Hosted UI or Amplify Auth                                 |
+| Sign in        | PWA → Cognito            | Returns JWT                                               |
+| API calls      | PWA → Backend            | `Authorization: Bearer <JWT>`                             |
+| Delete account | PWA → `/v2/auth/account` | Backend deletes Cognito user + DynamoDB data + Redis keys |
 
-Protected routes: `/api/v2/user/*`, `/api/v2/offers/*`.
+Protected routes: `/v2/user/*`, `/v2/offers/*`.
 
 ## Concurrency model for jobs
 

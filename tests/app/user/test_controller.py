@@ -29,7 +29,7 @@ def client(mock_container):
 def test_get_preferences_new_user_lazy_creates(client, mock_container):
     mock_container.users_repo.get.return_value = None
 
-    response = client.get("/api/v2/user/preferences")
+    response = client.get("/v2/user/preferences")
 
     assert response.status_code == 200
     data = response.json()
@@ -47,7 +47,7 @@ def test_get_preferences_existing_user(client, mock_container):
     )
     mock_container.users_repo.get.return_value = existing_user
 
-    response = client.get("/api/v2/user/preferences")
+    response = client.get("/v2/user/preferences")
 
     assert response.status_code == 200
     data = response.json()
@@ -67,7 +67,7 @@ def test_update_preferences(client, mock_container):
         "countries": ["IT", "ES"],
         "board": ["all-inclusive", "half-board"],
     }
-    response = client.patch("/api/v2/user/preferences", json=payload)
+    response = client.patch("/v2/user/preferences", json=payload)
 
     assert response.status_code == 200
     data = response.json()
@@ -90,7 +90,7 @@ def test_enable_push(client, mock_container):
             "keys": {"p256dh": "key_p256dh", "auth": "key_auth"},
         }
     }
-    response = client.post("/api/v2/user/push/enable", json=payload)
+    response = client.post("/v2/user/push/enable", json=payload)
 
     assert response.status_code == 204
     mock_container.users_repo.update_push.assert_called_once()
@@ -109,7 +109,7 @@ def test_disable_push(client, mock_container):
     existing_user: User = User(user_id="user-123")
     mock_container.users_repo.get.return_value = existing_user
 
-    response = client.post("/api/v2/user/push/disable")
+    response = client.post("/v2/user/push/disable")
 
     assert response.status_code == 204
     mock_container.users_repo.update_push.assert_called_once_with(

@@ -20,7 +20,7 @@ resource "aws_apigatewayv2_integration" "integration" {
 
 resource "aws_apigatewayv2_route" "route" {
   api_id    = aws_apigatewayv2_api.api.id
-  route_key = "ANY /api/v2/{proxy+}"
+  route_key = "ANY /v2/{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.integration.id}"
 }
 

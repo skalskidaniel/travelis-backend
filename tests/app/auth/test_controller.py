@@ -42,7 +42,7 @@ def test_delete_account_cascade_success(client, mock_container):
         {"user_id": "user-123", "offer_id": "offer-abc"}
     ]
 
-    response = client.delete("/api/v2/auth/account")
+    response = client.delete("/v2/auth/account")
 
     assert response.status_code == 204
 
@@ -64,7 +64,7 @@ def test_delete_account_cascade_success(client, mock_container):
 def test_delete_account_user_not_found_cleans_cognito(client, mock_container):
     mock_container.users_repo.get.return_value = None
 
-    response = client.delete("/api/v2/auth/account")
+    response = client.delete("/v2/auth/account")
 
     assert response.status_code == 204
 
@@ -85,7 +85,7 @@ def test_delete_account_no_cognito_pool_skips_cognito(client, mock_container):
     mock_container.users_repo.get.return_value = existing_user
     mock_container.user_offers_repo.query_by_user.return_value = []
 
-    response = client.delete("/api/v2/auth/account")
+    response = client.delete("/v2/auth/account")
 
     assert response.status_code == 204
 
@@ -100,7 +100,7 @@ def test_delete_account_fails_when_user_delete_fails(client, mock_container):
     mock_container.user_offers_repo.query_by_user.return_value = []
     mock_container.users_repo.delete.side_effect = RuntimeError("dynamodb error")
 
-    response = client.delete("/api/v2/auth/account")
+    response = client.delete("/v2/auth/account")
 
     assert response.status_code == 500
     assert "retryable" not in response.json()
@@ -116,7 +116,7 @@ def test_delete_account_fails_when_cognito_delete_fails(client, mock_container):
         "cognito error"
     )
 
-    response = client.delete("/api/v2/auth/account")
+    response = client.delete("/v2/auth/account")
 
     assert response.status_code == 500
     assert "retryable" not in response.json()
@@ -136,7 +136,7 @@ def test_delete_account_fails_when_user_offers_delete_fails_no_cell_decrement(
         "dynamodb error"
     )
 
-    response = client.delete("/api/v2/auth/account")
+    response = client.delete("/v2/auth/account")
 
     assert response.status_code == 500
     mock_container.feed_repo.clear_user.assert_not_called()
@@ -154,7 +154,7 @@ def test_delete_account_uses_updated_at_reference_date(client, mock_container):
     mock_container.users_repo.get.return_value = existing_user
     mock_container.user_offers_repo.query_by_user.return_value = []
 
-    response = client.delete("/api/v2/auth/account")
+    response = client.delete("/v2/auth/account")
 
     assert response.status_code == 204
     mock_container.cells_repo.decrement_activations.assert_called_once()

@@ -93,7 +93,7 @@ There is **no 2-minute sweeper**. Two distinct events drive matching:
 
 ### Preference debouncing (EventBridge Scheduler)
 
-On `PATCH /api/v2/user/preferences`:
+On `PATCH /v2/user/preferences`:
 
 1. Save latest preferences to `Users`.
 2. Update market cell activation (increment/decrement).
@@ -147,7 +147,7 @@ If the check determines that the offer is no longer available, the offer is dele
 
 ### Lazy ZSET Building
 
-The ZSET is built lazily on the first `GET /api/v2/offers` request for a specific sort field and order:
+The ZSET is built lazily on the first `GET /v2/offers` request for a specific sort field and order:
 
 1. Retrieve the user's current `feed_version` from the key `user:{user_id}:feed_version`.
 2. Check if ZSET key `user:{user_id}:sort:{field}:{order}:v{version}` exists in Redis.

@@ -31,7 +31,7 @@ def client(mock_container):
 
 
 def test_health_check_returns_ok(client):
-    response = client.get("/api/v2/health")
+    response = client.get("/v2/health")
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
@@ -42,7 +42,7 @@ def test_health_check_returns_ok(client):
 def test_health_check_redis_error(client, mock_container):
     mock_container.redis_client.ping = AsyncMock(side_effect=ConnectionError("down"))
 
-    response = client.get("/api/v2/health")
+    response = client.get("/v2/health")
     assert response.status_code == 503
     body = response.json()
     assert body["status"] == "unhealthy"
@@ -53,7 +53,7 @@ def test_health_check_redis_error(client, mock_container):
 def test_health_check_dynamodb_unavailable(client, mock_container):
     mock_container.users_repo = None
 
-    response = client.get("/api/v2/health")
+    response = client.get("/v2/health")
     assert response.status_code == 503
     body = response.json()
     assert body["status"] == "unhealthy"

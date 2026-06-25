@@ -89,7 +89,7 @@ def test_get_offers_empty_feed(client, mock_container, auth_headers):
     mock_container.feed_repo.get_or_build_sort_zset.return_value = False
     mock_container.user_offers_repo.query_by_user.return_value = []
 
-    response = client.get("/api/v2/offers", headers=auth_headers)
+    response = client.get("/v2/offers", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["offers"] == []
@@ -111,7 +111,7 @@ def test_get_offers_cached_feed(
     ]
     mock_container.offers_repo.get_batch.return_value = [sample_domain_offer]
 
-    response = client.get("/api/v2/offers", headers=auth_headers)
+    response = client.get("/v2/offers", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data["offers"]) == 1
@@ -137,7 +137,7 @@ def test_get_offers_build_zset(
         (offer_id, sample_domain_offer.cell_id)
     ]
 
-    response = client.get("/api/v2/offers", headers=auth_headers)
+    response = client.get("/v2/offers", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data["offers"]) == 1
@@ -165,7 +165,7 @@ def test_get_offers_outdated_cursor_resets(
         "utf-8"
     )
 
-    response = client.get(f"/api/v2/offers?cursor={cursor_str}", headers=auth_headers)
+    response = client.get(f"/v2/offers?cursor={cursor_str}", headers=auth_headers)
     assert response.status_code == 200
 
     # It should query page 1 (offset=0, limit=20) instead of offset 20 from cursor due to mismatch
@@ -189,7 +189,7 @@ def test_get_offer_detail_matched(
     }
     mock_container.offers_repo.get.return_value = sample_domain_offer
 
-    response = client.get(f"/api/v2/offers/{offer_id}", headers=auth_headers)
+    response = client.get(f"/v2/offers/{offer_id}", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["offer_id"] == offer_id
@@ -199,7 +199,7 @@ def test_get_offer_detail_matched(
 def test_get_offer_detail_not_matched(client, mock_container, auth_headers):
     mock_container.user_offers_repo.get.return_value = None
 
-    response = client.get("/api/v2/offers/some-offer-id", headers=auth_headers)
+    response = client.get("/v2/offers/some-offer-id", headers=auth_headers)
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
@@ -209,7 +209,7 @@ def test_get_shared_offer_detail(client, mock_container, sample_domain_offer):
     mock_container.offers_repo.get.return_value = sample_domain_offer
 
     # Unauthenticated request
-    response = client.get(f"/api/v2/offers/cell-123/{offer_id}")
+    response = client.get(f"/v2/offers/cell-123/{offer_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["offer_id"] == offer_id
@@ -218,12 +218,12 @@ def test_get_shared_offer_detail(client, mock_container, sample_domain_offer):
 def test_get_shared_offer_detail_not_found(client, mock_container):
     mock_container.offers_repo.get.return_value = None
 
-    response = client.get("/api/v2/offers/cell-123/some-offer-id")
+    response = client.get("/v2/offers/cell-123/some-offer-id")
     assert response.status_code == 404
 
 
 def test_get_offers_invalid_cursor(client, auth_headers):
-    response = client.get("/api/v2/offers?cursor=not-base-64", headers=auth_headers)
+    response = client.get("/v2/offers?cursor=not-base-64", headers=auth_headers)
     assert response.status_code == 400
     assert "Invalid pagination cursor" in response.json()["detail"]
 
@@ -237,7 +237,7 @@ def test_get_offers_rejects_negative_cursor_offset(
         "utf-8"
     )
 
-    response = client.get(f"/api/v2/offers?cursor={cursor_str}", headers=auth_headers)
+    response = client.get(f"/v2/offers?cursor={cursor_str}", headers=auth_headers)
 
     assert response.status_code == 400
 
@@ -256,7 +256,7 @@ def test_get_offers_prunes_stale_user_offers_on_hydration_miss(
     mock_container.feed_repo.get_feed_version.side_effect = [1, 2]
     mock_container.feed_repo.get_size.return_value = 0
 
-    response = client.get("/api/v2/offers", headers=auth_headers)
+    response = client.get("/v2/offers", headers=auth_headers)
 
     assert response.status_code == 200
     mock_container.user_offers_repo.delete_batch.assert_called_once_with(
@@ -274,7 +274,7 @@ def test_get_offer_detail_missing_from_offers_table(
     }
     mock_container.offers_repo.get.return_value = None
 
-    response = client.get("/api/v2/offers/offer-1", headers=auth_headers)
+    response = client.get("/v2/offers/offer-1", headers=auth_headers)
     assert response.status_code == 404
     assert "Offer details not found" in response.json()["detail"]
 
@@ -286,7 +286,7 @@ def test_get_offers_empty_page_from_zset(client, mock_container, auth_headers):
     # ZSET exists but returns empty keys (e.g. offset beyond total size)
     mock_container.feed_repo.get_page.return_value = []
 
-    response = client.get("/api/v2/offers", headers=auth_headers)
+    response = client.get("/v2/offers", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["offers"] == []
     assert response.json()["total_count"] == 10
@@ -307,7 +307,7 @@ def test_get_offers_with_next_cursor(
     ]
     mock_container.offers_repo.get_batch.return_value = [sample_domain_offer]
 
-    response = client.get("/api/v2/offers?limit=2", headers=auth_headers)
+    response = client.get("/v2/offers?limit=2", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["next_cursor"] is not None
@@ -332,7 +332,7 @@ def test_favorite_offer_existing(client, mock_container, auth_headers):
         "favorited": False,
     }
 
-    response = client.put("/api/v2/offers/offer-123/favorite", headers=auth_headers)
+    response = client.put("/v2/offers/offer-123/favorite", headers=auth_headers)
     assert response.status_code == 204
     mock_container.user_offers_repo.set_favorite.assert_called_once_with(
         "user-123", "offer-123", True
@@ -347,7 +347,7 @@ def test_favorite_offer_new_shared_success(
     mock_container.offers_repo.get.return_value = sample_domain_offer
 
     response = client.put(
-        "/api/v2/offers/offer-123/favorite?cell_id=cell-123",
+        "/v2/offers/offer-123/favorite?cell_id=cell-123",
         headers=auth_headers,
     )
     assert response.status_code == 204
@@ -366,7 +366,7 @@ def test_favorite_offer_new_shared_missing_cell_id(
 ):
     mock_container.user_offers_repo.get.return_value = None
 
-    response = client.put("/api/v2/offers/offer-123/favorite", headers=auth_headers)
+    response = client.put("/v2/offers/offer-123/favorite", headers=auth_headers)
     assert response.status_code == 400
     assert "cell_id is required" in response.json()["detail"]
 
@@ -376,7 +376,7 @@ def test_favorite_offer_new_shared_not_found(client, mock_container, auth_header
     mock_container.offers_repo.get.return_value = None
 
     response = client.put(
-        "/api/v2/offers/offer-123/favorite?cell_id=cell-123",
+        "/v2/offers/offer-123/favorite?cell_id=cell-123",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -386,7 +386,7 @@ def test_favorite_offer_new_shared_not_found(client, mock_container, auth_header
 def test_unfavorite_offer_not_favorited(client, mock_container, auth_headers):
     mock_container.user_offers_repo.get.return_value = None
 
-    response = client.delete("/api/v2/offers/offer-123/favorite", headers=auth_headers)
+    response = client.delete("/v2/offers/offer-123/favorite", headers=auth_headers)
     assert response.status_code == 404
     assert "Offer is not marked as favorite" in response.json()["detail"]
 
@@ -413,7 +413,7 @@ def test_unfavorite_offer_still_matched(
     ]
 
     response = client.delete(
-        f"/api/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers
+        f"/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers
     )
     assert response.status_code == 204
     mock_container.user_offers_repo.set_favorite.assert_called_once_with(
@@ -441,7 +441,7 @@ def test_unfavorite_offer_no_longer_matched(
     mock_container.matching_service._filter_offers_vectorized.return_value = []
 
     response = client.delete(
-        f"/api/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers
+        f"/v2/offers/{sample_domain_offer.offer_id}/favorite", headers=auth_headers
     )
     assert response.status_code == 204
     mock_container.user_offers_repo.delete.assert_called_once_with(
@@ -463,7 +463,7 @@ def test_get_favorites_feed_success(
     ]
     mock_container.offers_repo.get_batch.return_value = [sample_domain_offer]
 
-    response = client.get("/api/v2/offers/favorites", headers=auth_headers)
+    response = client.get("/v2/offers/favorites", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data["offers"]) == 1

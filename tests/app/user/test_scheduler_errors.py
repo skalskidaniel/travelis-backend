@@ -35,7 +35,7 @@ def test_update_preferences_succeeds_when_scheduler_fails(client, mock_container
     )
 
     response = client.patch(
-        "/api/v2/user/preferences",
+        "/v2/user/preferences",
         json={"min_stars": 5},
     )
 
@@ -54,7 +54,7 @@ def test_get_preferences_succeeds_when_scheduler_fails(client, mock_container):
         ScheduleCreateException("Failed to create match schedule")
     )
 
-    response = client.get("/api/v2/user/preferences")
+    response = client.get("/v2/user/preferences")
 
     # The request should succeed with 200 because user is successfully created in DynamoDB
     assert response.status_code == 200
@@ -70,7 +70,7 @@ def test_global_scheduler_exception_handler_sanitizes_errors(client, mock_contai
         "Failed to create match schedule: LAMBDA_FUNCTION_ARN is missing"
     )
 
-    response = client.get("/api/v2/user/preferences")
+    response = client.get("/v2/user/preferences")
 
     # Should raise 503 and sanitize the message
     assert response.status_code == 503

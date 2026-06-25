@@ -15,7 +15,7 @@ This document is the entry point for architecture documentation. Each linked fil
 | [data-model.md](architecture/data-model.md)             | DynamoDB tables, Redis keys, offer identity                     |
 | [pipeline.md](architecture/pipeline.md)                 | Scraping, scoring, matching, debouncing, schedules              |
 | [attractiveness.md](architecture/attractiveness.md)     | Two-stage scoring algorithm                                     |
-| [api.md](architecture/api.md)                           | REST API (`/api/v2/*`) contracts                                |
+| [api.md](architecture/api.md)                           | REST API (`/v2/*`) contracts                                    |
 | [infrastructure.md](architecture/infrastructure.md)     | Terraform modules, AWS resources, Redis Cloud                   |
 
 ## Provider integrations
@@ -32,7 +32,7 @@ External API contracts live separately (reverse-engineered, versioned in git):
 | Code layering        | Hexagonal: `src/core` domain + adapters, `src/app` entrypoints       |
 | Concurrency          | Async end-to-end (`aioboto3`); `asyncio` fan-out for scraping        |
 | Scheduled jobs       | Dual entry handler; EventBridge invokes jobs in-process              |
-| Cell scraping        | `asyncio` worker pool fan-out inside one invocation (bounded)          |
+| Cell scraping        | `asyncio` worker pool fan-out inside one invocation (bounded)        |
 | Persistence          | DynamoDB (4 tables) + Redis Cloud (user offer feed)                  |
 | Market cells         | Global cells with activation tracking                                |
 | Offer identity       | Semantic fingerprint hash; `external_offer_id` stored separately     |

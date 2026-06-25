@@ -42,7 +42,7 @@ def test_cors_headers(healthy_container):
     client = TestClient(app)
     try:
         response = client.get(
-            "/api/v2/health",
+            "/v2/health",
             headers={
                 "Origin": "https://wakacje-travelis.pl",
                 "Access-Control-Request-Method": "GET",
@@ -75,8 +75,8 @@ def test_lambda_handler_api_gateway(lambda_context, healthy_container):
 
     event = {
         "version": "2.0",
-        "routeKey": "GET /api/v2/health",
-        "rawPath": "/api/v2/health",
+        "routeKey": "GET /v2/health",
+        "rawPath": "/v2/health",
         "rawQueryString": "",
         "headers": {
             "accept": "*/*",
@@ -90,13 +90,13 @@ def test_lambda_handler_api_gateway(lambda_context, healthy_container):
             "domainPrefix": "api",
             "http": {
                 "method": "GET",
-                "path": "/api/v2/health",
+                "path": "/v2/health",
                 "protocol": "HTTP/1.1",
                 "sourceIp": "127.0.0.1",
                 "userAgent": "Custom User Agent",
             },
             "requestId": "request-id",
-            "routeKey": "GET /api/v2/health",
+            "routeKey": "GET /v2/health",
             "stage": "$default",
             "time": "12/Mar/2020:19:03:58 +0000",
             "timeEpoch": 1583348638385,

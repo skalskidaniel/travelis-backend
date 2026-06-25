@@ -82,7 +82,7 @@ aws s3 cp docs/providers/wakacjepl/wakacjepl_geo_catalog.json \
 
 HTTP API (v2) proxying all routes to the Lambda. Routes:
 
-- `ANY /api/v2/{proxy+}` → Lambda
+- `ANY /v2/{proxy+}` → Lambda
 
 ### DynamoDB
 

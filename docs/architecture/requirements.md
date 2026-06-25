@@ -33,7 +33,7 @@ CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the ev
 ### API & Infrastructure
 
 - [ ] Implement CORS middleware (frontend origin whitelist)
-- [ ] Implement health check endpoint (`/api/v2/health`)
+- [ ] Implement health check endpoint (`/v2/health`)
 - [ ] Ensure all API endpoints are mounted under `/api/v2`
 - [ ] Validate proper use of RESTful HTTP status codes (`200`, `204`, `400`, `401`, `404`, `429`, `500`)
 

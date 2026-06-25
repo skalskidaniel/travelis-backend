@@ -5,7 +5,10 @@ from aws_lambda_powertools import Logger
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
 from app.rate_limiter import RateLimiter
-from app.user.schemas import UserPreferencesUpdate, PushEnableRequest
+from app.user.schemas import (
+    PushEnableRequest,
+    UserPreferencesUpdate,
+)
 from core.container import Container
 from core.exceptions.scheduler import SchedulerException
 from core.models.user import (

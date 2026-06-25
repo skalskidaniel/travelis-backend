@@ -16,20 +16,20 @@ TraveLis is a vacation deal aggregator. Users set trip preferences; the backend 
 
 The codebase decomposes into 12 functional areas, auto-detected by GitNexus community detection:
 
-| Area | Symbols | Description |
-|------|---------|-------------|
-| **App** | 12 | Entrypoints: FastAPI app, Lambda handler, auth, rate limiter, FastAPI dependencies |
-| **Jobs** | 7 | Background job orchestrators: scrape coordinator, availability checker |
-| **Auth** | 5 | JWT verification dependencies, account deletion controller |
-| **User** | 7 | User preferences controller, push notification settings |
-| **Offers** | 5 | Paginated offer feed controller, API schemas |
-| **Providers** | 17 | Provider ports and adapters: base protocol, TUI, wakacje.pl |
-| **Models** | 4 | Domain models: Offer, RawOffer, MarketCell, User, common types |
-| **Repositories** | 16 | DynamoDB adapters (users, cells, offers, user_offers) + Redis feed repo |
-| **Services** | 12 | Business logic: ingest, matching, scoring, activation, scheduler, notifications, JWT |
-| **Scoring** | 2 | Attractiveness scoring algorithm (two-stage: price gate + composite) |
-| **Exceptions** | 11 | Core and app exception hierarchies |
-| **Scripts** | 9 | One-off contract probes and utilities (not part of the app) |
+| Area             | Symbols | Description                                                                          |
+| ---------------- | ------- | ------------------------------------------------------------------------------------ |
+| **App**          | 12      | Entrypoints: FastAPI app, Lambda handler, auth, rate limiter, FastAPI dependencies   |
+| **Jobs**         | 7       | Background job orchestrators: scrape coordinator, availability checker               |
+| **Auth**         | 5       | JWT verification dependencies, account deletion controller                           |
+| **User**         | 7       | User preferences controller, push notification settings                              |
+| **Offers**       | 5       | Paginated offer feed controller, API schemas                                         |
+| **Providers**    | 17      | Provider ports and adapters: base protocol, TUI, wakacje.pl                          |
+| **Models**       | 4       | Domain models: Offer, RawOffer, MarketCell, User, common types                       |
+| **Repositories** | 16      | DynamoDB adapters (users, cells, offers, user_offers) + Redis feed repo              |
+| **Services**     | 12      | Business logic: ingest, matching, scoring, activation, scheduler, notifications, JWT |
+| **Scoring**      | 2       | Attractiveness scoring algorithm (two-stage: price gate + composite)                 |
+| **Exceptions**   | 11      | Core and app exception hierarchies                                                   |
+| **Scripts**      | 9       | One-off contract probes and utilities (not part of the app)                          |
 
 ---
 
@@ -53,7 +53,7 @@ Fetches all active market cells (DynamoDB Scan), fans out HTTP requests to provi
 ### 2. Offer Feed API
 
 ```
-GET /api/v2/offers?sort=attractiveness&order=desc&limit=20
+GET /v2/offers?sort=attractiveness&order=desc&limit=20
   └─ get_offers_feed()              # src/app/offers/controller.py:62
        ├─ get_current_user()        # src/app/auth/dependencies.py — JWT validation
        ├─ get_container()           # src/app/dependencies.py — DI composition root
@@ -67,7 +67,7 @@ GET /api/v2/offers?sort=attractiveness&order=desc&limit=20
 ### 3. User Preferences Update
 
 ```
-PUT /api/v2/user/preferences
+PUT /v2/user/preferences
   └─ update_preferences()           # src/app/user/controller.py:64
        ├─ get_current_user()        # JWT validation
        ├─ get_container()           # DI
@@ -80,7 +80,7 @@ PUT /api/v2/user/preferences
 ### 4. Account Deletion (Cascade)
 
 ```
-DELETE /api/v2/auth/account
+DELETE /v2/auth/account
   └─ delete_account()               # src/app/auth/controller.py:31
        ├─ get_current_user()
        ├─ get_container()
@@ -243,10 +243,10 @@ flowchart TB
                               │
                    ┌──────────┴──────────┐
                    │   FastAPI Routes    │
-                   │  /api/v2/offers     │
-                   │  /api/v2/user       │
-                   │  /api/v2/auth       │
-                   │  /api/v2/health     │
+                   │  /v2/offers     │
+                   │  /v2/user       │
+                   │  /v2/auth       │
+                   │  /v2/health     │
                    └─────────────────────┘
                               ▲
                               │
@@ -259,18 +259,18 @@ flowchart TB
 
 ## Key Architecture Decisions
 
-| Decision | Choice |
-|----------|--------|
-| Deployment | Lambdalith — single artifact, two Lambda functions |
-| Layering | Hexagonal: `core` never imports `app` |
-| Async | Async end-to-end (`aioboto3`, `httpx`, `redis.asyncio`) |
-| Scraping | `asyncio` worker pool fan-out within a single invocation |
-| Offer Identity | SHA-256 semantic fingerprint (not provider IDs) |
-| Dedup | Intra-scrape (lowest price) + cross-provider (fingerprint collision) |
-| Persistence | DynamoDB (4 tables, no GSIs) + Redis Cloud (feed cache) |
-| Scoring | Two-stage: Z-score price gate → composite (price 40%, rating 40%, reviews 20%) |
-| Feed | Lazy Redis ZSET per (user, sort, order, version) built on first request |
-| Matching | Event-driven: post-scrape auto-match + debounced preference updates via Scheduler |
-| Account Provisioning | Cognito PostConfirmation trigger creates Users + default cells |
+| Decision             | Choice                                                                            |
+| -------------------- | --------------------------------------------------------------------------------- |
+| Deployment           | Lambdalith — single artifact, two Lambda functions                                |
+| Layering             | Hexagonal: `core` never imports `app`                                             |
+| Async                | Async end-to-end (`aioboto3`, `httpx`, `redis.asyncio`)                           |
+| Scraping             | `asyncio` worker pool fan-out within a single invocation                          |
+| Offer Identity       | SHA-256 semantic fingerprint (not provider IDs)                                   |
+| Dedup                | Intra-scrape (lowest price) + cross-provider (fingerprint collision)              |
+| Persistence          | DynamoDB (4 tables, no GSIs) + Redis Cloud (feed cache)                           |
+| Scoring              | Two-stage: Z-score price gate → composite (price 40%, rating 40%, reviews 20%)    |
+| Feed                 | Lazy Redis ZSET per (user, sort, order, version) built on first request           |
+| Matching             | Event-driven: post-scrape auto-match + debounced preference updates via Scheduler |
+| Account Provisioning | Cognito PostConfirmation trigger creates Users + default cells                    |
 
 See [docs/architecture/](docs/architecture/) for detailed docs on each subsystem.

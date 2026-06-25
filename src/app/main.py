@@ -128,10 +128,10 @@ async def account_deletion_exception_handler(
     return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
-app.include_router(auth_router, prefix="/api/v2/auth")
-app.include_router(health_router, prefix="/api/v2/health")
-app.include_router(offers_router, prefix="/api/v2/offers")
-app.include_router(user_router, prefix="/api/v2/user")
+app.include_router(auth_router, prefix="/v2/auth")
+app.include_router(health_router, prefix="/v2/health")
+app.include_router(offers_router, prefix="/v2/offers")
+app.include_router(user_router, prefix="/v2/user")
 
 mangum_handler = Mangum(app, lifespan="off")  # must remain "off" to work with mangum
 

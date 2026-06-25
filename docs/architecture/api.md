@@ -5,26 +5,26 @@ All endpoints are prefixed with `/api/v2`. Authentication via Cognito JWT unless
 Module layout matches `src/app/`:
 
 ```
-app.include_router(auth_router,   prefix="/api/v2/auth")
-app.include_router(offers_router, prefix="/api/v2/offers")
-app.include_router(user_router,   prefix="/api/v2/user")
+app.include_router(auth_router,   prefix="/v2/auth")
+app.include_router(offers_router, prefix="/v2/offers")
+app.include_router(user_router,   prefix="/v2/user")
 ```
 
 ## Conventions
 
-| Rule          | Value                                   |
-| ------------- | --------------------------------------- |
-| Auth header   | `Authorization: Bearer <cognito_jwt>`   |
-| Content-Type  | `application/json`                      |
-| Error format  | `{ "detail": "..." }` (FastAPI default) |
-| Pagination    | Cursor-based (`cursor`, `limit`)        |
+| Rule          | Value                                       |
+| ------------- | ------------------------------------------- |
+| Auth header   | `Authorization: Bearer <cognito_jwt>`       |
+| Content-Type  | `application/json`                          |
+| Error format  | `{ "detail": "..." }` (FastAPI default)     |
+| Pagination    | Cursor-based (`cursor`, `limit`)            |
 | Rate limiting | Redis-backed custom Rate Limiter dependency |
 
-## Auth — `/api/v2/auth`
+## Auth — `/v2/auth`
 
 Sign up and sign in happen in the PWA via Cognito directly. Only account deletion goes through the backend. On sign-up confirmation, a Cognito **post-confirmation** trigger provisions the backend `Users` record (default preferences), activates default market cells, and schedules the first match — so there is no client-facing "create account" endpoint. A lazy get-or-create on the first authenticated request is the fallback.
 
-### `DELETE /api/v2/auth/account`
+### `DELETE /v2/auth/account`
 
 Delete the authenticated user's account.
 
@@ -40,9 +40,9 @@ Delete the authenticated user's account.
 
 ---
 
-## User — `/api/v2/user`
+## User — `/v2/user`
 
-### `GET /api/v2/user/preferences`
+### `GET /v2/user/preferences`
 
 Return current preferences.
 
@@ -64,7 +64,7 @@ Return current preferences.
 }
 ```
 
-### `PATCH /api/v2/user/preferences`
+### `PATCH /v2/user/preferences`
 
 Update preferences. Saves immediately; triggers a debounced match via EventBridge Scheduler.
 
@@ -74,7 +74,7 @@ Update preferences. Saves immediately; triggers a debounced match via EventBridg
 
 **Side effects:** market cell activation updated; one-time schedule `match-{user_id}` upserted for `at(now + 15s)` (see [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler)).
 
-### `POST /api/v2/user/push/enable`
+### `POST /v2/user/push/enable`
 
 Register Web Push subscription.
 
@@ -91,7 +91,7 @@ Register Web Push subscription.
 
 **Response:** `204 No Content`
 
-### `POST /api/v2/user/push/disable`
+### `POST /v2/user/push/disable`
 
 Disable push notifications.
 
@@ -99,11 +99,11 @@ Disable push notifications.
 
 ---
 
-## Offers — `/api/v2/offers`
+## Offers — `/v2/offers`
 
 Read-only feed. No per-offer seen tracking.
 
-### `GET /api/v2/offers`
+### `GET /v2/offers`
 
 Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB hydration.
 
@@ -149,7 +149,7 @@ Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB
 
 `feed_version` lets the client detect feed changes (e.g. for in-app "new offers" badge). `total_count` indicates the total number of matched offers in the user's feed.
 
-### `GET /api/v2/offers/{offer_id}`
+### `GET /v2/offers/{offer_id}`
 
 Single offer detail for an offer in the user's feed.
 
@@ -203,31 +203,31 @@ Single offer detail for an offer in the user's feed.
 
 **Response `404`:** offer not in user's feed or does not exist.
 
-### `GET /api/v2/offers/favorites`
+### `GET /v2/offers/favorites`
 
 Retrieve a list of the authenticated user's favorited offers.
 
 **Query parameters:**
 
-| Param    | Default          | Values                                                                                   |
-| -------- | ---------------- | ---------------------------------------------------------------------------------------- |
-| `limit`  | `20`             | 1–50                                                                                     |
-| `cursor` | —                | Opaque cursor from previous response                                                     |
+| Param    | Default | Values                               |
+| -------- | ------- | ------------------------------------ |
+| `limit`  | `20`    | 1–50                                 |
+| `cursor` | —       | Opaque cursor from previous response |
 
 **Response `200`:**
-Same response schema as `GET /api/v2/offers` (returns a paginated list of favorited offers).
+Same response schema as `GET /v2/offers` (returns a paginated list of favorited offers).
 
 ---
 
-### `PUT /api/v2/offers/{offer_id}/favorite`
+### `PUT /v2/offers/{offer_id}/favorite`
 
 Mark an offer as favorited by the authenticated user.
 
 **Query parameters:**
 
-| Param     | Required | Description                                                                                                    |
-| --------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `cell_id` | No       | The market cell ID of the offer. Required if the offer is not currently in the user's matched feed.            |
+| Param     | Required | Description                                                                                         |
+| --------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `cell_id` | No       | The market cell ID of the offer. Required if the offer is not currently in the user's matched feed. |
 
 **Response `204`:** No Content
 
@@ -237,7 +237,7 @@ Mark an offer as favorited by the authenticated user.
 
 ---
 
-### `DELETE /api/v2/offers/{offer_id}/favorite`
+### `DELETE /v2/offers/{offer_id}/favorite`
 
 Remove an offer from the authenticated user's favorites.
 
@@ -249,13 +249,13 @@ Remove an offer from the authenticated user's favorites.
 
 ---
 
-### `GET /api/v2/offers/{cell_id}/{offer_id}`
+### `GET /v2/offers/{cell_id}/{offer_id}`
 
 Single offer detail by cell and offer ID. Used for shared offer lookups (e.g. from the custom `share_url` format `/offer/{cell_id}/{offer_id}`). Does not require the offer to be in the calling user's personal matched feed.
 
 **Behavior**: Fetches directly from the `Offers` table using `(cell_id, offer_id)`. Can be queried by unauthenticated requests (if sharing is public) or authenticated requests.
 
-**Response `200`:** Same response schema as `GET /api/v2/offers/{offer_id}` above.
+**Response `200`:** Same response schema as `GET /v2/offers/{offer_id}` above.
 
 **Response `404`:** offer does not exist (expired or invalid).
 
@@ -263,7 +263,7 @@ Single offer detail by cell and offer ID. Used for shared offer lookups (e.g. fr
 
 ## System
 
-### `GET /api/v2/health`
+### `GET /v2/health`
 
 **Response `200`:**
 
@@ -276,6 +276,7 @@ No authentication required.
 ## Middleware & Rate Limiting
 
 The API implements three security and resource management layers:
+
 1. **CORS:** Restricts API consumption to whitelisted origins (e.g. the PWA).
 2. **JWT Validation:** Verifies AWS Cognito JWT tokens on protected routers.
 3. **Redis-backed Rate Limiting:** Enforces route-level request limits using a custom, fail-open rate limiter.
@@ -283,22 +284,23 @@ The API implements three security and resource management layers:
 If a client exceeds their limit, the API returns a `429 Too Many Requests` response with a `Retry-After` header indicating the cooldown period in seconds.
 
 ### Identifier Tracking
-* **Authenticated Requests:** Identified by the Cognito `sub` (User ID) claim extracted from the `Authorization` header.
-* **Unauthenticated/Public Requests:** Identified by the client's host IP address.
+
+- **Authenticated Requests:** Identified by the Cognito `sub` (User ID) claim extracted from the `Authorization` header.
+- **Unauthenticated/Public Requests:** Identified by the client's host IP address.
 
 ### Configured Rate Limits
 
-| Endpoint Group | Route | Rate Limit | Identified By |
-| -------------- | ----- | ---------- | ------------- |
-| **Authentication** | `DELETE /api/v2/auth/account` | 3 / minute | User ID |
-| **User Preferences** | `GET /api/v2/user/preferences`<br>`PATCH /api/v2/user/preferences` | 10 / minute | User ID |
-| **User Notifications** | `POST /api/v2/user/push/enable`<br>`POST /api/v2/user/push/disable` | 10 / minute | User ID |
-| **Offers Feed** | `GET /api/v2/offers` | 100 / minute | User ID |
-| **Offer Details** | `GET /api/v2/offers/{offer_id}` | 100 / minute | User ID |
-| **Favorites Feed** | `GET /api/v2/offers/favorites` | 100 / minute | User ID |
-| **Favorite Action** | `PUT /api/v2/offers/{offer_id}/favorite`<br>`DELETE /api/v2/offers/{offer_id}/favorite` | 50 / minute | User ID |
-| **Shared Offer Details** | `GET /api/v2/offers/{cell_id}/{offer_id}` | 60 / minute | Client IP |
-| **System** | `GET /api/v2/health` | No Limit | — |
+| Endpoint Group           | Route                                                                           | Rate Limit   | Identified By |
+| ------------------------ | ------------------------------------------------------------------------------- | ------------ | ------------- |
+| **Authentication**       | `DELETE /v2/auth/account`                                                       | 3 / minute   | User ID       |
+| **User Preferences**     | `GET /v2/user/preferences`<br>`PATCH /v2/user/preferences`                      | 10 / minute  | User ID       |
+| **User Notifications**   | `POST /v2/user/push/enable`<br>`POST /v2/user/push/disable`                     | 10 / minute  | User ID       |
+| **Offers Feed**          | `GET /v2/offers`                                                                | 100 / minute | User ID       |
+| **Offer Details**        | `GET /v2/offers/{offer_id}`                                                     | 100 / minute | User ID       |
+| **Favorites Feed**       | `GET /v2/offers/favorites`                                                      | 100 / minute | User ID       |
+| **Favorite Action**      | `PUT /v2/offers/{offer_id}/favorite`<br>`DELETE /v2/offers/{offer_id}/favorite` | 50 / minute  | User ID       |
+| **Shared Offer Details** | `GET /v2/offers/{cell_id}/{offer_id}`                                           | 60 / minute  | Client IP     |
+| **System**               | `GET /v2/health`                                                                | No Limit     | —             |
 
 ## HTTP status codes
 
