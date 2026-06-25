@@ -30,8 +30,8 @@ The scheduled job router (`handle_non_http(event, context)`) dispatches tasks ba
 | Event Source                  | Payload / Structure                              | Handler Path                                                           | Description                                       |
 | :---------------------------- | :----------------------------------------------- | :--------------------------------------------------------------------- | :------------------------------------------------ |
 | **API Gateway**               | HTTP request                                     | API Lambda → Mangum → FastAPI routers (async)                          | All `/v2/*` HTTP traffic                          |
-| **EventBridge Cron (Scrape)** | `{ "type": "scrape_offers" }`                    | Cron Lambda → `handle_non_http` → `app.jobs.coordinator`               | Orchestrates cell scraping (3× daily)             |
-| **EventBridge Cron (Avail)**  | `{ "type": "check_availability" }`               | Cron Lambda → `handle_non_http` → `app.jobs.availability`              | Checks active offer availability (1× daily)       |
+| **EventBridge Cron (Scrape)** | `{ "type": "scrape_offers" }`                    | Cron Lambda → `handle_non_http` → `app.jobs.coordinator`               | Orchestrates cell scraping (4× daily)             |
+| **EventBridge Cron (Avail)**  | `{ "type": "check_availability" }`               | Cron Lambda → `handle_non_http` → `app.jobs.availability`              | Checks active offer availability (4× daily)       |
 | **EventBridge Scheduler**     | `{ "type": "match_user", "user_id": "usr_123" }` | Cron Lambda → `handle_non_http` → `matching_service.match_user_offers` | Debounced per-user re-match (one-time schedule)   |
 | **Cognito Post-Confirm**      | Cognito `PostConfirmation` event payload         | API Lambda → `handle_non_http` → `get_or_create_user`                  | Creates `Users` row + default cells + first match |
 

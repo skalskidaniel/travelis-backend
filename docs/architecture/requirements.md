@@ -136,8 +136,8 @@ Users can mark specific offers as "favorited". The server persists this state pe
 - Sources: wakacje.pl and tui.pl public JSON APIs (see [providers/](../providers/index.md)).
 - Scraping targets **active global market cells** (see [pipeline.md](pipeline.md)).
 - When a user changes preferences, the backend updates which market cells are active.
-- Scrape schedule: **3× daily**.
-- Availability / price check: **1× daily**.
+- Scrape schedule: **4× daily**.
+- Availability / price check: **4× daily**.
 - Only statistically attractive offers are persisted (no per-cell quantity cap).
 - wakacje.pl duplicates (same trip, different tour operator or price) are treated as **one offer** (see [data-model.md](data-model.md)).
 

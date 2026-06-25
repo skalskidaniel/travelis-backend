@@ -128,7 +128,7 @@ For each claimed user:
 
 ## Availability check (`jobs.availability`)
 
-Triggered 1× daily.
+Triggered 4× daily.
 
 Baseline is **availability-by-absence**, which works for both providers without a per-offer endpoint: an offer no longer returned by the latest scrape of its cell is marked `available = false`, and the `departure_date` TTL eventually removes it.
 

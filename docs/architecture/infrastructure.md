@@ -111,8 +111,8 @@ Only the periodic jobs use fixed schedules. There is **no `match-users` poll** â
 
 | Rule                 | Schedule                  | Target               | Job                 |
 | -------------------- | ------------------------- | -------------------- | ------------------- |
-| `scrape-offers`      | `cron(0 6,14,22 * * ? *)` | Cron Lambda (direct) | `jobs.coordinator`  |
-| `check-availability` | `cron(0 4 * * ? *)`       | Cron Lambda (direct) | `jobs.availability` |
+| `scrape-offers`      | `cron(0 6,10,14,18 * * ? *)` | Cron Lambda (direct) | `jobs.coordinator`  |
+| `check-availability` | `cron(0 8,12,16,20 * * ? *)` | Cron Lambda (direct) | `jobs.availability` |
 
 Cron times are UTC; adjust for desired local schedule.
 

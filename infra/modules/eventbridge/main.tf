@@ -1,8 +1,8 @@
-# 1. Scrape Offers Cron Rule (3x daily: 06:00, 14:00, 22:00 UTC)
+# 1. Scrape Offers Cron Rule (4x daily)
 resource "aws_cloudwatch_event_rule" "scrape_offers" {
   name                = "${var.project}-${var.environment}-scrape-offers-rule"
-  description         = "Triggers scrape_offers job 3x daily"
-  schedule_expression = "cron(0 6,14,22 * * ? *)"
+  description         = "Triggers scrape_offers job 4x daily"
+  schedule_expression = "cron(0 6,10,14,18 * * ? *)"
 }
 
 resource "aws_cloudwatch_event_target" "scrape_offers_target" {
@@ -12,11 +12,11 @@ resource "aws_cloudwatch_event_target" "scrape_offers_target" {
   input     = jsonencode({ "type" : "scrape_offers" })
 }
 
-# 2. Availability Check Cron Rule (1x daily: 04:00 UTC)
+# 2. Availability Check Cron Rule (4x daily)
 resource "aws_cloudwatch_event_rule" "check_availability" {
   name                = "${var.project}-${var.environment}-check-availability-rule"
-  description         = "Triggers check_availability job 1x daily"
-  schedule_expression = "cron(0 4 * * ? *)"
+  description         = "Triggers check_availability job 4x daily"
+  schedule_expression = "cron(0 8,12,16,20 * * ? *)"
 }
 
 resource "aws_cloudwatch_event_target" "check_availability_target" {
