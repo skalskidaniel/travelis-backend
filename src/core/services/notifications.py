@@ -25,7 +25,7 @@ NOTIFICATION_TEMPLATES = [
     },
 ]
 
-EXPIRED_SUBSCRIPTION_STATUS_CODES = frozenset({404, 410})
+EXPIRED_SUBSCRIPTION_STATUS_CODES = frozenset({403, 404, 410})
 
 
 class PushSendResult(str, Enum):

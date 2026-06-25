@@ -4,7 +4,7 @@ from core.models.common import BoardType
 from core.providers.utils import parse_optional_http_url
 
 REPRESENTATIVE_CHILD_AGE_YEARS = 8
-WAKACJE_ORIGIN = "https://www.wakacje.pl"
+WAKACJE_IMAGES_ORIGIN = "https://i.wakacje.pl"
 
 SERVICE_TO_BOARD: dict[int, BoardType] = {
     1: BoardType.ALL_INCLUSIVE,
@@ -81,7 +81,7 @@ def build_wakacje_offer_page_path(
 def parse_wakacje_image_url(
     photos: object,
     *,
-    origin: str = WAKACJE_ORIGIN,
+    origin: str = WAKACJE_IMAGES_ORIGIN,
 ) -> str | None:
     if not isinstance(photos, dict) or not photos.keys():
         return None

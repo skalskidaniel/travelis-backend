@@ -72,7 +72,7 @@ def test_parse_wakacje_image_url_relative_path():
     }
     assert (
         parse_wakacje_image_url(photos)
-        == "https://www.wakacje.pl/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
+        == "https://i.wakacje.pl/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
     )
 
 

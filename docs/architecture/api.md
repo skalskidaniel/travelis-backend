@@ -136,7 +136,7 @@ Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB
       "review_count": 544,
       "price_total": 6148,
       "referral_url": "https://...",
-      "image_url": "https://www.wakacje.pl/no-index/hotel/...",
+      "image_url": "https://i.wakacje.pl/no-index/hotel/...",
       "share_url": "https://wakacje-travelis.pl/offer/a1b2c3.../a1b2c3...",
       "favorited": false
     }
@@ -179,7 +179,7 @@ Single offer detail for an offer in the user's feed.
   "attractiveness_score": 0.92,
   "available": true,
   "referral_url": "https://...",
-  "image_url": "https://www.wakacje.pl/no-index/hotel/...",
+  "image_url": "https://i.wakacje.pl/no-index/hotel/...",
   "share_url": "https://wakacje-travelis.pl/offer/cell123/a1b2c3...",
   "favorited": false,
   "sources": [

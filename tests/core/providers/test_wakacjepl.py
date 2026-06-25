@@ -336,7 +336,7 @@ async def test_search_happy_path(wakacjepl_provider):
             )
             assert (
                 str(offer.image_url)
-                == "https://www.wakacje.pl/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
+                == "https://i.wakacje.pl/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
             )
 
 
