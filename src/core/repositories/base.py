@@ -104,7 +104,12 @@ class FeedRepository(Protocol):
     async def increment_feed_version(self, user_id: str) -> int: ...
 
     async def get_or_build_sort_zset(
-        self, user_id: str, field: str, order: str, version: int
+        self,
+        user_id: str,
+        field: str,
+        order: str,
+        version: int,
+        filter_mode: str = "all",
     ) -> bool: ...
 
     async def add_to_sort_zset(
@@ -114,6 +119,7 @@ class FeedRepository(Protocol):
         order: str,
         version: int,
         members: list[tuple[str, float]],
+        filter_mode: str = "all",
     ) -> None: ...
 
     async def get_page(
@@ -124,10 +130,16 @@ class FeedRepository(Protocol):
         version: int,
         offset: int,
         limit: int,
+        filter_mode: str = "all",
     ) -> list[tuple[str, str]]: ...
 
     async def get_size(
-        self, user_id: str, field: str, order: str, version: int
+        self,
+        user_id: str,
+        field: str,
+        order: str,
+        version: int,
+        filter_mode: str = "all",
     ) -> int: ...
 
     async def clear_user(self, user_id: str) -> None: ...

@@ -3,6 +3,14 @@ from typing import Any
 from core.repositories.base import FeedRepository
 
 
+def _sort_zset_key(
+    user_id: str, field: str, order: str, version: int, filter_mode: str
+) -> str:
+    return (
+        f"user:{user_id}:sort:{field}:{order}:filter:{filter_mode}:v{version}"
+    )
+
+
 class RedisFeedRepository(FeedRepository):
     """Redis implementation of the FeedRepository."""
 
@@ -18,9 +26,14 @@ class RedisFeedRepository(FeedRepository):
         return int(version)
 
     async def get_or_build_sort_zset(
-        self, user_id: str, field: str, order: str, version: int
+        self,
+        user_id: str,
+        field: str,
+        order: str,
+        version: int,
+        filter_mode: str = "all",
     ) -> bool:
-        key = f"user:{user_id}:sort:{field}:{order}:v{version}"
+        key = _sort_zset_key(user_id, field, order, version, filter_mode)
         exists = await self.redis.exists(key)
         return bool(exists)
 
@@ -31,11 +44,12 @@ class RedisFeedRepository(FeedRepository):
         order: str,
         version: int,
         members: list[tuple[str, float]],
+        filter_mode: str = "all",
     ) -> None:
         if not members:
             return
 
-        key = f"user:{user_id}:sort:{field}:{order}:v{version}"
+        key = _sort_zset_key(user_id, field, order, version, filter_mode)
         mapping = {member: score for member, score in members}
 
         async with self.redis.pipeline(transaction=True) as pipe:
@@ -51,8 +65,9 @@ class RedisFeedRepository(FeedRepository):
         version: int,
         offset: int,
         limit: int,
+        filter_mode: str = "all",
     ) -> list[tuple[str, str]]:
-        key = f"user:{user_id}:sort:{field}:{order}:v{version}"
+        key = _sort_zset_key(user_id, field, order, version, filter_mode)
         start = offset
         end = offset + limit - 1
         desc = order == "desc"
@@ -68,8 +83,15 @@ class RedisFeedRepository(FeedRepository):
                 parsed.append((val, ""))
         return parsed
 
-    async def get_size(self, user_id: str, field: str, order: str, version: int) -> int:
-        key = f"user:{user_id}:sort:{field}:{order}:v{version}"
+    async def get_size(
+        self,
+        user_id: str,
+        field: str,
+        order: str,
+        version: int,
+        filter_mode: str = "all",
+    ) -> int:
+        key = _sort_zset_key(user_id, field, order, version, filter_mode)
         return await self.redis.zcard(key)
 
     async def clear_user(self, user_id: str) -> None:

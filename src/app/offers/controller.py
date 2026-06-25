@@ -1,7 +1,7 @@
 import base64
 import json
 from aws_lambda_powertools import Logger
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Path
 
@@ -14,11 +14,14 @@ from app.offers.schemas import (
     PaginatedOffersResponse,
 )
 from core.container import Container
+from core.models.cell import _allowed_country_codes
 from core.models.offer import Offer
 
 logger = Logger(child=True)
 
 router = APIRouter(tags=["Offers Feed"])
+
+NEW_OFFERS_WINDOW = timedelta(hours=4)
 
 
 async def _prune_stale_user_offers(
@@ -74,6 +77,79 @@ def calculate_zset_score(offer: Offer, field: str) -> float:
         return hash_fraction
 
 
+def _coerce_utc_datetime(value: datetime | str | None) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    if isinstance(value, str):
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    return None
+
+
+def resolve_feed_filter_mode(country: str | None, new_only: bool) -> str:
+    if country is not None and new_only:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot combine country and new filters",
+        )
+    if country is not None:
+        normalized = country.strip().upper()
+        if normalized not in _allowed_country_codes():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid country code: {country}",
+            )
+        return f"country:{normalized}"
+    if new_only:
+        return "new"
+    return "all"
+
+
+async def _apply_feed_filter(
+    container: Container,
+    offers: list[Offer],
+    user_offers: list[dict],
+    filter_mode: str,
+) -> list[Offer]:
+    if filter_mode == "all":
+        return offers
+
+    user_offer_by_id = {item["offer_id"]: item for item in user_offers}
+
+    if filter_mode == "new":
+        cutoff = datetime.now(timezone.utc) - NEW_OFFERS_WINDOW
+        filtered: list[Offer] = []
+        for offer in offers:
+            user_offer = user_offer_by_id.get(offer.offer_id)
+            if not user_offer:
+                continue
+            matched_at = _coerce_utc_datetime(user_offer.get("matched_at"))
+            if matched_at is not None and matched_at >= cutoff:
+                filtered.append(offer)
+        return filtered
+
+    if filter_mode.startswith("country:"):
+        country_code = filter_mode.split(":", 1)[1]
+        cell_ids = list({offer.cell_id for offer in offers})
+        cells = await container.cells_repo.get_batch(cell_ids)
+        cell_country = {
+            cell.cell_id: cell.country for cell in cells if cell.cell_id is not None
+        }
+        return [
+            offer
+            for offer in offers
+            if cell_country.get(offer.cell_id) == country_code
+        ]
+
+    return offers
+
+
 @router.get(
     "",
     response_model=PaginatedOffersResponse,
@@ -115,10 +191,22 @@ async def get_offers_feed(
         default=None,
         description="Base64 encoded pagination cursor containing offset and feed version.",
     ),
+    country: str | None = Query(
+        default=None,
+        min_length=2,
+        max_length=2,
+        description="Filter feed to a single destination country (ISO 3166-1 alpha-2).",
+        examples=["GR"],
+    ),
+    new: bool = Query(
+        default=False,
+        description="When true, return only offers matched within the last 4 hours.",
+    ),
     user_id: str = Depends(get_current_user),
     container: Container = Depends(get_container),
 ):
     """Retrieve a paginated, sorted list of travel offers from the user's matched feed."""
+    filter_mode = resolve_feed_filter_mode(country, new)
     offset = 0
     cursor_feed_version = None
 
@@ -156,11 +244,13 @@ async def get_offers_feed(
         field=sort,
         order=order,
         version=current_version,
+        filter_mode=filter_mode,
     )
 
     if not zset_exists:
         logger.info(
-            f"ZSET not cached for user {user_id}, sort {sort}, order {order}, v{current_version}. Building..."
+            f"ZSET not cached for user {user_id}, sort {sort}, order {order}, "
+            f"filter {filter_mode}, v{current_version}. Building..."
         )
         user_offers: list[dict] = await container.user_offers_repo.query_by_user(
             user_id
@@ -175,14 +265,16 @@ async def get_offers_feed(
         if await _prune_stale_user_offers(container, user_id, offer_keys, offers):
             current_version = await container.feed_repo.get_feed_version(user_id)
 
-        valid_offers: list[Offer] = offers
+        valid_offers: list[Offer] = await _apply_feed_filter(
+            container, offers, user_offers, filter_mode
+        )
 
         members = [
             (f"{o.offer_id}:{o.cell_id}", calculate_zset_score(o, sort))
             for o in valid_offers
         ]
         await container.feed_repo.add_to_sort_zset(
-            user_id, sort, order, current_version, members
+            user_id, sort, order, current_version, members, filter_mode=filter_mode
         )
         total_count = len(valid_offers)
     else:
@@ -191,6 +283,7 @@ async def get_offers_feed(
             field=sort,
             order=order,
             version=current_version,
+            filter_mode=filter_mode,
         )
 
     offer_keys = await container.feed_repo.get_page(
@@ -200,6 +293,7 @@ async def get_offers_feed(
         version=current_version,
         offset=offset,
         limit=limit,
+        filter_mode=filter_mode,
     )
 
     if not offer_keys:
@@ -221,6 +315,7 @@ async def get_offers_feed(
             field=sort,
             order=order,
             version=current_version,
+            filter_mode=filter_mode,
         )
 
     offer_ids = [oid for oid, _ in offer_keys]

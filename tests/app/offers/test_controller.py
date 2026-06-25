@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from app.auth.dependencies import get_current_user
 from app.dependencies import get_container
 from app.main import app
-from app.offers.controller import calculate_zset_score
+from app.offers.controller import calculate_zset_score, resolve_feed_filter_mode
 from core.models.common import BoardType, ProviderName
 from core.models.offer import Offer, OfferMetadata, OfferSource, TuiMetadata
 
@@ -21,6 +21,7 @@ def mock_container():
     c.feed_repo = AsyncMock()
     c.user_offers_repo = AsyncMock()
     c.offers_repo = AsyncMock()
+    c.cells_repo = AsyncMock()
     c.settings = MagicMock()
     return c
 
@@ -176,6 +177,7 @@ def test_get_offers_outdated_cursor_resets(
         version=50,
         offset=0,
         limit=20,
+        filter_mode="all",
     )
 
 
@@ -321,6 +323,147 @@ def test_calculate_zset_score_coverage(sample_domain_offer):
     assert calculate_zset_score(sample_domain_offer, "departure_date") > 0
     assert calculate_zset_score(sample_domain_offer, "duration") > 0
     assert calculate_zset_score(sample_domain_offer, "unknown_field") > 0
+
+
+def test_resolve_feed_filter_mode_defaults():
+    assert resolve_feed_filter_mode(None, False) == "all"
+    assert resolve_feed_filter_mode(None, True) == "new"
+    assert resolve_feed_filter_mode("gr", False) == "country:GR"
+
+
+def test_get_offers_rejects_combined_country_and_new_filters(client, auth_headers):
+    response = client.get("/v2/offers?country=GR&new=true", headers=auth_headers)
+    assert response.status_code == 400
+    assert "Cannot combine country and new filters" in response.json()["detail"]
+
+
+def test_get_offers_rejects_invalid_country_code(client, auth_headers):
+    response = client.get("/v2/offers?country=ZZ", headers=auth_headers)
+    assert response.status_code == 400
+    assert "Invalid country code" in response.json()["detail"]
+
+
+def test_get_offers_country_filter_builds_country_scoped_zset(
+    client, mock_container, auth_headers, sample_domain_offer
+):
+    other_offer = sample_domain_offer.model_copy(
+        update={
+            "offer_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cell_id": "bbbbbbbbbbbbbbbb",
+            "location": "Spain/Mallorca/Palma",
+        }
+    )
+    mock_container.feed_repo.get_feed_version.return_value = 1
+    mock_container.feed_repo.get_or_build_sort_zset.return_value = False
+    mock_container.user_offers_repo.query_by_user.return_value = [
+        {
+            "offer_id": sample_domain_offer.offer_id,
+            "cell_id": sample_domain_offer.cell_id,
+            "matched_at": datetime.now(timezone.utc),
+        },
+        {
+            "offer_id": other_offer.offer_id,
+            "cell_id": other_offer.cell_id,
+            "matched_at": datetime.now(timezone.utc),
+        },
+    ]
+    mock_container.offers_repo.get_batch.return_value = [
+        sample_domain_offer,
+        other_offer,
+    ]
+    mock_container.cells_repo.get_batch.return_value = [
+        MagicMock(cell_id=sample_domain_offer.cell_id, country="GR"),
+        MagicMock(cell_id=other_offer.cell_id, country="ES"),
+    ]
+    mock_container.feed_repo.get_page.return_value = [
+        (sample_domain_offer.offer_id, sample_domain_offer.cell_id)
+    ]
+
+    response = client.get("/v2/offers?country=GR", headers=auth_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["offers"]) == 1
+    assert data["offers"][0]["offer_id"] == sample_domain_offer.offer_id
+    assert data["total_count"] == 1
+    mock_container.feed_repo.add_to_sort_zset.assert_called_once()
+    assert (
+        mock_container.feed_repo.add_to_sort_zset.call_args.kwargs["filter_mode"]
+        == "country:GR"
+    )
+
+
+def test_get_offers_new_filter_builds_new_scoped_zset(
+    client, mock_container, auth_headers, sample_domain_offer
+):
+    recent_matched_at = datetime.now(timezone.utc)
+    stale_matched_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    stale_offer = sample_domain_offer.model_copy(
+        update={
+            "offer_id": "cccccccccccccccccccccccccccccccc",
+            "cell_id": "cccccccccccccccc",
+        }
+    )
+    mock_container.feed_repo.get_feed_version.return_value = 1
+    mock_container.feed_repo.get_or_build_sort_zset.return_value = False
+    mock_container.user_offers_repo.query_by_user.return_value = [
+        {
+            "offer_id": sample_domain_offer.offer_id,
+            "cell_id": sample_domain_offer.cell_id,
+            "matched_at": recent_matched_at,
+        },
+        {
+            "offer_id": stale_offer.offer_id,
+            "cell_id": stale_offer.cell_id,
+            "matched_at": stale_matched_at,
+        },
+    ]
+    mock_container.offers_repo.get_batch.return_value = [sample_domain_offer, stale_offer]
+    mock_container.feed_repo.get_page.return_value = [
+        (sample_domain_offer.offer_id, sample_domain_offer.cell_id)
+    ]
+
+    response = client.get("/v2/offers?new=true", headers=auth_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["offers"]) == 1
+    assert data["offers"][0]["offer_id"] == sample_domain_offer.offer_id
+    assert data["total_count"] == 1
+    mock_container.feed_repo.add_to_sort_zset.assert_called_once()
+    assert mock_container.feed_repo.add_to_sort_zset.call_args.kwargs["filter_mode"] == "new"
+
+
+def test_get_offers_country_filter_pagination_uses_filter_mode(
+    client, mock_container, auth_headers, sample_domain_offer
+):
+    mock_container.feed_repo.get_feed_version.return_value = 1
+    mock_container.feed_repo.get_or_build_sort_zset.return_value = True
+    mock_container.feed_repo.get_size.return_value = 1
+    mock_container.feed_repo.get_page.return_value = [
+        (sample_domain_offer.offer_id, sample_domain_offer.cell_id)
+    ]
+    mock_container.offers_repo.get_batch.return_value = [sample_domain_offer]
+
+    response = client.get("/v2/offers?country=GR", headers=auth_headers)
+
+    assert response.status_code == 200
+    mock_container.feed_repo.get_or_build_sort_zset.assert_called_once_with(
+        user_id="user-123",
+        field="attractiveness",
+        order="desc",
+        version=1,
+        filter_mode="country:GR",
+    )
+    mock_container.feed_repo.get_page.assert_called_once_with(
+        user_id="user-123",
+        field="attractiveness",
+        order="desc",
+        version=1,
+        offset=0,
+        limit=20,
+        filter_mode="country:GR",
+    )
 
 
 def test_favorite_offer_existing(client, mock_container, auth_headers):
