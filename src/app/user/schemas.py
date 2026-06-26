@@ -1,6 +1,6 @@
 from datetime import date
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from core.models.common import BoardType
+from core.models.common import BoardType, Rating
 
 
 class UserPreferencesUpdate(BaseModel):
@@ -54,10 +54,8 @@ class UserPreferencesUpdate(BaseModel):
         description="Minimum hotel star rating (between 2 and 5).",
         examples=[4],
     )
-    min_rating: int | None = Field(
+    min_rating: Rating | None = Field(
         default=None,
-        ge=0,
-        le=5,
         description="Minimum normalized guest rating (between 0 and 5).",
         examples=[4],
     )

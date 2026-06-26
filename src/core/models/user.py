@@ -1,7 +1,8 @@
+from decimal import Decimal
 from datetime import datetime, date, timezone
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from core.models.common import BoardType
+from core.models.common import BoardType, Rating
 
 
 class UserPreferences(BaseModel):
@@ -54,10 +55,8 @@ class UserPreferences(BaseModel):
         description="Minimum hotel star rating (between 2 and 5).",
         examples=[4],
     )
-    min_rating: int = Field(
-        default=0,
-        ge=0,
-        le=5,
+    min_rating: Rating = Field(
+        default=Decimal(0),
         description="Minimum normalized guest rating (between 0 and 5).",
         examples=[4],
     )
