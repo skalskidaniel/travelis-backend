@@ -93,6 +93,9 @@ async def run_availability_job(container: Container, context=None) -> dict:
                     new_price = await provider.check_price(offer)
                     if new_price != offer.price_total:
                         offer.price_total = new_price
+                        offer.price_per_person = (
+                            Decimal(str(new_price)) / (offer.adults + offer.children)
+                        ).quantize(Decimal("0.01"))
                         offer.price_per_day = (
                             Decimal(str(new_price))
                             / offer.duration

@@ -42,6 +42,7 @@ def sample_domain_offer() -> Offer:
         rating=4.5,
         review_count=100,
         price_total=Decimal("1000.00"),
+        price_per_person=Decimal("500.00"),
         price_per_day=Decimal("142.86"),
         referral_url=HttpUrl("https://tui.pl/ref"),
         image_url=HttpUrl("https://tui.pl/img.jpg"),

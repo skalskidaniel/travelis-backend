@@ -9,12 +9,12 @@
 
 Wakacje.pl JSON APIs use a **two-layer** status model. Always inspect the JSON body — not only the HTTP status.
 
-| Layer | Field | Meaning |
-| ----- | ----- | ------- |
-| Transport | HTTP status | Usually `200` even when the call logically failed |
-| Application | `success` | `true` = envelope OK; `false` = logical failure |
-| Application | `error.status` / `status` / `statusCode` | Inner status code (often `400`) when `success` is `false` |
-| Application | `error.message` / `msg` | Human-readable or endpoint label (e.g. `getStoreBoxOffers`, `checkOfferAvailability`) |
+| Layer       | Field                                    | Meaning                                                                               |
+| ----------- | ---------------------------------------- | ------------------------------------------------------------------------------------- |
+| Transport   | HTTP status                              | Usually `200` even when the call logically failed                                     |
+| Application | `success`                                | `true` = envelope OK; `false` = logical failure                                       |
+| Application | `error.status` / `status` / `statusCode` | Inner status code (often `400`) when `success` is `false`                             |
+| Application | `error.message` / `msg`                  | Human-readable or endpoint label (e.g. `getStoreBoxOffers`, `checkOfferAvailability`) |
 
 **Search / calculator** failures observed in contract probing (2026-06-17):
 
@@ -335,6 +335,7 @@ Observation from the UI (selecting "Grecja → Kreta"):
 ### Travel Dates vs Market Cell Bounds
 
 Unlike TUI, Wakacje.pl's search API accepts:
+
 - `departureDate`: The earliest departure date (trip start)
 - `arrivalDate`: The absolute latest return date (trip end)
 
@@ -503,7 +504,7 @@ customHeaders: {"Page-Source":"PO","Tour-Operator-Code":"VITX","Tour-Operator-Id
 }
 ```
 
-Use `data.availability === true` and `data.status === "OK"`. If the offer is no longer available, the daily availability job deletes it directly from the database; otherwise, the job updates `price_total` (and recomputes `price_per_day`) when changed.
+Use `data.availability === true` and `data.status === "OK"`. If the offer is no longer available, the daily availability job deletes it directly from the database; otherwise, the job updates `price_total` (and recomputes `price_per_person` and `price_per_day`) when changed.
 
 ### Departure airport IDs
 
@@ -526,12 +527,12 @@ For each endpoint the script sends a valid baseline request, then mutates every 
 
 A field is classified as:
 
-| Classification | Remove tolerated | Invalid value tolerated | Integration implication |
-| -------------- | ---------------- | ----------------------- | ----------------------- |
-| **Required** | No | No | Must be present with a valid value |
-| **Presence-required** | No | Yes | Key must exist; exact value may be loosely validated |
-| **Valid-if-present** | Yes | No | May be omitted; if sent, must be correct |
-| **Optional** | Yes | Yes | Cosmetic / defaulted server-side |
+| Classification        | Remove tolerated | Invalid value tolerated | Integration implication                              |
+| --------------------- | ---------------- | ----------------------- | ---------------------------------------------------- |
+| **Required**          | No               | No                      | Must be present with a valid value                   |
+| **Presence-required** | No               | Yes                     | Key must exist; exact value may be loosely validated |
+| **Valid-if-present**  | Yes              | No                      | May be omitted; if sent, must be correct             |
+| **Optional**          | Yes              | Yes                     | Cosmetic / defaulted server-side                     |
 
 Logical success criteria used by the probe:
 
@@ -550,34 +551,34 @@ Baseline: **150 mutations**, **30** changed logical outcome (baseline succeeded)
 
 #### Headers
 
-| Header | Classification | Notes |
-| ------ | -------------- | ----- |
+| Header         | Classification   | Notes                                                          |
+| -------------- | ---------------- | -------------------------------------------------------------- |
 | `content-type` | Valid-if-present | Omit OK; invalid value → `success: false`, `error.status: 400` |
-| `referer` | Valid-if-present | Omit OK; invalid value → logical failure |
-| `accept` | Optional | |
-| `origin` | Optional | |
+| `referer`      | Valid-if-present | Omit OK; invalid value → logical failure                       |
+| `accept`       | Optional         |                                                                |
+| `origin`       | Optional         |                                                                |
 
 #### Request body (RPC envelope)
 
-| Field | Classification | Notes |
-| ----- | -------------- | ----- |
-| `method` | Optional | Must stay `search.tripsSearch` in production; probe invalid sentinel was tolerated |
-| `params` | Valid-if-present | Top-level `params` object; invalidating entire block fails |
-| `params.query` | **Required** | Removing breaks search (`HTTP 500` in probe) |
-| `params.query.rooms` | **Required** | Occupancy block must be present |
-| `params.query.rooms[].ages` | **Required** | Must be present (empty list when `kid: 0`) |
-| `params.query.duration` | Presence-required | Object key required; probe tolerated invalid inner values |
-| `params.query.attribute` | Presence-required | Key required; invalid value tolerated in probe |
-| `params.cityId` | **Required** | Key must be present (use `[]` when not filtering by city) |
-| `params.countryId` | Valid-if-present | Omit OK; invalid array content fails |
-| `params.query.departureDate` | Valid-if-present | |
-| `params.query.arrivalDate` | Valid-if-present | |
-| `params.query.service` | Valid-if-present | Board filter IDs |
-| `params.query.minCategory` | Optional | Star filter; probe tolerated removal |
-| `params.query.sort` / `pageNumber` | Valid-if-present | |
-| `params.query.departure` | Valid-if-present | `null` = any airport |
-| `params.limit` | Valid-if-present | |
-| `params.brand`, `flatArray`, `multiSearch`, `imageSizes`, `withPromoOffer`, `qsVersion`, `searchType`, `type`, `priceHistory`, `withHotelRate`, `withPromotionsInfo`, `recommendationVersion`, `firstMinuteTui`, `offersAttributes`, `alternative.*` | Optional | Branding / feature toggles |
+| Field                                                                                                                                                                                                                                                | Classification    | Notes                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------- |
+| `method`                                                                                                                                                                                                                                             | Optional          | Must stay `search.tripsSearch` in production; probe invalid sentinel was tolerated |
+| `params`                                                                                                                                                                                                                                             | Valid-if-present  | Top-level `params` object; invalidating entire block fails                         |
+| `params.query`                                                                                                                                                                                                                                       | **Required**      | Removing breaks search (`HTTP 500` in probe)                                       |
+| `params.query.rooms`                                                                                                                                                                                                                                 | **Required**      | Occupancy block must be present                                                    |
+| `params.query.rooms[].ages`                                                                                                                                                                                                                          | **Required**      | Must be present (empty list when `kid: 0`)                                         |
+| `params.query.duration`                                                                                                                                                                                                                              | Presence-required | Object key required; probe tolerated invalid inner values                          |
+| `params.query.attribute`                                                                                                                                                                                                                             | Presence-required | Key required; invalid value tolerated in probe                                     |
+| `params.cityId`                                                                                                                                                                                                                                      | **Required**      | Key must be present (use `[]` when not filtering by city)                          |
+| `params.countryId`                                                                                                                                                                                                                                   | Valid-if-present  | Omit OK; invalid array content fails                                               |
+| `params.query.departureDate`                                                                                                                                                                                                                         | Valid-if-present  |                                                                                    |
+| `params.query.arrivalDate`                                                                                                                                                                                                                           | Valid-if-present  |                                                                                    |
+| `params.query.service`                                                                                                                                                                                                                               | Valid-if-present  | Board filter IDs                                                                   |
+| `params.query.minCategory`                                                                                                                                                                                                                           | Optional          | Star filter; probe tolerated removal                                               |
+| `params.query.sort` / `pageNumber`                                                                                                                                                                                                                   | Valid-if-present  |                                                                                    |
+| `params.query.departure`                                                                                                                                                                                                                             | Valid-if-present  | `null` = any airport                                                               |
+| `params.limit`                                                                                                                                                                                                                                       | Valid-if-present  |                                                                                    |
+| `params.brand`, `flatArray`, `multiSearch`, `imageSizes`, `withPromoOffer`, `qsVersion`, `searchType`, `type`, `priceHistory`, `withHotelRate`, `withPromotionsInfo`, `recommendationVersion`, `firstMinuteTui`, `offersAttributes`, `alternative.*` | Optional          | Branding / feature toggles                                                         |
 
 > **Practical minimum for TraveLis search:** keep the full envelope shape from the adapter (`WakacjePlProvider._build_search_payload`). Do not drop `params.query`, `params.query.rooms`, `params.cityId`, or `params.query.rooms[].ages`. Send valid `content-type` and `referer` when calling the API.
 
@@ -587,22 +588,22 @@ Baseline: **42 mutations**, **10** changed logical outcome (baseline succeeded).
 
 #### Headers
 
-| Header | Classification |
-| ------ | -------------- |
-| `content-type` | Valid-if-present |
-| `referer` | Valid-if-present |
-| `accept`, `origin` | Optional |
+| Header             | Classification   |
+| ------------------ | ---------------- |
+| `content-type`     | Valid-if-present |
+| `referer`          | Valid-if-present |
+| `accept`, `origin` | Optional         |
 
 #### Request body
 
-| Field | Classification | Notes |
-| ----- | -------------- | ----- |
-| `departureDate` | **Required** | `YYYY-MM-DD` in calculator payload (adapter uses `yyyyMMdd` internally, formatted at send time) |
-| `tourId` | **Required** | `metadata.wakacje_pl.tour_operator_id` |
-| `kidsAges` | **Required** | Must be present (empty when `kids: 0`) |
-| `adults` | Presence-required | Key required |
-| `transportId` | Valid-if-present | |
-| `departureCityId`, `departureCityCode`, `hotelId`, `serviceId`, `duration`, `kids`, `infants`, `tourOp`, `cruiseId`, `roundTripId`, `isAlternativeRoom`, `isOffer77` | Optional | Probe tolerated removal; keep populated values from ingest for correct variant matching |
+| Field                                                                                                                                                                | Classification    | Notes                                                                                           |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------- |
+| `departureDate`                                                                                                                                                      | **Required**      | `YYYY-MM-DD` in calculator payload (adapter uses `yyyyMMdd` internally, formatted at send time) |
+| `tourId`                                                                                                                                                             | **Required**      | `metadata.wakacje_pl.tour_operator_id`                                                          |
+| `kidsAges`                                                                                                                                                           | **Required**      | Must be present (empty when `kids: 0`)                                                          |
+| `adults`                                                                                                                                                             | Presence-required | Key required                                                                                    |
+| `transportId`                                                                                                                                                        | Valid-if-present  |                                                                                                 |
+| `departureCityId`, `departureCityCode`, `hotelId`, `serviceId`, `duration`, `kids`, `infants`, `tourOp`, `cruiseId`, `roundTripId`, `isAlternativeRoom`, `isOffer77` | Optional          | Probe tolerated removal; keep populated values from ingest for correct variant matching         |
 
 > **Practical minimum:** never omit `adults`, `departureDate`, `tourId`, or `kidsAges`. Match occupancy and dates to the persisted offer / scrape cell.
 

@@ -68,6 +68,7 @@ async def test_run_availability_job_nothing_available(mock_container):
         rating=4.0,
         review_count=50,
         price_total=Decimal("1000"),
+        price_per_person=Decimal("500.00"),
         price_per_day=Decimal("71.43"),
         referral_url="https://tui.pl/ref",
         available=False,
@@ -124,6 +125,7 @@ async def test_run_availability_job_becomes_unavailable(mock_container):
         rating=4.0,
         review_count=50,
         price_total=Decimal("1000"),
+        price_per_person=Decimal("500.00"),
         price_per_day=Decimal("71.43"),
         referral_url="https://tui.pl/ref",
         available=True,
@@ -191,6 +193,7 @@ async def test_run_availability_job_price_updates(mock_container):
         rating=4.0,
         review_count=50,
         price_total=Decimal("1000"),
+        price_per_person=Decimal("500.00"),
         price_per_day=Decimal("71.43"),
         referral_url="https://tui.pl/ref",
         available=True,
@@ -223,5 +226,6 @@ async def test_run_availability_job_price_updates(mock_container):
     saved_offer: Offer = mock_container.offers_repo.put_batch.call_args[0][0][0]
     assert saved_offer.available is True
     assert saved_offer.price_total == Decimal("1200")
+    assert saved_offer.price_per_person == Decimal("600.00")
     assert saved_offer.price_per_day == Decimal("85.71")
     mock_container.matching_service.bulk_match_users.assert_not_called()

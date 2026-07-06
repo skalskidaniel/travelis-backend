@@ -352,6 +352,12 @@ class TuiProvider:
         participants = cell.adults + cell.children
         price_total = Decimal(str(price_total_raw))
         if price_per_person_raw is not None:
+            price_per_person = Decimal(str(price_per_person_raw)).quantize(
+                Decimal("0.01")
+            )
+        else:
+            price_per_person = (price_total / participants).quantize(Decimal("0.01"))
+        if price_per_person_raw is not None:
             price_per_day_one_person = (
                 Decimal(str(price_per_person_raw)) / duration
             ).quantize(Decimal("0.01"))
@@ -392,6 +398,7 @@ class TuiProvider:
             rating=Decimal(str(rating_raw)),
             review_count=int(review_count),
             price_total=price_total,
+            price_per_person=price_per_person,
             price_per_day=price_per_day_one_person,
             referral_url=f"{TUI_ORIGIN}{offer_url}",
             image_url=image_url,

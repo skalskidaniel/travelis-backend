@@ -556,6 +556,7 @@ class WakacjePlProvider:
 
         participants = cell.adults + cell.children
         price_total = Decimal(str(price))
+        price_per_person = (price_total / participants).quantize(Decimal("0.01"))
         price_per_day_one_person = (price_total / duration / participants).quantize(
             Decimal("0.01")
         )
@@ -613,6 +614,7 @@ class WakacjePlProvider:
             rating=rating,
             review_count=int(review_count),
             price_total=price_total,
+            price_per_person=price_per_person,
             price_per_day=price_per_day_one_person,
             referral_url=referral_url,
             image_url=image_url,

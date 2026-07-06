@@ -150,6 +150,7 @@ class RawOffer(BaseModel):
         ge=0, description="Number of guest reviews backing the rating."
     )
     price_total: PricePLN
+    price_per_person: PricePLN
     price_per_day: PricePLN
     referral_url: AnyHttpUrl = Field(description="Provider deep link.")
     image_url: AnyHttpUrl | None = Field(

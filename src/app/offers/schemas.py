@@ -62,6 +62,10 @@ class OfferFeedItem(BaseModel):
         description="Total cost of the trip for all travelers in PLN.",
         examples=[Decimal("2450.00")],
     )
+    price_per_person: Decimal = Field(
+        description="Total trip cost per traveler in PLN.",
+        examples=[Decimal("1225.00")],
+    )
     referral_url: str = Field(
         description="Affiliate/referral deep link to the provider page.",
         examples=[
@@ -103,6 +107,7 @@ class OfferFeedItem(BaseModel):
             rating=float(offer.rating),
             review_count=offer.review_count,
             price_total=offer.price_total,
+            price_per_person=offer.price_per_person,
             referral_url=str(offer.referral_url),
             image_url=str(offer.image_url) if offer.image_url else None,
             share_url=str(offer.share_url),
@@ -178,6 +183,10 @@ class OfferDetailResponse(BaseModel):
         description="Total cost of the trip for all travelers in PLN.",
         examples=[Decimal("2450.00")],
     )
+    price_per_person: Decimal = Field(
+        description="Total trip cost per traveler in PLN.",
+        examples=[Decimal("1225.00")],
+    )
     price_per_day: Decimal = Field(
         description="Average price per person per day in PLN.",
         examples=[Decimal("350.00")],
@@ -250,6 +259,7 @@ class OfferDetailResponse(BaseModel):
             rating=float(offer.rating),
             review_count=offer.review_count,
             price_total=offer.price_total,
+            price_per_person=offer.price_per_person,
             price_per_day=offer.price_per_day,
             attractiveness_score=offer.attractiveness_score,
             available=offer.available,

@@ -66,6 +66,7 @@ def make_offer(
         rating=rating,
         review_count=100,
         price_total=3000.0,
+        price_per_person=1500.0,
         price_per_day=428.5,
         attractiveness_score=0.8,
         referral_url="https://wakacje.pl/ref1",
@@ -140,6 +141,7 @@ def mock_offers():
         rating=4.5,
         review_count=100,
         price_total=3000.0,
+        price_per_person=1500.0,
         price_per_day=428.5,
         attractiveness_score=0.8,
         referral_url="https://wakacje.pl/ref1",
@@ -170,6 +172,7 @@ def mock_offers():
         rating=2.5,  # Too low (prefs min_rating = 4)
         review_count=100,
         price_total=1500.0,
+        price_per_person=750.0,
         price_per_day=214.2,
         attractiveness_score=0.5,
         referral_url="https://wakacje.pl/ref2",
