@@ -21,7 +21,7 @@ from core.repositories.user_offers import DynamoUserOffersRepository
 import redis.asyncio as aioredis
 from core.repositories.feed import RedisFeedRepository
 
-pytestmark = [pytest.mark.asyncio, pytest.mark.repo_integration]
+pytestmark = pytest.mark.asyncio
 
 ENDPOINT_URL = os.environ.get("DYNAMODB_ENDPOINT_URL", "http://localhost:8000")
 

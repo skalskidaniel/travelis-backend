@@ -4,7 +4,7 @@ from decimal import Decimal
 from core.models.common import BoardType, ProviderName
 from core.models.offer import OfferMetadata, RawOffer, TuiMetadata, WakacjePlMetadata
 
-from tests.core.providers.utils import (
+from tests.unit.core.providers.utils import (
     board_label_matches,
     departure_city_label,
     hotel_title_token,

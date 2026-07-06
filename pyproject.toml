@@ -26,10 +26,7 @@ entrypoint = "app.main:app"
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 addopts = "-rf"
-markers = [
-    "provider_integration: marks test as a provider integration test",
-    "repo_integration: marks test as a repo integration test",
-]
+testpaths = ["tests/unit"]
 filterwarnings = [
     "ignore:There is no current event loop:DeprecationWarning:mangum.adapter",
     "ignore::UserWarning:aws_lambda_powertools",

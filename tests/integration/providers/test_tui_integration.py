@@ -24,7 +24,7 @@ from core.providers.tui.main import (
 )
 from core.providers.resources import tui_filters
 
-pytestmark = [pytest.mark.asyncio, pytest.mark.provider_integration]
+pytestmark = pytest.mark.asyncio
 
 
 _TUI_FILTERS = tui_filters
@@ -386,7 +386,7 @@ async def test_referral_url_matches_offer_page(
             f"Live TUI search returned no offers for next-month cell with board {board.value}."
         )
 
-    from tests.core.providers.utils import (
+    from tests.unit.core.providers.utils import (
         PAGE_FETCH_HEADERS,
         verify_tui_offer_urls,
         offer_url_check_sample_size,

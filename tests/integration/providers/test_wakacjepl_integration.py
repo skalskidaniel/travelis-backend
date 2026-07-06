@@ -21,7 +21,7 @@ from core.providers.utils import month_date_bounds
 from core.providers.wakacjepl.main import WakacjePlProvider
 from core.providers.resources import wakacjepl_filters
 
-pytestmark = [pytest.mark.asyncio, pytest.mark.provider_integration]
+pytestmark = pytest.mark.asyncio
 
 
 _WAKACJE_FILTERS = wakacjepl_filters
@@ -356,7 +356,7 @@ async def test_referral_url_matches_offer_page(
             f"Live Wakacje.pl search returned no offers for next-month cell with board {board.value}."
         )
 
-    from tests.core.providers.utils import (
+    from tests.unit.core.providers.utils import (
         verify_wakacje_offer_urls,
         offer_url_check_sample_size,
     )
