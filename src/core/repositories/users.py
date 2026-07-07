@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any
 from botocore.exceptions import ClientError
 
@@ -69,22 +69,23 @@ class DynamoUsersRepository(UsersRepository):
 
         return [User(**deserialize_item(item)) for item in items]
 
-    async def touch_last_seen(self, user_id: str, seen_date: date) -> None:
-        seen_str = seen_date.isoformat()
+    async def record_session_start(
+        self, user_id: str, new_since: datetime, last_active_at: datetime
+    ) -> None:
         try:
             await self.table.update_item(
                 Key={"user_id": user_id},
-                UpdateExpression="SET last_seen_date = :d",
-                ExpressionAttributeValues={":d": seen_str},
-                ConditionExpression=(
-                    "attribute_exists(user_id) AND "
-                    "(attribute_not_exists(last_seen_date) OR last_seen_date < :d)"
-                ),
+                UpdateExpression="SET new_since = :ns, last_active_at = :la",
+                ExpressionAttributeValues={
+                    ":ns": new_since.isoformat(),
+                    ":la": last_active_at.isoformat(),
+                },
+                ConditionExpression="attribute_exists(user_id)",
             )
         except ClientError as exc:
             error_code = exc.response.get("Error", {}).get("Code")
             if error_code == "ConditionalCheckFailedException":
-                return
+                raise ItemNotFoundException(f"User not found: {user_id}") from exc
             raise
 
     async def mark_inactive(self, user_ids: list[str]) -> int:
@@ -135,13 +136,13 @@ class DynamoUsersRepository(UsersRepository):
         results = await asyncio.gather(*[_update(uid) for uid in user_ids])
         return sum(1 for r in results if r)
 
-    async def list_users_inactive_since(self, cutoff: date) -> list[User]:
+    async def list_users_inactive_since(self, cutoff: datetime) -> list[User]:
         cutoff_str = cutoff.isoformat()
         items: list[User] = []
         exclusive_start_key = None
         while True:
             kwargs: dict = {
-                "FilterExpression": ("last_seen_date < :cutoff AND is_active = :true"),
+                "FilterExpression": ("last_active_at < :cutoff AND is_active = :true"),
                 "ExpressionAttributeValues": {
                     ":cutoff": cutoff_str,
                     ":true": True,

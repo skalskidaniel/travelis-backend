@@ -26,7 +26,7 @@ entrypoint = "app.main:app"
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 addopts = "-rf"
-testpaths = ["tests/unit"]
+testpaths = ["tests"]
 filterwarnings = [
     "ignore:There is no current event loop:DeprecationWarning:mangum.adapter",
     "ignore::UserWarning:aws_lambda_powertools",

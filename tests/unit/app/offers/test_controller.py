@@ -22,6 +22,7 @@ def mock_container():
     c.user_offers_repo = AsyncMock()
     c.offers_repo = AsyncMock()
     c.cells_repo = AsyncMock()
+    c.users_repo = AsyncMock()
     c.settings = MagicMock()
     return c
 
@@ -327,8 +328,13 @@ def test_calculate_zset_score_coverage(sample_domain_offer):
 
 
 def test_resolve_feed_filter_mode_defaults():
+    fixed_new_since = datetime(2026, 6, 1, tzinfo=timezone.utc)
+
     assert resolve_feed_filter_mode(None, False) == "all"
-    assert resolve_feed_filter_mode(None, True) == "new"
+    assert resolve_feed_filter_mode(None, True, fixed_new_since) == (
+        f"new:{int(fixed_new_since.timestamp())}"
+    )
+    assert resolve_feed_filter_mode(None, True).startswith("new:")
     assert resolve_feed_filter_mode("gr", False) == "country:GR"
 
 
@@ -397,6 +403,9 @@ def test_get_offers_country_filter_builds_country_scoped_zset(
 def test_get_offers_new_filter_builds_new_scoped_zset(
     client, mock_container, auth_headers, sample_domain_offer
 ):
+    from core.models.user import User
+
+    new_since = datetime(2024, 1, 1, tzinfo=timezone.utc)
     recent_matched_at = datetime.now(timezone.utc)
     stale_matched_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
     stale_offer = sample_domain_offer.model_copy(
@@ -404,6 +413,9 @@ def test_get_offers_new_filter_builds_new_scoped_zset(
             "offer_id": "cccccccccccccccccccccccccccccccc",
             "cell_id": "cccccccccccccccc",
         }
+    )
+    mock_container.users_repo.get.return_value = User(
+        user_id="user-123", new_since=new_since
     )
     mock_container.feed_repo.get_feed_version.return_value = 1
     mock_container.feed_repo.get_or_build_sort_zset.return_value = False
@@ -419,7 +431,10 @@ def test_get_offers_new_filter_builds_new_scoped_zset(
             "matched_at": stale_matched_at,
         },
     ]
-    mock_container.offers_repo.get_batch.return_value = [sample_domain_offer, stale_offer]
+    mock_container.offers_repo.get_batch.return_value = [
+        sample_domain_offer,
+        stale_offer,
+    ]
     mock_container.feed_repo.get_page.return_value = [
         (sample_domain_offer.offer_id, sample_domain_offer.cell_id)
     ]
@@ -432,7 +447,11 @@ def test_get_offers_new_filter_builds_new_scoped_zset(
     assert data["offers"][0]["offer_id"] == sample_domain_offer.offer_id
     assert data["total_count"] == 1
     mock_container.feed_repo.add_to_sort_zset.assert_called_once()
-    assert mock_container.feed_repo.add_to_sort_zset.call_args.kwargs["filter_mode"] == "new"
+    expected_filter_mode = f"new:{int(new_since.timestamp())}"
+    assert (
+        mock_container.feed_repo.add_to_sort_zset.call_args.kwargs["filter_mode"]
+        == expected_filter_mode
+    )
 
 
 def test_get_offers_country_filter_pagination_uses_filter_mode(

@@ -118,7 +118,7 @@ def test_container(verifier):
 
     container = MagicMock()
     container.cognito_jwt_verifier = verifier_instance
-    container.user_activity_service.touch_daily = AsyncMock()
+    container.user_activity_service.touch = AsyncMock()
 
     return container
 
@@ -140,7 +140,7 @@ def test_get_current_user_valid_token(test_client, test_container, verifier):
     )
     assert response.status_code == 200
     assert response.json() == {"user_id": "user-123"}
-    test_container.user_activity_service.touch_daily.assert_called_with("user-123")
+    test_container.user_activity_service.touch.assert_called_with("user-123")
 
 
 def test_get_current_user_missing_header(test_client):
@@ -166,7 +166,7 @@ def test_get_current_user_configuration_error_returns_500():
     )
     container = MagicMock()
     container.cognito_jwt_verifier = verifier
-    container.user_activity_service.touch_daily = AsyncMock()
+    container.user_activity_service.touch = AsyncMock()
 
     auth_test_app.dependency_overrides[get_container] = lambda: container
     with TestClient(auth_test_app) as client:

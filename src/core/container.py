@@ -156,6 +156,7 @@ class Container:
             cells_repo=self.cells_repo,
             redis_client=self.redis_client,
             inactivity_threshold_days=self.settings.inactivity_threshold_days,
+            session_gap_minutes=self.settings.session_gap_minutes,
         )
 
     async def cleanup(self) -> None:

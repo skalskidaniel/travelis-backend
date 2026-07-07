@@ -1,7 +1,7 @@
 import base64
 import json
 from aws_lambda_powertools import Logger
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Path
 
@@ -20,8 +20,6 @@ from core.models.offer import Offer
 logger = Logger(child=True)
 
 router = APIRouter(tags=["Offers Feed"])
-
-NEW_OFFERS_WINDOW = timedelta(hours=4)
 
 
 async def _prune_stale_user_offers(
@@ -92,7 +90,9 @@ def _coerce_utc_datetime(value: datetime | str | None) -> datetime | None:
     return None
 
 
-def resolve_feed_filter_mode(country: str | None, new_only: bool) -> str:
+def resolve_feed_filter_mode(
+    country: str | None, new_only: bool, new_since: datetime | None = None
+) -> str:
     if country is not None and new_only:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -107,7 +107,8 @@ def resolve_feed_filter_mode(country: str | None, new_only: bool) -> str:
             )
         return f"country:{normalized}"
     if new_only:
-        return "new"
+        cutoff = new_since or datetime.now(timezone.utc)
+        return f"new:{int(cutoff.timestamp())}"
     return "all"
 
 
@@ -122,8 +123,10 @@ async def _apply_feed_filter(
 
     user_offer_by_id = {item["offer_id"]: item for item in user_offers}
 
-    if filter_mode == "new":
-        cutoff = datetime.now(timezone.utc) - NEW_OFFERS_WINDOW
+    if filter_mode.startswith("new:"):
+        cutoff = datetime.fromtimestamp(
+            int(filter_mode.split(":", 1)[1]), tz=timezone.utc
+        )
         filtered: list[Offer] = []
         for offer in offers:
             user_offer = user_offer_by_id.get(offer.offer_id)
@@ -142,9 +145,7 @@ async def _apply_feed_filter(
             cell.cell_id: cell.country for cell in cells if cell.cell_id is not None
         }
         return [
-            offer
-            for offer in offers
-            if cell_country.get(offer.cell_id) == country_code
+            offer for offer in offers if cell_country.get(offer.cell_id) == country_code
         ]
 
     return offers
@@ -200,13 +201,17 @@ async def get_offers_feed(
     ),
     new: bool = Query(
         default=False,
-        description="When true, return only offers matched within the last 4 hours.",
+        description="When true, return only offers matched since the start of your current session.",
     ),
     user_id: str = Depends(get_current_user),
     container: Container = Depends(get_container),
 ):
     """Retrieve a paginated, sorted list of travel offers from the user's matched feed."""
-    filter_mode = resolve_feed_filter_mode(country, new)
+    new_since = None
+    if new:
+        user = await container.users_repo.get(user_id)
+        new_since = user.new_since if user else None
+    filter_mode = resolve_feed_filter_mode(country, new, new_since)
     offset = 0
     cursor_feed_version = None
 

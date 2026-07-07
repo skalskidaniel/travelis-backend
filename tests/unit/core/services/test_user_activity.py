@@ -1,75 +1,79 @@
-from datetime import date, datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from core.models.user import User, UserPreferences
 from core.services.activation import generate_required_cells
-from core.services.user_activity import (
-    UserActivityService,
-    seconds_until_next_utc_midnight,
-)
+from core.services.user_activity import UserActivityService
 
 
-def test_seconds_until_next_utc_midnight_is_positive():
-    secs = seconds_until_next_utc_midnight()
-    assert 1 <= secs <= 86400
-
-
-def test_seconds_until_next_utc_midnight_at_midnight_is_full_day():
-    midnight = datetime(2026, 6, 25, 0, 0, 0, tzinfo=timezone.utc)
-    secs = seconds_until_next_utc_midnight(midnight)
-    assert secs == 86400
-
-
-def test_seconds_until_next_utc_midnight_just_before_midnight_is_small():
-    almost = datetime(2026, 6, 25, 23, 59, 59, tzinfo=timezone.utc)
-    secs = seconds_until_next_utc_midnight(almost)
-    assert secs == 1
-
-
-def _make_service():
+def _make_service(session_gap_minutes: int = 30):
     return UserActivityService(
         users_repo=MagicMock(),
         cells_repo=MagicMock(),
         redis_client=MagicMock(),
         inactivity_threshold_days=7,
+        session_gap_minutes=session_gap_minutes,
     )
 
 
 @pytest.mark.asyncio
-async def test_touch_daily_first_call_writes_to_repo():
+async def test_touch_continuing_session_is_noop():
     service = _make_service()
-    service.redis.set = AsyncMock(return_value=True)
-    service.users_repo.touch_last_seen = AsyncMock()
+    service.redis.set = AsyncMock(return_value=datetime.now(timezone.utc).isoformat())
+    service.users_repo.get = AsyncMock()
+    service.users_repo.record_session_start = AsyncMock()
 
-    await service.touch_daily("user-1")
+    await service.touch("user-1")
 
     service.redis.set.assert_awaited_once()
-    service.users_repo.touch_last_seen.assert_awaited_once_with("user-1", date.today())
+    _, kwargs = service.redis.set.await_args
+    assert kwargs["ex"] == 30 * 60
+    assert kwargs["get"] is True
+    service.users_repo.get.assert_not_called()
+    service.users_repo.record_session_start.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_touch_daily_second_call_is_noop():
+async def test_touch_session_boundary_records_session_start():
     service = _make_service()
     service.redis.set = AsyncMock(return_value=None)
-    service.users_repo.touch_last_seen = AsyncMock()
+    prior_last_active = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    service.users_repo.get = AsyncMock(
+        return_value=User(user_id="user-1", last_active_at=prior_last_active)
+    )
+    service.users_repo.record_session_start = AsyncMock()
 
-    await service.touch_daily("user-1")
+    await service.touch("user-1")
 
-    service.redis.set.assert_awaited_once()
-    service.users_repo.touch_last_seen.assert_not_called()
+    service.users_repo.get.assert_awaited_once_with("user-1")
+    service.users_repo.record_session_start.assert_awaited_once()
+    _, kwargs = service.users_repo.record_session_start.await_args
+    assert kwargs["new_since"] == prior_last_active
+    assert isinstance(kwargs["last_active_at"], datetime)
 
 
 @pytest.mark.asyncio
-async def test_touch_daily_swallows_repo_error():
+async def test_touch_session_boundary_skips_missing_user():
     service = _make_service()
-    service.redis.set = AsyncMock(return_value=True)
-    service.users_repo.touch_last_seen = AsyncMock(
-        side_effect=RuntimeError("dynamo unavailable")
-    )
+    service.redis.set = AsyncMock(return_value=None)
+    service.users_repo.get = AsyncMock(return_value=None)
+    service.users_repo.record_session_start = AsyncMock()
 
-    await service.touch_daily("user-1")
+    await service.touch("user-1")
+
+    service.users_repo.record_session_start.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_touch_swallows_repo_error():
+    service = _make_service()
+    service.redis.set = AsyncMock(return_value=None)
+    service.users_repo.get = AsyncMock(side_effect=RuntimeError("dynamo unavailable"))
+    service.users_repo.record_session_start = AsyncMock()
+
+    await service.touch("user-1")
 
 
 @pytest.mark.asyncio
@@ -153,8 +157,10 @@ async def test_sweep_uses_threshold_for_cutoff():
     service.cells_repo.decrement_activations = AsyncMock(return_value={})
     service.users_repo.mark_inactive = AsyncMock(return_value=0)
 
+    before = datetime.now(timezone.utc)
     await service.sweep()
+    after = datetime.now(timezone.utc)
 
     call_args = service.users_repo.list_users_inactive_since.await_args.args[0]
-    expected_cutoff = date.today().toordinal() - 14
-    assert call_args.toordinal() == expected_cutoff
+    assert isinstance(call_args, datetime)
+    assert before - timedelta(days=14) <= call_args <= after - timedelta(days=14)

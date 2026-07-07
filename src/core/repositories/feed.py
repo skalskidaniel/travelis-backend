@@ -6,9 +6,7 @@ from core.repositories.base import FeedRepository
 def _sort_zset_key(
     user_id: str, field: str, order: str, version: int, filter_mode: str
 ) -> str:
-    return (
-        f"user:{user_id}:sort:{field}:{order}:filter:{filter_mode}:v{version}"
-    )
+    return f"user:{user_id}:sort:{field}:{order}:filter:{filter_mode}:v{version}"
 
 
 class RedisFeedRepository(FeedRepository):

@@ -1,5 +1,4 @@
-from datetime import date, datetime, time, timezone
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from aws_lambda_powertools import Logger
 
@@ -8,20 +7,6 @@ from core.repositories.base import CellsRepository, UsersRepository
 from core.services.activation import generate_required_cells
 
 logger = Logger(child=True)
-
-
-def seconds_until_next_utc_midnight(now: datetime | None = None) -> int:
-    """Seconds remaining until the next 00:00 UTC. The Redis key TTL is anchored
-    to UTC midnight, so a touch early in a day doesn't trigger a second write
-    near day-end and vice versa.
-    """
-    now = now or datetime.now(timezone.utc)
-    tomorrow = datetime.combine(
-        date.fromordinal(now.date().toordinal() + 1),
-        time.min,
-        tzinfo=timezone.utc,
-    )
-    return max(int((tomorrow - now).total_seconds()), 1)
 
 
 class UserActivityService:
@@ -33,37 +18,50 @@ class UserActivityService:
         cells_repo: CellsRepository,
         redis_client,
         inactivity_threshold_days: int,
+        session_gap_minutes: int = 30,
     ) -> None:
         self.users_repo = users_repo
         self.cells_repo = cells_repo
         self.redis = redis_client
         self.inactivity_threshold_days = inactivity_threshold_days
+        self.session_gap_minutes = session_gap_minutes
 
     @staticmethod
     def _redis_key(user_id: str) -> str:
-        return f"user:{user_id}:last_seen_daily"
+        return f"user:{user_id}:session"
 
-    async def touch_daily(self, user_id: str) -> None:
-        """First call per UTC day writes last_seen_date to DynamoDB; later calls are no-ops.
+    async def touch(self, user_id: str) -> None:
+        """Detect session boundaries and persist last_active_at / new_since.
 
-        Redis SET ... NX EX dedupes so at most one DynamoDB write hits per user per day.
+        A sliding Redis key marks the current session. `SET ... EX ... GET`
+        atomically refreshes the TTL and returns the previous value in one
+        round trip: if a previous value existed, the user is still within the
+        same session (idle gap not exceeded) and there's nothing to persist.
+        If it's absent (expired or first-ever touch), a new session has just
+        started: the user's prior `last_active_at` becomes the `new_since`
+        boundary used to resolve "new" offers, and `last_active_at` advances
+        to now.
         """
-        today = date.today()
-        ttl = seconds_until_next_utc_midnight()
-        first_today = await self.redis.set(
+        now = datetime.now(timezone.utc)
+        ttl = self.session_gap_minutes * 60
+        previous = await self.redis.set(
             self._redis_key(user_id),
-            today.isoformat(),
+            now.isoformat(),
             ex=ttl,
-            nx=True,
+            get=True,
         )
-        if not first_today:
+        if previous is not None:
             return
+
         try:
-            await self.users_repo.touch_last_seen(user_id, today)
-        except Exception as exc:
-            logger.warning(
-                f"Failed to persist last_seen_date for user {user_id}: {exc}"
+            user = await self.users_repo.get(user_id)
+            if user is None:
+                return
+            await self.users_repo.record_session_start(
+                user_id, new_since=user.last_active_at, last_active_at=now
             )
+        except Exception as exc:
+            logger.warning(f"Failed to persist session start for user {user_id}: {exc}")
 
     async def ensure_active(self, user: User) -> bool:
         """Re-activate an inactive user by restoring their cell activations.
@@ -79,7 +77,9 @@ class UserActivityService:
 
     async def sweep(self) -> dict:
         """Weekly: decrement cell activations for users idle beyond the threshold."""
-        cutoff = date.today() - timedelta(days=self.inactivity_threshold_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(
+            days=self.inactivity_threshold_days
+        )
         inactive_users = await self.users_repo.list_users_inactive_since(cutoff)
         if not inactive_users:
             logger.info("Inactivity sweep: no users to deactivate.")

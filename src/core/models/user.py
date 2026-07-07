@@ -147,5 +147,6 @@ class User(BaseModel):
     push_subscription: PushSubscription | None = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_seen_date: date = Field(default_factory=date.today)
+    last_active_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    new_since: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True)

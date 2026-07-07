@@ -28,6 +28,6 @@ async def get_current_user(
     if container.user_activity_service is not None:
         import asyncio
 
-        asyncio.create_task(container.user_activity_service.touch_daily(user_id))
+        asyncio.create_task(container.user_activity_service.touch(user_id))
 
     return user_id

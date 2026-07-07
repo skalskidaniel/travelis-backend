@@ -69,7 +69,9 @@ async def test_feed_repo_clear_user(redis_client):
     await repo.clear_user(user_id)
 
     assert not await redis_client.exists(f"user:{user_id}:feed_version")
-    assert not await redis_client.exists(f"user:{user_id}:sort:price:desc:filter:all:v1")
+    assert not await redis_client.exists(
+        f"user:{user_id}:sort:price:desc:filter:all:v1"
+    )
 
 
 async def test_feed_repo_get_size(redis_client):
@@ -100,7 +102,9 @@ async def test_feed_repo_filter_modes_use_disjoint_keys(redis_client):
     await repo.add_to_sort_zset(
         user_id, field, "desc", 1, members, filter_mode="country:GR"
     )
-    await repo.add_to_sort_zset(user_id, field, "desc", 1, members, filter_mode="new")
+    await repo.add_to_sort_zset(
+        user_id, field, "desc", 1, members, filter_mode="new:1717200000"
+    )
 
     assert await repo.get_or_build_sort_zset(
         user_id, field, "desc", 1, filter_mode="all"
@@ -109,7 +113,7 @@ async def test_feed_repo_filter_modes_use_disjoint_keys(redis_client):
         user_id, field, "desc", 1, filter_mode="country:GR"
     )
     assert await repo.get_or_build_sort_zset(
-        user_id, field, "desc", 1, filter_mode="new"
+        user_id, field, "desc", 1, filter_mode="new:1717200000"
     )
     assert not await repo.get_or_build_sort_zset(
         user_id, field, "desc", 1, filter_mode="country:ES"

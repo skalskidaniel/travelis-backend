@@ -108,6 +108,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("INACTIVITY_THRESHOLD_DAYS"),
         ge=1,
     )
+    session_gap_minutes: int = Field(
+        default=30,
+        validation_alias=AliasChoices("SESSION_GAP_MINUTES"),
+        ge=1,
+    )
 
     db: DatabaseSettings | None = None
     push: PushSettings | None = None
