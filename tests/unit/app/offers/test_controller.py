@@ -151,6 +151,36 @@ def test_get_offers_build_zset(
     mock_container.feed_repo.add_to_sort_zset.assert_called_once()
 
 
+def test_get_offers_build_zset_excludes_unavailable(
+    client, mock_container, auth_headers, sample_domain_offer
+):
+    from core.models.offer import mark_offer_unavailable
+
+    mock_container.feed_repo.get_feed_version.return_value = 1
+    mock_container.feed_repo.get_or_build_sort_zset.return_value = False
+
+    sold = mark_offer_unavailable(sample_domain_offer, now=datetime.now(timezone.utc))
+    mock_container.user_offers_repo.query_by_user.return_value = [
+        {
+            "offer_id": sold.offer_id,
+            "cell_id": sold.cell_id,
+            "favorited": True,
+        }
+    ]
+    mock_container.offers_repo.get_batch.return_value = [sold]
+    mock_container.feed_repo.get_page.return_value = []
+
+    response = client.get("/v2/offers", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["offers"] == []
+    assert data["total_count"] == 0
+
+    mock_container.feed_repo.add_to_sort_zset.assert_called_once()
+    members = mock_container.feed_repo.add_to_sort_zset.call_args[0][4]
+    assert members == []
+
+
 def test_get_offers_outdated_cursor_resets(
     client, mock_container, auth_headers, sample_domain_offer
 ):

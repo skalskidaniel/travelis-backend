@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Self
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
@@ -37,6 +37,7 @@ REFERRAL_PARAMS = {
     "a_cid": "11111111",
     "a_aid": "2933",
 }
+SOLD_OFFER_TTL_DAYS = 14
 
 
 class OfferSource(BaseModel):
@@ -209,7 +210,11 @@ class Offer(ScoredOffer):
         description="UTC timestamp when the offer row was last updated."
     )
     ttl: int = Field(
-        ge=0, description="DynamoDB TTL as epoch seconds derived from departure_date."
+        ge=0,
+        description=(
+            "DynamoDB TTL as epoch seconds. Equals departure_date 00:00 UTC while "
+            "available; set to now+14d when soft-deleted as sold."
+        ),
     )
 
     @field_validator("share_url")
@@ -246,14 +251,15 @@ class Offer(ScoredOffer):
                 msg = "external_offer_id must match metadata.tui.offer_code"
                 raise InvalidOfferMetadataException(msg)
 
-        expected_ttl = int(
-            datetime.combine(
-                self.departure_date, time.min, tzinfo=timezone.utc
-            ).timestamp()
-        )
-        if self.ttl != expected_ttl:
-            msg = "ttl must equal departure_date epoch at 00:00:00 UTC"
-            raise ValueError(msg)
+        if self.available:
+            expected_ttl = int(
+                datetime.combine(
+                    self.departure_date, time.min, tzinfo=timezone.utc
+                ).timestamp()
+            )
+            if self.ttl != expected_ttl:
+                msg = "ttl must equal departure_date epoch at 00:00:00 UTC"
+                raise ValueError(msg)
 
         canonical_share_url = f"{SHARE_URL_PREFIX}{self.cell_id}/{self.offer_id}"
         self.share_url = type(self.share_url)(canonical_share_url)
@@ -298,3 +304,12 @@ class Offer(ScoredOffer):
             )
         )
         return type(value)(new_url)
+
+
+def mark_offer_unavailable(offer: Offer, *, now: datetime) -> Offer:
+    """Soft-delete an offer: mark unavailable and expire via DynamoDB TTL in 14 days."""
+    data = offer.model_dump()
+    data["available"] = False
+    data["ttl"] = int((now + timedelta(days=SOLD_OFFER_TTL_DAYS)).timestamp())
+    data["updated_at"] = now
+    return Offer(**data)

@@ -88,12 +88,12 @@ HTTP API (v2) proxying all routes to the Lambda. Routes:
 
 Four tables with **on-demand capacity** (`PAY_PER_REQUEST`) for low operational overhead during early traffic:
 
-| Table         | PK        | SK         | GSI | TTL                                                     |
-| ------------- | --------- | ---------- | --- | ------------------------------------------------------- |
-| `Users`       | `user_id` | —          | —   |                                                         |
-| `MarketCells` | `cell_id` | —          | —   |                                                         |
-| `Offers`      | `cell_id` | `offer_id` | —   | `ttl` (epoch of `departure_date`)                       |
-| `UserOffers`  | `user_id` | `offer_id` | —   | Pruned cascadingly by eventual consistency in match job |
+| Table         | PK        | SK         | GSI | TTL                                                       |
+| ------------- | --------- | ---------- | --- | --------------------------------------------------------- |
+| `Users`       | `user_id` | —          | —   |                                                           |
+| `MarketCells` | `cell_id` | —          | —   |                                                           |
+| `Offers`      | `cell_id` | `offer_id` | —   | `ttl` (departure_date while available; now+14d when sold) |
+| `UserOffers`  | `user_id` | `offer_id` | —   | Pruned cascadingly by eventual consistency in match job   |
 
 No capacity units are configured. Revisit provisioned capacity only if traffic becomes predictable enough that it is clearly cheaper than on-demand billing.
 
@@ -109,8 +109,8 @@ No capacity units are configured. Revisit provisioned capacity only if traffic b
 
 Only the periodic jobs use fixed schedules. There is **no `match-users` poll** — matching is event-driven (see below).
 
-| Rule                 | Schedule                  | Target               | Job                 |
-| -------------------- | ------------------------- | -------------------- | ------------------- |
+| Rule                 | Schedule                     | Target               | Job                 |
+| -------------------- | ---------------------------- | -------------------- | ------------------- |
 | `scrape-offers`      | `cron(0 6,10,14,18 * * ? *)` | Cron Lambda (direct) | `jobs.coordinator`  |
 | `check-availability` | `cron(0 8,12,16,20 * * ? *)` | Cron Lambda (direct) | `jobs.availability` |
 

@@ -5,7 +5,7 @@ from datetime import datetime, time, timezone
 
 from core.container import Container
 from core.models.cell import MarketCell
-from core.models.offer import Offer, RawOffer, ScoredOffer
+from core.models.offer import Offer, RawOffer, ScoredOffer, mark_offer_unavailable
 from core.services.ingest import (
     ingest_raw_offers,
     merge_existing_and_new_offer,
@@ -183,19 +183,20 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
                     else:
                         offers_to_save.append(new_offer)
 
-                # Availability-by-absence: delete offers no longer returned by providers
-                offers_to_delete = []
+                # Availability-by-absence: soft-delete offers no longer returned by providers
                 for oid, existing_offer in existing_map.items():
                     if oid not in seen_offer_ids and existing_offer.available:
-                        offers_to_delete.append((cell.cell_id, oid))
+                        offers_to_save.append(
+                            mark_offer_unavailable(existing_offer, now=now)
+                        )
 
                 if offers_to_save:
                     await container.offers_repo.put_batch(offers_to_save)
-                if offers_to_delete:
-                    await container.offers_repo.delete_batch(offers_to_delete)
-                    logger.info(
-                        f"Deleted {len(offers_to_delete)} unavailable offers for cell {cell.cell_id}"
-                    )
+                    soft_deleted = sum(1 for o in offers_to_save if not o.available)
+                    if soft_deleted:
+                        logger.info(
+                            f"Soft-deleted {soft_deleted} unavailable offers for cell {cell.cell_id}"
+                        )
                 await container.cells_repo.update_last_scraped([cell.cell_id], now)
 
                 scraped_cell_ids.append(cell.cell_id)

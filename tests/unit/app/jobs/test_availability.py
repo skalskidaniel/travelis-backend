@@ -29,7 +29,7 @@ async def test_run_availability_job_no_cells(mock_container):
     result = await run_availability_job(mock_container)
     assert result["checked_offers_count"] == 0
     assert result["updated_offers_count"] == 0
-    assert result["deleted_offers_count"] == 0
+    assert result["unavailable_offers_count"] == 0
     assert result["remain_available_count"] == 0
     mock_container.matching_service.bulk_match_users.assert_not_called()
 
@@ -86,7 +86,7 @@ async def test_run_availability_job_nothing_available(mock_container):
     result = await run_availability_job(mock_container)
     assert result["checked_offers_count"] == 0
     assert result["updated_offers_count"] == 0
-    assert result["deleted_offers_count"] == 0
+    assert result["unavailable_offers_count"] == 0
     assert result["remain_available_count"] == 0
     mock_container.offers_repo.put.assert_not_called()
     mock_container.matching_service.bulk_match_users.assert_not_called()
@@ -148,13 +148,16 @@ async def test_run_availability_job_becomes_unavailable(mock_container):
 
     assert result["checked_offers_count"] == 1
     assert result["updated_offers_count"] == 0
-    assert result["deleted_offers_count"] == 1
+    assert result["unavailable_offers_count"] == 1
     assert result["remain_available_count"] == 0
 
-    mock_container.offers_repo.delete_batch.assert_called_once_with(
-        [(offer.cell_id, offer.offer_id)]
-    )
-    mock_container.offers_repo.put.assert_not_called()
+    mock_container.offers_repo.delete_batch.assert_not_called()
+    mock_container.offers_repo.put_batch.assert_called_once()
+    saved_offer: Offer = mock_container.offers_repo.put_batch.call_args[0][0][0]
+    assert saved_offer.available is False
+    assert saved_offer.offer_id == offer.offer_id
+    # TTL should be ~now + 14 days, not departure_date
+    assert saved_offer.ttl != 1783641600
     mock_container.matching_service.bulk_match_users.assert_called_once_with(
         [offer.cell_id]
     )
@@ -219,7 +222,7 @@ async def test_run_availability_job_price_updates(mock_container):
 
     assert result["checked_offers_count"] == 1
     assert result["updated_offers_count"] == 1
-    assert result["deleted_offers_count"] == 0
+    assert result["unavailable_offers_count"] == 0
     assert result["remain_available_count"] == 1
 
     mock_container.offers_repo.put_batch.assert_called_once_with([offer])

@@ -77,7 +77,7 @@ async def trigger_availability():
         print("Status: Success")
         print(f"Checked Offers: {results.get('checked_offers_count', 0)}")
         print(f"Remain Available: {results.get('remain_available_count', 0)}")
-        print(f"Deleted Offers: {results.get('deleted_offers_count', 0)}")
+        print(f"Unavailable Offers: {results.get('unavailable_offers_count', 0)}")
         print(f"Price Updates: {results.get('updated_offers_count', 0)}")
 
     except Exception as e:

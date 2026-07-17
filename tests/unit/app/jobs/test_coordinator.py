@@ -177,15 +177,16 @@ async def test_run_scrape_job_availability_by_absence(mock_container):
         await run_scrape_job(mock_container)
 
         calls = mock_container.offers_repo.put_batch.call_args[0][0]
-        assert len(calls) == 1
+        assert len(calls) == 2
 
-        new_saved = calls[0]
-        assert new_saved.external_offer_id == "tui-new"
+        new_saved = next(o for o in calls if o.external_offer_id == "tui-new")
         assert new_saved.available is True
 
-        mock_container.offers_repo.delete_batch.assert_called_once_with(
-            [(cell.cell_id, existing_offer.offer_id)]
-        )
+        soft_deleted = next(o for o in calls if o.offer_id == existing_offer.offer_id)
+        assert soft_deleted.available is False
+        assert soft_deleted.ttl != existing_offer.ttl
+
+        mock_container.offers_repo.delete_batch.assert_not_called()
 
 
 @pytest.mark.asyncio

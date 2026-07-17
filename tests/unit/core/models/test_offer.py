@@ -216,6 +216,29 @@ def test_ttl_must_match_departure_date_epoch(valid_offer_kwargs):
         Offer(**valid_offer_kwargs)
 
 
+def test_ttl_may_differ_when_unavailable(valid_offer_kwargs):
+    valid_offer_kwargs["available"] = False
+    valid_offer_kwargs["ttl"] = 1783814401
+    offer: Offer = Offer(**valid_offer_kwargs)
+    assert offer.available is False
+    assert offer.ttl == 1783814401
+
+
+def test_mark_offer_unavailable_sets_available_and_ttl(valid_offer_kwargs):
+    from datetime import timedelta
+
+    from core.models.offer import SOLD_OFFER_TTL_DAYS, mark_offer_unavailable
+
+    offer: Offer = Offer(**valid_offer_kwargs)
+    now = datetime(2026, 7, 17, 12, 0, 0, tzinfo=timezone.utc)
+    marked = mark_offer_unavailable(offer, now=now)
+
+    assert marked.available is False
+    assert marked.updated_at == now
+    assert marked.ttl == int((now + timedelta(days=SOLD_OFFER_TTL_DAYS)).timestamp())
+    assert offer.available is True  # original unchanged
+
+
 def test_legacy_image_url_remaps_to_image_urls(valid_offer_kwargs):
     valid_offer_kwargs["image_url"] = "https://i.wakacje.pl/media/hotel/legacy.jpg"
     offer: Offer = Offer(**valid_offer_kwargs)

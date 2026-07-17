@@ -697,3 +697,55 @@ async def test_match_user_offers_clears_stale_matches_when_no_required_cells(
     assert feed_changed is True
     user_offers_repo.delete_batch.assert_called_once_with([("usr_123", "stale-offer")])
     feed_repo.increment_feed_version.assert_called_once_with("usr_123")
+
+
+@pytest.mark.asyncio
+async def test_match_user_offers_preserves_favorited_obsolete(test_user, mock_offers):
+    users_repo = MagicMock()
+    users_repo.get = AsyncMock(return_value=test_user)
+
+    offers_repo = MagicMock()
+    offers_repo.query_by_cell = AsyncMock(return_value=mock_offers)
+
+    favorited_id = "favorited-sold-offer"
+    stale_id = "stale-non-favorited"
+
+    user_offers_repo = MagicMock()
+    user_offers_repo.query_by_user = AsyncMock(
+        return_value=[
+            {
+                "user_id": "usr_123",
+                "offer_id": favorited_id,
+                "favorited": True,
+            },
+            {
+                "user_id": "usr_123",
+                "offer_id": stale_id,
+                "favorited": False,
+            },
+        ]
+    )
+    user_offers_repo.put_batch = AsyncMock()
+    user_offers_repo.delete_batch = AsyncMock()
+
+    feed_repo = MagicMock()
+    feed_repo.increment_feed_version = AsyncMock()
+
+    test_user.push_enabled = False
+
+    service = MatchingService(
+        users_repo=users_repo,
+        offers_repo=offers_repo,
+        user_offers_repo=user_offers_repo,
+        feed_repo=feed_repo,
+        notifications_service=MagicMock(),
+        activation_service=MagicMock(),
+    )
+
+    feed_changed = await service.match_user_offers("usr_123", date(2026, 6, 18))
+
+    assert feed_changed is True
+    user_offers_repo.delete_batch.assert_called_once_with([("usr_123", stale_id)])
+    deleted_ids = {oid for _, oid in user_offers_repo.delete_batch.call_args[0][0]}
+    assert favorited_id not in deleted_ids
+    feed_repo.increment_feed_version.assert_called_once_with("usr_123")

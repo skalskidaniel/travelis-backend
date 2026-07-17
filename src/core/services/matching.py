@@ -120,16 +120,28 @@ class MatchingService:
         existing_offer_ids = {item["offer_id"] for item in existing_items}
         new_offer_ids = {o.offer_id for o in matched_offers}
 
-        to_delete_ids = existing_offer_ids - new_offer_ids
+        favorited_ids = {
+            item["offer_id"] for item in existing_items if item.get("favorited", False)
+        }
+        obsolete_ids = existing_offer_ids - new_offer_ids
+        # Keep favorited rows so sold favorites remain hydratable until Offer TTL expires.
+        to_delete_ids = obsolete_ids - favorited_ids
+        retained_favorited_obsolete = obsolete_ids & favorited_ids
         to_insert_offers: list[Offer] = [
             o for o in matched_offers if o.offer_id not in existing_offer_ids
         ]
 
-        feed_changed = len(to_delete_ids) > 0 or len(to_insert_offers) > 0
+        feed_changed = (
+            len(to_delete_ids) > 0
+            or len(to_insert_offers) > 0
+            or len(retained_favorited_obsolete) > 0
+        )
         logger.debug(
-            "Feed diff for user %s: to_delete=%d, to_insert=%d, feed_changed=%s",
+            "Feed diff for user %s: to_delete=%d, retained_favorited=%d, "
+            "to_insert=%d, feed_changed=%s",
             user_id,
             len(to_delete_ids),
+            len(retained_favorited_obsolete),
             len(to_insert_offers),
             feed_changed,
         )

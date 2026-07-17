@@ -5,7 +5,7 @@ from aws_lambda_powertools import Logger
 
 from core.container import Container
 from core.models.cell import MarketCell
-from core.models.offer import Offer
+from core.models.offer import Offer, mark_offer_unavailable
 from core.models.common import ProviderName
 from core.providers.base import OfferProvider
 
@@ -25,7 +25,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
         return {
             "checked_offers_count": 0,
             "updated_offers_count": 0,
-            "deleted_offers_count": 0,
+            "unavailable_offers_count": 0,
             "remain_available_count": 0,
         }
 
@@ -42,7 +42,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
         return {
             "checked_offers_count": 0,
             "updated_offers_count": 0,
-            "deleted_offers_count": 0,
+            "unavailable_offers_count": 0,
             "remain_available_count": 0,
         }
 
@@ -55,8 +55,7 @@ async def run_availability_job(container: Container, context=None) -> dict:
     checked_count = 0
     updated_count = 0
     sem = asyncio.Semaphore(15)
-    deleted_cell_ids = set()
-    offers_to_delete = []
+    unavailable_cell_ids = set()
     offers_to_update = []
 
     tui: OfferProvider = container.tui_provider
@@ -79,10 +78,12 @@ async def run_availability_job(container: Container, context=None) -> dict:
                 is_available = await provider.check_availability(offer)
 
                 if not is_available:
-                    offers_to_delete.append((offer.cell_id, offer.offer_id))
-                    deleted_cell_ids.add(offer.cell_id)
+                    now = datetime.now(timezone.utc)
+                    offers_to_update.append(mark_offer_unavailable(offer, now=now))
+                    unavailable_cell_ids.add(offer.cell_id)
                     logger.info(
-                        f"Offer {offer.offer_id} ({offer.provider}) is no longer available. Deleted."
+                        f"Offer {offer.offer_id} ({offer.provider}) is no longer available. "
+                        "Soft-deleted with 14-day TTL."
                     )
                 else:
                     logger.debug(
@@ -122,30 +123,31 @@ async def run_availability_job(container: Container, context=None) -> dict:
     tasks = [check_single_offer(offer) for offer in available_offers]
     await asyncio.gather(*tasks)
 
-    if offers_to_delete:
-        await container.offers_repo.delete_batch(offers_to_delete)
-        logger.info(f"Batch deleted {len(offers_to_delete)} unavailable offers.")
+    unavailable_count = sum(1 for o in offers_to_update if not o.available)
 
     if offers_to_update:
         await container.offers_repo.put_batch(offers_to_update)
-        logger.info(f"Batch updated {len(offers_to_update)} offers with new prices.")
-
-    if deleted_cell_ids:
         logger.info(
-            f"Triggering bulk user matching for {len(deleted_cell_ids)} cell(s) affected by availability deletions."
+            f"Batch updated {len(offers_to_update)} offers "
+            f"({unavailable_count} soft-deleted, {updated_count} price updates)."
         )
-        await container.matching_service.bulk_match_users(list(deleted_cell_ids))
 
-    deleted_count = len(offers_to_delete)
-    remain_available_count = checked_count - deleted_count
+    if unavailable_cell_ids:
+        logger.info(
+            f"Triggering bulk user matching for {len(unavailable_cell_ids)} cell(s) "
+            "affected by availability soft-deletes."
+        )
+        await container.matching_service.bulk_match_users(list(unavailable_cell_ids))
+
+    remain_available_count = checked_count - unavailable_count
     logger.info(
         f"Availability check complete. Checked: {checked_count}, "
-        f"Remain Available: {remain_available_count}, Deleted: {deleted_count}, "
+        f"Remain Available: {remain_available_count}, Unavailable: {unavailable_count}, "
         f"Price Updates: {updated_count}"
     )
     return {
         "checked_offers_count": checked_count,
         "updated_offers_count": updated_count,
-        "deleted_offers_count": deleted_count,
+        "unavailable_offers_count": unavailable_count,
         "remain_available_count": remain_available_count,
     }

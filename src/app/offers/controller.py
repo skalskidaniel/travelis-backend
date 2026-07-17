@@ -30,8 +30,9 @@ async def _prune_stale_user_offers(
 ) -> bool:
     """Remove UserOffers rows whose offers no longer exist and bump feed version.
 
-    Favorited offers are pruned identically to non-favorited ones; the
-    `favorited` flag does not grant any persistence contract here.
+    Favorited rows are kept while the Offer still exists (including soft-deleted
+    sold offers retained via TTL). They are pruned only on hydration miss after
+    the Offer row expires from DynamoDB.
     """
     returned_keys = {(offer.cell_id, offer.offer_id) for offer in hydrated_offers}
     stale_keys = [key for key in requested_keys if key not in returned_keys]
@@ -270,8 +271,10 @@ async def get_offers_feed(
         if await _prune_stale_user_offers(container, user_id, offer_keys, offers):
             current_version = await container.feed_repo.get_feed_version(user_id)
 
+        # Sold (soft-deleted) offers may remain in UserOffers for favorites; exclude from feed.
+        available_offers = [o for o in offers if o.available]
         valid_offers: list[Offer] = await _apply_feed_filter(
-            container, offers, user_offers, filter_mode
+            container, available_offers, user_offers, filter_mode
         )
 
         members = [

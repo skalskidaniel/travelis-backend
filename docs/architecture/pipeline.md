@@ -130,7 +130,7 @@ For each claimed user:
 
 Triggered 4× daily.
 
-Baseline is **availability-by-absence**, which works for both providers without a per-offer endpoint: an offer no longer returned by the latest scrape of its cell is marked `available = false`, and the `departure_date` TTL eventually removes it.
+Baseline is **availability-by-absence**, which works for both providers without a per-offer endpoint: an offer no longer returned by the latest scrape of its cell is marked `available = false` and given a 14-day DynamoDB TTL; DynamoDB eventually removes the row.
 
 Optional refinement for fresher availability _between_ scrapes (requires provider metadata persisted at ingest — see [data-model.md](data-model.md#offer-metadata)):
 
@@ -141,7 +141,7 @@ Optional refinement for fresher availability _between_ scrapes (requires provide
 
 Contract details: [providers/wakacjepl/contract.md](../providers/wakacjepl/contract.md#offer-availability). Prototype: `notebooks/wakacje_pl_availability.ipynb`.
 
-If the check determines that the offer is no longer available, the offer is deleted from the `Offers` table. If one or more offers are deleted, the availability job collects their `cell_id`s and triggers a bulk user re-matching run (`MatchingService.bulk_match_users`) at the end of the job to immediately prune the deleted offers from `UserOffers`. Otherwise, if the offer is still available but its price has changed, its price attributes (`price_total`, `price_per_person`, and `price_per_day`) are updated in-place.
+If the check determines that the offer is no longer available, the offer is **soft-deleted**: `available = false` and `ttl` set to now + 14 days (DynamoDB TTL). The job then triggers a bulk user re-matching run (`MatchingService.bulk_match_users`) on the affected cells so non-favorited matches leave the feed immediately; favorited `UserOffers` rows are retained until the Offer TTL expires. Otherwise, if the offer is still available but its price has changed, its price attributes (`price_total`, `price_per_person`, and `price_per_day`) are updated in-place.
 
 ## Redis feed rebuild and lazy ZSET pagination
 

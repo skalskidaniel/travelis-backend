@@ -129,7 +129,7 @@ Server does **not** track per-offer seen state.
 
 ### Favorited Offers
 
-Users can mark specific offers as "favorited". The server persists this state per user-offer pair as long as the underlying offer is still present in the `Offers` table. Favorited offers are **not** treated specially during matching or pruning: when an offer is removed from `Offers` (TTL expiry, marked unavailable, or hydration miss during a feed read), the corresponding `UserOffers` row — including its `favorited` flag — is deleted.
+Users can mark specific offers as "favorited". The server persists this state per user-offer pair as long as the underlying offer is still present in the `Offers` table. When an offer is soft-deleted as sold (`available = false`, 14-day TTL), matching keeps favorited `UserOffers` rows so favorites remain hydratable; non-favorited matches are pruned from the feed. Favorited rows are removed only after the Offer expires via DynamoDB TTL (hydration miss) or when the user unfavorites.
 
 ### Offer acquisition
 
