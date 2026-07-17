@@ -26,4 +26,5 @@ module "environment_stack" {
   google_client_id             = var.google_client_id
   google_client_secret         = var.google_client_secret
   custom_domain                = var.custom_domain
+  attractiveness_z_threshold   = var.attractiveness_z_threshold
 }

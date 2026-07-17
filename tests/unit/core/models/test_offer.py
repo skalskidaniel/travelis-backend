@@ -214,3 +214,25 @@ def test_ttl_must_match_departure_date_epoch(valid_offer_kwargs):
         ValidationError, match="ttl must equal departure_date epoch at 00:00:00 UTC"
     ):
         Offer(**valid_offer_kwargs)
+
+
+def test_legacy_image_url_remaps_to_image_urls(valid_offer_kwargs):
+    valid_offer_kwargs["image_url"] = "https://i.wakacje.pl/media/hotel/legacy.jpg"
+    offer: Offer = Offer(**valid_offer_kwargs)
+    assert [str(u) for u in offer.image_urls] == [
+        "https://i.wakacje.pl/media/hotel/legacy.jpg"
+    ]
+
+
+def test_legacy_null_image_url_remaps_to_empty_list(valid_offer_kwargs):
+    valid_offer_kwargs["image_url"] = None
+    offer: Offer = Offer(**valid_offer_kwargs)
+    assert offer.image_urls == []
+
+
+def test_image_urls_rejects_more_than_eight(valid_offer_kwargs):
+    valid_offer_kwargs["image_urls"] = [
+        f"https://i.wakacje.pl/media/hotel/{i}.jpg" for i in range(9)
+    ]
+    with pytest.raises(ValidationError):
+        Offer(**valid_offer_kwargs)

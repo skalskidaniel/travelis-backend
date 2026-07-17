@@ -74,7 +74,7 @@ def sample_domain_offer() -> Offer:
         price_per_person=Decimal("500.00"),
         price_per_day=Decimal("142.86"),
         referral_url="https://tui.pl/ref",
-        image_url="https://tui.pl/img.jpg",
+        image_urls=["https://tui.pl/img.jpg"],
         share_url="https://wakacje-travelis.pl/offer/1a2b3c4d5e6f7a8b/1a2b3c4d5e6f7a8b1a2b3c4d5e6f7a8b",
         available=True,
         room_type="Double Room",

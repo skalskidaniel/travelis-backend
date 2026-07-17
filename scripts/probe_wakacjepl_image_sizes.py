@@ -32,7 +32,7 @@ from core.providers.wakacjepl.main import (  # noqa: E402
     SEARCH_URL,
     WakacjePlProvider,
 )
-from core.providers.wakacjepl.utils import parse_wakacje_image_url  # noqa: E402
+from core.providers.wakacjepl.utils import parse_wakacje_image_urls  # noqa: E402
 
 DEFAULT_IMAGE_SIZES = [
     "570,428",
@@ -290,7 +290,8 @@ def _analyze_offer(
     same_offer = str(offer.get("offerId")) == target_offer_id
     photos = offer.get("photos")
     photo_keys = _parse_photo_keys(photos)
-    image_url = parse_wakacje_image_url(photos)
+    image_urls = parse_wakacje_image_urls(photos)
+    image_url = image_urls[0] if image_urls else None
 
     key_dimensions: tuple[int, int] | None = None
     if photo_keys:
@@ -410,7 +411,8 @@ async def run_probe(args: argparse.Namespace) -> int:
                 hotel_id=hotel_id,
                 target_offer_id=target_offer_id,
             )
-            image_url = parse_wakacje_image_url(offer.get("photos")) if offer else None
+            image_urls = parse_wakacje_image_urls(offer.get("photos")) if offer else []
+            image_url = image_urls[0] if image_urls else None
             pixel_dims = None
             if args.fetch_pixels and image_url:
                 pixel_dims, fetch_status = await _fetch_pixel_size(

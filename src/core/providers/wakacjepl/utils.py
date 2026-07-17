@@ -78,26 +78,34 @@ def build_wakacje_offer_page_path(
     )
 
 
-def parse_wakacje_image_url(
+MAX_OFFER_IMAGES = 8
+
+
+def parse_wakacje_image_urls(
     photos: object,
     *,
     origin: str = WAKACJE_IMAGES_ORIGIN,
-) -> str | None:
+    limit: int = MAX_OFFER_IMAGES,
+) -> list[str]:
     if not isinstance(photos, dict) or not photos.keys():
-        return None
+        return []
 
     urls = photos.get(list(photos.keys())[0])
     if not isinstance(urls, list) or not urls:
-        return None
+        return []
 
-    first = urls[0]
-    if not isinstance(first, str):
-        return None
-
-    raw = first.strip()
-    if not raw:
-        return None
-    if raw.startswith("/"):
-        raw = f"{origin}{raw}"
-
-    return parse_optional_http_url(raw)
+    result: list[str] = []
+    for entry in urls:
+        if len(result) >= limit:
+            break
+        if not isinstance(entry, str):
+            continue
+        raw = entry.strip()
+        if not raw:
+            continue
+        if raw.startswith("/"):
+            raw = f"{origin}{raw}"
+        parsed = parse_optional_http_url(raw)
+        if parsed is not None:
+            result.append(parsed)
+    return result

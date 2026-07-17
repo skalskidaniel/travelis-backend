@@ -34,7 +34,7 @@ from core.providers.wakacjepl.utils import (
     build_wakacje_offer_page_path,
     build_wakacje_offer_selector,
     format_wakacje_date,
-    parse_wakacje_image_url,
+    parse_wakacje_image_urls,
     representative_child_birthday,
 )
 
@@ -214,7 +214,7 @@ class WakacjePlProvider:
                     "withHotelRate": 1,
                     "withPromoOffer": 0,
                     "recommendationVersion": "noTUI",
-                    "imageLimit": 1,
+                    "imageLimit": 8,
                     "withPromotionsInfo": False,
                     "type": "tours",
                     "firstMinuteTui": False,
@@ -582,7 +582,7 @@ class WakacjePlProvider:
             children=cell.children,
         )
         referral_url = f"{WAKACJE_ORIGIN}{offer_page_path}?{offer_selector}"
-        image_url = parse_wakacje_image_url(item.get("photos"))
+        image_urls = parse_wakacje_image_urls(item.get("photos"))
 
         wakacje_metadata = WakacjePlMetadata(
             hotel_id=hotel_id_int,
@@ -617,7 +617,7 @@ class WakacjePlProvider:
             price_per_person=price_per_person,
             price_per_day=price_per_day_one_person,
             referral_url=referral_url,
-            image_url=image_url,
+            image_urls=image_urls,
             available=True,
             room_type=str(room_type).strip(),
             adults=cell.adults,

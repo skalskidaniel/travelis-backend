@@ -153,8 +153,10 @@ class RawOffer(BaseModel):
     price_per_person: PricePLN
     price_per_day: PricePLN
     referral_url: AnyHttpUrl = Field(description="Provider deep link.")
-    image_url: AnyHttpUrl | None = Field(
-        default=None, description="Link for first offer image."
+    image_urls: list[AnyHttpUrl] = Field(
+        default_factory=list,
+        max_length=8,
+        description="Up to 8 offer image URLs (provider order preserved).",
     )
     available: bool = Field(
         description="Whether the provider marks the offer as bookable."
@@ -169,6 +171,21 @@ class RawOffer(BaseModel):
     metadata: OfferMetadata = Field(
         description="Provider-specific metadata captured at ingest."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def remap_legacy_image_url(cls, data: object) -> object:
+        """Accept legacy DynamoDB rows that stored a singular image_url."""
+        if not isinstance(data, dict):
+            return data
+        if "image_urls" in data or "image_url" not in data:
+            return data
+        legacy = data.pop("image_url")
+        if legacy is None:
+            data["image_urls"] = []
+        else:
+            data["image_urls"] = [legacy]
+        return data
 
 
 class ScoredOffer(RawOffer):

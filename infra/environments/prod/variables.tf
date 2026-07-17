@@ -78,3 +78,9 @@ variable "custom_domain" {
   type        = string
   default     = "api.wakacje-travelis.pl"
 }
+
+variable "attractiveness_z_threshold" {
+  description = "Z-score threshold for Stage 1 attractiveness filtering."
+  type        = number
+  default     = -1.2
+}

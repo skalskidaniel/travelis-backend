@@ -72,10 +72,11 @@ class OfferFeedItem(BaseModel):
             "https://www.wakacje.pl/oferty/grecja/kreta/hotel-seaside-resort-123456.html?utm_source=travellead"
         ],
     )
-    image_url: str | None = Field(
-        default=None,
-        description="Direct URL to the main preview image of the hotel.",
-        examples=["https://images.travelis.pl/hotels/123456_main.jpg"],
+    image_urls: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description="Up to 8 direct URLs to hotel images (provider order preserved).",
+        examples=[["https://images.travelis.pl/hotels/123456_main.jpg"]],
     )
     share_url: str = Field(
         description="Public URL used for sharing this offer with other users.",
@@ -109,7 +110,7 @@ class OfferFeedItem(BaseModel):
             price_total=offer.price_total,
             price_per_person=offer.price_per_person,
             referral_url=str(offer.referral_url),
-            image_url=str(offer.image_url) if offer.image_url else None,
+            image_urls=[str(u) for u in offer.image_urls],
             share_url=str(offer.share_url),
             favorited=favorited,
         )
@@ -207,10 +208,11 @@ class OfferDetailResponse(BaseModel):
             "https://www.wakacje.pl/oferty/grecja/kreta/hotel-seaside-resort-123456.html?utm_source=travellead"
         ],
     )
-    image_url: str | None = Field(
-        default=None,
-        description="Direct URL to the main preview image of the hotel.",
-        examples=["https://images.travelis.pl/hotels/123456_main.jpg"],
+    image_urls: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description="Up to 8 direct URLs to hotel images (provider order preserved).",
+        examples=[["https://images.travelis.pl/hotels/123456_main.jpg"]],
     )
     share_url: str = Field(
         description="Public URL used for sharing this offer with other users.",
@@ -264,7 +266,7 @@ class OfferDetailResponse(BaseModel):
             attractiveness_score=offer.attractiveness_score,
             available=offer.available,
             referral_url=str(offer.referral_url),
-            image_url=str(offer.image_url) if offer.image_url else None,
+            image_urls=[str(u) for u in offer.image_urls],
             share_url=str(offer.share_url),
             sources=offer.metadata.sources,
             scraped_at=offer.scraped_at,

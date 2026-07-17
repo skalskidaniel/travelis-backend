@@ -45,7 +45,7 @@ def sample_domain_offer() -> Offer:
         price_per_person=Decimal("500.00"),
         price_per_day=Decimal("142.86"),
         referral_url=HttpUrl("https://tui.pl/ref"),
-        image_url=HttpUrl("https://tui.pl/img.jpg"),
+        image_urls=[HttpUrl("https://tui.pl/img.jpg")],
         share_url=HttpUrl(
             "https://wakacje-travelis.pl/offer/1a2b3c4d5e6f7a8b/1a2b3c4d5e6f7a8b1a2b3c4d5e6f7a8b"
         ),
@@ -65,6 +65,7 @@ def test_offer_feed_item_from_domain(sample_domain_offer):
     assert feed_item.offer_id == sample_domain_offer.offer_id
     assert feed_item.country == "Greece"
     assert feed_item.location == "Greece/Crete/Ierapetra"
+    assert feed_item.image_urls == ["https://tui.pl/img.jpg"]
     assert not hasattr(feed_item, "metadata")
 
 
@@ -74,6 +75,7 @@ def test_offer_detail_response_from_domain(sample_domain_offer):
     assert detail.country == "Greece"
     assert detail.region == "Crete"
     assert detail.location == "Greece/Crete/Ierapetra"
+    assert detail.image_urls == ["https://tui.pl/img.jpg"]
     assert detail.sources == sample_domain_offer.metadata.sources
     assert not hasattr(detail, "metadata")
 

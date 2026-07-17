@@ -33,3 +33,34 @@ def representative_child_birthday(today: date | None = None) -> str:
 
 def parse_tui_image_url(value: object) -> str | None:
     return parse_optional_http_url(value)
+
+
+MAX_OFFER_IMAGES = 8
+
+
+def parse_tui_image_urls(
+    item: object,
+    *,
+    limit: int = MAX_OFFER_IMAGES,
+) -> list[str]:
+    if not isinstance(item, dict):
+        return []
+
+    gallery = item.get("gallery")
+    if isinstance(gallery, list):
+        result: list[str] = []
+        for entry in gallery:
+            if len(result) >= limit:
+                break
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("galleryItemType") != "IMAGE":
+                continue
+            parsed = parse_tui_image_url(entry.get("url"))
+            if parsed is not None:
+                result.append(parsed)
+        if result:
+            return result
+
+    fallback = parse_tui_image_url(item.get("imageUrl"))
+    return [fallback] if fallback is not None else []

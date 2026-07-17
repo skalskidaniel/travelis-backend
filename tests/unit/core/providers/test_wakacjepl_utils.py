@@ -7,7 +7,7 @@ from core.providers.wakacjepl.utils import (
     build_wakacje_offer_page_path,
     build_wakacje_offer_selector,
     build_wakacje_occupancy_selector,
-    parse_wakacje_image_url,
+    parse_wakacje_image_urls,
 )
 
 
@@ -66,34 +66,42 @@ def test_build_wakacje_offer_selector():
     )
 
 
-def test_parse_wakacje_image_url_relative_path():
+def test_parse_wakacje_image_urls_relative_path():
     photos = {
         "570,428": ["/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"]
     }
-    assert (
-        parse_wakacje_image_url(photos)
-        == "https://i.wakacje.pl/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
-    )
+    assert parse_wakacje_image_urls(photos) == [
+        "https://i.wakacje.pl/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
+    ]
 
 
-def test_parse_wakacje_image_url_absolute_path():
+def test_parse_wakacje_image_urls_absolute_path():
     photos = {"570,428": ["https://i.wakacje.pl/media/hotel/example.jpg"]}
-    assert (
-        parse_wakacje_image_url(photos)
-        == "https://i.wakacje.pl/media/hotel/example.jpg"
-    )
+    assert parse_wakacje_image_urls(photos) == [
+        "https://i.wakacje.pl/media/hotel/example.jpg"
+    ]
 
 
-def test_parse_wakacje_image_url_picks_first():
+def test_parse_wakacje_image_urls_keeps_order():
     photos = {
         "570,428": [
             "https://i.wakacje.pl/media/hotel/first.jpg",
             "https://i.wakacje.pl/media/hotel/second.jpg",
         ]
     }
-    assert (
-        parse_wakacje_image_url(photos) == "https://i.wakacje.pl/media/hotel/first.jpg"
-    )
+    assert parse_wakacje_image_urls(photos) == [
+        "https://i.wakacje.pl/media/hotel/first.jpg",
+        "https://i.wakacje.pl/media/hotel/second.jpg",
+    ]
+
+
+def test_parse_wakacje_image_urls_caps_at_eight():
+    photos = {
+        "570,428": [f"https://i.wakacje.pl/media/hotel/{i}.jpg" for i in range(1, 11)]
+    }
+    assert parse_wakacje_image_urls(photos) == [
+        f"https://i.wakacje.pl/media/hotel/{i}.jpg" for i in range(1, 9)
+    ]
 
 
 @pytest.mark.parametrize(
@@ -106,5 +114,5 @@ def test_parse_wakacje_image_url_picks_first():
         {"570,428": ["not-a-url"]},
     ],
 )
-def test_parse_wakacje_image_url_returns_none_on_missing_or_invalid(photos):
-    assert parse_wakacje_image_url(photos) is None
+def test_parse_wakacje_image_urls_returns_empty_on_missing_or_invalid(photos):
+    assert parse_wakacje_image_urls(photos) == []

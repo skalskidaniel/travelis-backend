@@ -335,15 +335,14 @@ async def test_search_happy_path(wakacjepl_provider):
                 offer.metadata.wakacje_pl.offer_page_path
                 == "/oferty/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html"
             )
-            assert (
-                str(offer.image_url)
-                == "https://i.wakacje.pl/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
-            )
+            assert [str(u) for u in offer.image_urls] == [
+                "https://i.wakacje.pl/no-index/hotel/kakkos-terra-blue-obiekt-1748805127-570-428.jpg"
+            ]
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_search_maps_missing_photos_to_none_image_url(wakacjepl_provider):
+async def test_search_maps_missing_photos_to_empty_image_urls(wakacjepl_provider):
     cell = MarketCell(
         country="GR",
         month="2026-08",
@@ -408,7 +407,7 @@ async def test_search_maps_missing_photos_to_none_image_url(wakacjepl_provider):
             offers: list[RawOffer] = await wakacjepl_provider.search(cell)
 
             assert len(offers) == 1
-            assert offers[0].image_url is None
+            assert offers[0].image_urls == []
 
 
 @pytest.mark.asyncio

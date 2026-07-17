@@ -85,7 +85,7 @@ referer: https://www.wakacje.pl/wczasy/?src=fromSearch
       "withHotelRate": 1,
       "withPromoOffer": 0,
       "recommendationVersion": "noTUI",
-      "imageLimit": 1,
+      "imageLimit": 8,
       "withPromotionsInfo": false,
       "type": "tours",
       "firstMinuteTui": false,
@@ -366,7 +366,7 @@ Combined format:
 ### Image URL Extraction
 
 - The search API returns a `"photos"` dictionary containing keys mapping to sizes (e.g. `"570,428"`).
-- The adapter selects the first available photo array from the dictionary, extracts the first image path, normalizes relative paths by prepending `https://www.wakacje.pl`, and stores it under the `image_url` field.
+- The adapter selects the first available photo array from the dictionary, normalizes each path (relative paths are prepended with `https://i.wakacje.pl`), and stores up to 8 valid URLs under the `image_urls` field. Search requests use `imageLimit: 8`.
 
 ### Aggregation & Deduplication
 
