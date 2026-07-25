@@ -1,4 +1,6 @@
 from datetime import date, datetime, time, timezone
+from decimal import Decimal
+from pydantic import AnyHttpUrl, HttpUrl
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -63,20 +65,20 @@ def make_offer(
         duration=resolved_duration,
         board=BoardType.ALL_INCLUSIVE,
         stars=4,
-        rating=rating,
+        rating=Decimal(str(rating)),
         review_count=100,
-        price_total=3000.0,
-        price_per_person=1500.0,
-        price_per_day=428.5,
+        price_total=Decimal("3000.0"),
+        price_per_person=Decimal("1500.0"),
+        price_per_day=Decimal("428.5"),
         attractiveness_score=0.8,
-        referral_url="https://wakacje.pl/ref1",
-        image_urls=["https://image.com/1"],
+        referral_url=AnyHttpUrl("https://wakacje.pl/ref1"),
+        image_urls=[AnyHttpUrl("https://image.com/1")],
         available=True,
         room_type="Double Room",
         adults=2,
         children=children,
         metadata=OfferMetadata(price_z_score=-1.5, wakacje_pl=meta_wak),
-        share_url=f"https://wakacje-travelis.pl/offer/0123456789abcdef/{offer_id}",
+        share_url=HttpUrl(f"https://wakacje-travelis.pl/offer/0123456789abcdef/{offer_id}"),
         scraped_at=datetime(2026, 6, 18, 12, 0, 0, tzinfo=timezone.utc),
         updated_at=datetime(2026, 6, 18, 12, 0, 0, tzinfo=timezone.utc),
         ttl=ttl,
@@ -91,7 +93,7 @@ def test_user():
             countries=["GR"],
             adults=2,
             min_stars=4,
-            min_rating=4,
+            min_rating=Decimal("4"),
             date_from=date(2026, 7, 1),
             date_to=date(2026, 7, 31),
             duration_min=5,
@@ -138,20 +140,20 @@ def mock_offers():
         duration=7,
         board=BoardType.ALL_INCLUSIVE,
         stars=4,
-        rating=4.5,
+        rating=Decimal("4.5"),
         review_count=100,
-        price_total=3000.0,
-        price_per_person=1500.0,
-        price_per_day=428.5,
+        price_total=Decimal("3000.0"),
+        price_per_person=Decimal("1500.0"),
+        price_per_day=Decimal("428.5"),
         attractiveness_score=0.8,
-        referral_url="https://wakacje.pl/ref1",
-        image_urls=["https://image.com/1"],
+        referral_url=AnyHttpUrl("https://wakacje.pl/ref1"),
+        image_urls=[AnyHttpUrl("https://image.com/1")],
         available=True,
         room_type="Double Room",
         adults=2,
         children=0,
         metadata=OfferMetadata(price_z_score=-1.5, wakacje_pl=meta_wak),
-        share_url="https://wakacje-travelis.pl/offer/0123456789abcdef/0123456789abcdef0123456789abcdef",
+        share_url=HttpUrl("https://wakacje-travelis.pl/offer/0123456789abcdef/0123456789abcdef0123456789abcdef"),
         scraped_at=datetime(2026, 6, 18, 12, 0, 0, tzinfo=timezone.utc),
         updated_at=datetime(2026, 6, 18, 12, 0, 0, tzinfo=timezone.utc),
         ttl=1783641600,
@@ -169,20 +171,20 @@ def mock_offers():
         duration=7,
         board=BoardType.ALL_INCLUSIVE,
         stars=4,
-        rating=2.5,  # Too low (prefs min_rating = 4)
+        rating=Decimal("2.5"),  # Too low (prefs min_rating = 4)
         review_count=100,
-        price_total=1500.0,
-        price_per_person=750.0,
-        price_per_day=214.2,
+        price_total=Decimal("1500.0"),
+        price_per_person=Decimal("750.0"),
+        price_per_day=Decimal("214.2"),
         attractiveness_score=0.5,
-        referral_url="https://wakacje.pl/ref2",
-        image_urls=["https://image.com/2"],
+        referral_url=AnyHttpUrl("https://wakacje.pl/ref2"),
+        image_urls=[AnyHttpUrl("https://image.com/2")],
         available=True,
         room_type="Double Room",
         adults=2,
         children=0,
         metadata=OfferMetadata(price_z_score=-1.0, wakacje_pl=meta_wak),
-        share_url="https://wakacje-travelis.pl/offer/0123456789abcdef/fedcba9876543210fedcba9876543210",
+        share_url=HttpUrl("https://wakacje-travelis.pl/offer/0123456789abcdef/fedcba9876543210fedcba9876543210"),
         scraped_at=datetime(2026, 6, 18, 12, 0, 0, tzinfo=timezone.utc),
         updated_at=datetime(2026, 6, 18, 12, 0, 0, tzinfo=timezone.utc),
         ttl=1783641600,
@@ -338,7 +340,7 @@ def test_filter_departure_airports():
     prefs: UserPreferences = UserPreferences(
         countries=["GR"],
         departure_airports=["WAW"],
-        min_rating=4,
+        min_rating=Decimal("4"),
     )
     offers: list[Offer] = [
         make_offer(offer_id="a" * 32, departure_airport="WAW"),
@@ -361,7 +363,7 @@ def test_filter_duration_bounds():
     )
     prefs: UserPreferences = UserPreferences(
         countries=["GR"],
-        min_rating=4,
+        min_rating=Decimal("4"),
         duration_min=5,
         duration_max=7,
     )
@@ -408,7 +410,7 @@ def test_filter_date_range():
     )
     prefs: UserPreferences = UserPreferences(
         countries=["GR"],
-        min_rating=4,
+        min_rating=Decimal("4"),
         date_from=date(2026, 7, 1),
         date_to=date(2026, 7, 31),
     )
@@ -514,7 +516,7 @@ def test_filter_empty_returns():
     offers: list[Offer] = [make_offer()]
 
     # Empty on rating
-    prefs_rating: UserPreferences = UserPreferences(min_rating=5)
+    prefs_rating: UserPreferences = UserPreferences(min_rating=Decimal("5"))
     assert service._filter_offers_vectorized(offers, prefs_rating) == []
 
     # Empty on airports
@@ -575,7 +577,7 @@ def test_filter_availability():
     )
     prefs: UserPreferences = UserPreferences(
         countries=["GR"],
-        min_rating=4,
+        min_rating=Decimal("4"),
     )
     offer_avail = make_offer(offer_id="a" * 32)
     offer_unavail = make_offer(offer_id="b" * 32)

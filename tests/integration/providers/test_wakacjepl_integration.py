@@ -21,7 +21,7 @@ from core.providers.utils import month_date_bounds
 from core.providers.wakacjepl.main import WakacjePlProvider
 from core.providers.resources import wakacjepl_filters
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 
 _WAKACJE_FILTERS = wakacjepl_filters
@@ -78,8 +78,8 @@ async def _run_with_transient_retry(call: Callable[[], Awaitable[T]]) -> T:
     raise RuntimeError(msg)
 
 
-@pytest_asyncio.fixture
-async def live_provider() -> WakacjePlProvider:
+@pytest_asyncio.fixture()
+async def live_provider() -> AsyncIterator[WakacjePlProvider]:
     limits = httpx.Limits(
         max_connections=MAX_CONCURRENT_LIVE_REQUESTS,
         max_keepalive_connections=MAX_CONCURRENT_LIVE_REQUESTS,

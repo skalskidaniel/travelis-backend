@@ -1,6 +1,7 @@
 import json
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from pydantic import AnyHttpUrl, HttpUrl
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -71,7 +72,7 @@ async def test_run_scrape_job_successful(mock_container):
         price_total=Decimal("2000.00"),
         price_per_person=Decimal("1000.00"),
         price_per_day=Decimal("142.86"),
-        referral_url="https://tui.pl/ref",
+        referral_url=AnyHttpUrl("https://tui.pl/ref"),
         available=True,
         room_type="Standard",
         adults=2,
@@ -138,7 +139,7 @@ async def test_run_scrape_job_availability_by_absence(mock_container):
         price_total=Decimal("2000.00"),
         price_per_person=Decimal("1000.00"),
         price_per_day=Decimal("142.86"),
-        referral_url="https://tui.pl/ref",
+        referral_url=AnyHttpUrl("https://tui.pl/ref"),
         available=True,
         room_type="Standard",
         adults=2,
@@ -151,13 +152,14 @@ async def test_run_scrape_job_availability_by_absence(mock_container):
         **raw_scraped.model_dump(),
         cell_id=cell.cell_id,
         offer_id="b" * 32,
-        share_url="https://wakacje-travelis.pl/offer/dummy/dummy",
+        share_url=HttpUrl("https://wakacje-travelis.pl/offer/dummy/dummy"),
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
         ttl=1783641600,
         attractiveness_score=0.5,
     )
     existing_offer.external_offer_id = "tui-existing"
+    assert existing_offer.metadata.tui is not None
     existing_offer.metadata.tui.offer_code = "tui-existing"
 
     mock_container.tui_provider.search = AsyncMock(return_value=[raw_scraped])
@@ -236,7 +238,7 @@ async def test_run_scrape_job_timeout_triggering(mock_container):
         price_total=Decimal("2000.00"),
         price_per_person=Decimal("1000.00"),
         price_per_day=Decimal("142.86"),
-        referral_url="https://tui.pl/ref",
+        referral_url=AnyHttpUrl("https://tui.pl/ref"),
         available=True,
         room_type="Standard",
         adults=2,
@@ -325,7 +327,7 @@ async def test_run_scrape_job_skips_cell_when_all_scored_offers_fail_validation(
         price_total=Decimal("2000.00"),
         price_per_person=Decimal("1000.00"),
         price_per_day=Decimal("142.86"),
-        referral_url="https://tui.pl/ref",
+        referral_url=AnyHttpUrl("https://tui.pl/ref"),
         available=True,
         room_type="Standard",
         adults=2,
@@ -377,7 +379,7 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
     valid_raw = RawOffer(
         provider=ProviderName.TUI,
         external_offer_id="tui-valid",
-        hotel_name="Sol Hotel",
+        hotel_name="Good Hotel",
         location="ES/Mallorca/Palma",
         departure_airport="WAW",
         departure_date=date(2026, 7, 10),
@@ -390,7 +392,7 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
         price_total=Decimal("2000.00"),
         price_per_person=Decimal("1000.00"),
         price_per_day=Decimal("142.86"),
-        referral_url="https://tui.pl/ref",
+        referral_url=AnyHttpUrl("https://tui.pl/ref"),
         available=True,
         room_type="Standard",
         adults=2,
@@ -413,7 +415,7 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
         price_total=Decimal("2500.00"),
         price_per_person=Decimal("1250.00"),
         price_per_day=Decimal("178.57"),
-        referral_url="https://tui.pl/ref2",
+        referral_url=AnyHttpUrl("https://tui.pl/ref2"),
         available=True,
         room_type="Standard",
         adults=2,
@@ -426,7 +428,7 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
         **invalid_raw.model_dump(),
         cell_id=cell.cell_id,
         offer_id=invalid_offer_id,
-        share_url="https://wakacje-travelis.pl/offer/dummy/dummy",
+        share_url=HttpUrl("https://wakacje-travelis.pl/offer/dummy/dummy"),
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
         ttl=1783641600,

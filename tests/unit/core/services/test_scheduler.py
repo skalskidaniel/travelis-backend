@@ -1,3 +1,4 @@
+from typing import Any, cast
 import pytest
 from unittest.mock import AsyncMock
 from botocore.exceptions import ClientError
@@ -78,7 +79,7 @@ async def test_schedule_match_create_fallback(mock_aws_arns):
         "Error": {"Code": "ResourceNotFoundException", "Message": "Schedule not found"}
     }
     mock_client.update_schedule.side_effect = ClientError(
-        error_response, "UpdateSchedule"
+        cast(Any, error_response), "UpdateSchedule"
     )
 
     service = SchedulerService(scheduler_client=mock_client, settings=settings)
@@ -99,7 +100,7 @@ async def test_schedule_match_raises_on_create_failure(mock_aws_arns):
     not_found = {
         "Error": {"Code": "ResourceNotFoundException", "Message": "Schedule not found"}
     }
-    mock_client.update_schedule.side_effect = ClientError(not_found, "UpdateSchedule")
+    mock_client.update_schedule.side_effect = ClientError(cast(Any, not_found), "UpdateSchedule")
     mock_client.create_schedule.side_effect = RuntimeError("create failed")
 
     service = SchedulerService(scheduler_client=mock_client, settings=settings)

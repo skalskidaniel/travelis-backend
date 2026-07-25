@@ -5,9 +5,10 @@ from datetime import date, datetime, timezone
 import os
 import re
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import TypeVar
 from decimal import Decimal
+from pydantic import AnyHttpUrl, HttpUrl
 
 from core.exceptions.provider import ProviderTimeoutException, TooManyRequestsException
 from core.models.cell import MarketCell
@@ -24,7 +25,7 @@ from core.providers.tui.main import (
 )
 from core.providers.resources import tui_filters
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 
 _TUI_FILTERS = tui_filters
@@ -87,8 +88,8 @@ async def _run_with_transient_retry(call: Callable[[], Awaitable[T]]) -> T:
     raise RuntimeError(msg)
 
 
-@pytest_asyncio.fixture
-async def live_provider() -> TuiProvider:
+@pytest_asyncio.fixture()
+async def live_provider() -> AsyncIterator[TuiProvider]:
     limits = httpx.Limits(
         max_connections=MAX_CONCURRENT_LIVE_REQUESTS,
         max_keepalive_connections=MAX_CONCURRENT_LIVE_REQUESTS,
@@ -272,7 +273,7 @@ async def test_check_availability_returns_unavailable(live_provider):
         price_total=Decimal("3000.00"),
         price_per_person=Decimal("1500.00"),
         price_per_day=Decimal("1500.00"),
-        referral_url="https://www.tui.pl/wypoczynek/wlochy/dolny-adriatyk/hotel-kent-rmi17050/OfferCodeWS/KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM",
+        referral_url=AnyHttpUrl("https://www.tui.pl/wypoczynek/wlochy/dolny-adriatyk/hotel-kent-rmi17050/OfferCodeWS/KRKRMI20260622113520260622202606272210L05RMI17050DZX1AA02ROADZX1A02FCMM"),
         available=True,
         room_type="Standard Room",
         adults=2,
@@ -285,7 +286,7 @@ async def test_check_availability_returns_unavailable(live_provider):
         cell_id="1234567890abcdef",
         offer_id="abcdefabcdefabcdefabcdefabcdef12",
         attractiveness_score=0.8,
-        share_url="https://wakacje-travelis.pl/offer/123",
+        share_url=HttpUrl("https://wakacje-travelis.pl/offer/123"),
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
         ttl=1782086400,

@@ -4,6 +4,7 @@ import pytest_asyncio
 import aioboto3
 from decimal import Decimal
 from datetime import datetime, date, timezone
+from pydantic import AnyHttpUrl, HttpUrl
 
 from core.models.cell import MarketCell
 from core.models.common import BoardType
@@ -21,7 +22,7 @@ from core.repositories.user_offers import DynamoUserOffersRepository
 import redis.asyncio as aioredis
 from core.repositories.feed import RedisFeedRepository
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 ENDPOINT_URL = os.environ.get("DYNAMODB_ENDPOINT_URL", "http://localhost:8000")
 
@@ -147,11 +148,13 @@ async def test_cells_repo_integration_lifecycle(cells_table):
     assert res == {cell.cell_id: 2}
 
     fetched = await repo.get(cell.cell_id)
+    assert fetched is not None
     assert fetched.activation_count == 2
 
     now = datetime(2026, 6, 17, 12, 0, 0, tzinfo=timezone.utc)
     await repo.update_last_scraped([cell.cell_id], now)
     fetched = await repo.get(cell.cell_id)
+    assert fetched is not None
     assert fetched.last_scraped_at == now
 
     res = await repo.decrement_activations([cell.cell_id])
@@ -188,7 +191,7 @@ def test_offer():
         price_total=Decimal("5000.00"),
         price_per_person=Decimal("2500.00"),
         price_per_day=Decimal("2500.00"),
-        referral_url="https://www.tui.pl/details-eg-1",
+        referral_url=AnyHttpUrl("https://www.tui.pl/details-eg-1"),
         available=True,
         room_type="Family Room Standard",
         adults=2,
@@ -199,7 +202,7 @@ def test_offer():
         cell_id="1234567890abcdef",
         offer_id="abcdefabcdefabcdefabcdefabcdef12",
         attractiveness_score=0.8,
-        share_url="https://wakacje-travelis.pl/offer/123",
+        share_url=HttpUrl("https://wakacje-travelis.pl/offer/123"),
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
         ttl=1783814400,
@@ -291,6 +294,7 @@ async def test_users_repo_integration_lifecycle(users_table, test_user):
     await repo.update_push(test_user.user_id, enabled=True, subscription=sub)
 
     fetched = await repo.get(test_user.user_id)
+    assert fetched is not None
     assert fetched.push_enabled is True
     assert fetched.push_subscription is not None
     assert fetched.push_subscription.endpoint == "https://push.example.com/sub/123"

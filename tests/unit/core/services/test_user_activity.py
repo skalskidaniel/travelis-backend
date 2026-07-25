@@ -1,3 +1,4 @@
+from typing import cast
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
@@ -28,6 +29,7 @@ async def test_touch_continuing_session_is_noop():
     await service.touch("user-1")
 
     service.redis.set.assert_awaited_once()
+    assert service.redis.set.await_args is not None
     _, kwargs = service.redis.set.await_args
     assert kwargs["ex"] == 30 * 60
     assert kwargs["get"] is True
@@ -49,6 +51,7 @@ async def test_touch_session_boundary_records_session_start():
 
     service.users_repo.get.assert_awaited_once_with("user-1")
     service.users_repo.record_session_start.assert_awaited_once()
+    assert service.users_repo.record_session_start.await_args is not None
     _, kwargs = service.users_repo.record_session_start.await_args
     assert kwargs["new_since"] == prior_last_active
     assert isinstance(kwargs["last_active_at"], datetime)
@@ -105,6 +108,7 @@ async def test_ensure_active_reactivates_inactive_user():
     expected_cells = generate_required_cells(prefs)
     expected_cell_ids = [c.cell_id for c in expected_cells]
     service.cells_repo.activate_cells.assert_awaited_once()
+    assert service.cells_repo.activate_cells.await_args is not None
     activated_cells_arg = service.cells_repo.activate_cells.await_args.args[0]
     assert [c.cell_id for c in activated_cells_arg] == expected_cell_ids
 
@@ -112,7 +116,8 @@ async def test_ensure_active_reactivates_inactive_user():
 @pytest.mark.asyncio
 async def test_sweep_no_inactive_users():
     service = _make_service()
-    service.users_repo.list_users_inactive_since = AsyncMock(return_value=[])
+    users_repo = cast(MagicMock, service.users_repo)
+    users_repo.list_users_inactive_since = AsyncMock(return_value=[])
 
     stats = await service.sweep()
 
@@ -128,11 +133,13 @@ async def test_sweep_decrements_cells_and_marks_inactive():
         User(user_id=f"user-{i}", preferences=UserPreferences(countries=["GR"]))
         for i in range(2)
     ]
-    service.users_repo.list_users_inactive_since = AsyncMock(
+    users_repo = cast(MagicMock, service.users_repo)
+    cells_repo = cast(MagicMock, service.cells_repo)
+    users_repo.list_users_inactive_since = AsyncMock(
         return_value=inactive_users
     )
-    service.users_repo.mark_inactive = AsyncMock(return_value=2)
-    service.cells_repo.decrement_activations = AsyncMock(return_value={})
+    users_repo.mark_inactive = AsyncMock(return_value=2)
+    cells_repo.decrement_activations = AsyncMock(return_value={})
 
     stats = await service.sweep()
 
@@ -146,21 +153,24 @@ async def test_sweep_decrements_cells_and_marks_inactive():
 
 
 @pytest.mark.asyncio
-async def test_sweep_uses_threshold_for_cutoff():
+async def test_sweep_deactivates_and_decrements():
     service = UserActivityService(
         users_repo=MagicMock(),
         cells_repo=MagicMock(),
         redis_client=MagicMock(),
         inactivity_threshold_days=14,
     )
-    service.users_repo.list_users_inactive_since = AsyncMock(return_value=[])
-    service.cells_repo.decrement_activations = AsyncMock(return_value={})
-    service.users_repo.mark_inactive = AsyncMock(return_value=0)
+    users_repo = cast(MagicMock, service.users_repo)
+    cells_repo = cast(MagicMock, service.cells_repo)
+    users_repo.list_users_inactive_since = AsyncMock(return_value=[])
+    cells_repo.decrement_activations = AsyncMock(return_value={})
+    users_repo.mark_inactive = AsyncMock(return_value=0)
 
     before = datetime.now(timezone.utc)
     await service.sweep()
     after = datetime.now(timezone.utc)
 
-    call_args = service.users_repo.list_users_inactive_since.await_args.args[0]
+    assert users_repo.list_users_inactive_since.await_args is not None
+    call_args = users_repo.list_users_inactive_since.await_args.args[0]
     assert isinstance(call_args, datetime)
     assert before - timedelta(days=14) <= call_args <= after - timedelta(days=14)

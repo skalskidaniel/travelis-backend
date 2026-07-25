@@ -37,11 +37,13 @@ async def test_cells_repo_lifecycle(cells_table):
     assert res == {cell.cell_id: 2}
 
     fetched = await repo.get(cell.cell_id)
+    assert fetched is not None
     assert fetched.activation_count == 2
 
     now = datetime(2026, 6, 17, 12, 0, 0)
     await repo.update_last_scraped([cell.cell_id], now)
     fetched = await repo.get(cell.cell_id)
+    assert fetched is not None
     assert fetched.last_scraped_at == now
 
     res = await repo.decrement_activations([cell.cell_id])

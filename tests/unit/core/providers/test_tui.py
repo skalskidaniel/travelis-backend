@@ -2,6 +2,7 @@ import pytest
 import respx
 import httpx
 from decimal import Decimal
+from pydantic import AnyHttpUrl, HttpUrl
 from datetime import date, datetime, timezone
 from unittest.mock import patch
 
@@ -273,7 +274,7 @@ def sample_offer():
         price_total=Decimal("5000.00"),
         price_per_person=Decimal("2500.00"),
         price_per_day=Decimal("2500.00"),
-        referral_url="https://www.tui.pl/details-eg-1",
+        referral_url=AnyHttpUrl("https://www.tui.pl/details-eg-1"),
         available=True,
         room_type="Family Room Standard",
         adults=2,
@@ -284,7 +285,7 @@ def sample_offer():
         cell_id="1234567890abcdef",
         offer_id="abcdefabcdefabcdefabcdefabcdef12",
         attractiveness_score=0.8,
-        share_url="https://wakacje-travelis.pl/offer/123",
+        share_url=HttpUrl("https://wakacje-travelis.pl/offer/123"),
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
         ttl=1783814400,

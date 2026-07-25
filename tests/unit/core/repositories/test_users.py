@@ -48,6 +48,7 @@ async def test_users_repo_lifecycle(users_table, test_user):
     await repo.update_push(test_user.user_id, enabled=True, subscription=sub)
 
     fetched = await repo.get(test_user.user_id)
+    assert fetched is not None
     assert fetched.push_enabled is True
     assert fetched.push_subscription is not None
     assert fetched.push_subscription.endpoint == "https://push.example.com/sub/123"

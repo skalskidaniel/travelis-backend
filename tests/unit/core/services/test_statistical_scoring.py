@@ -31,7 +31,7 @@ def create_mock_offer(
         duration=duration,
         board=BoardType.ALL_INCLUSIVE,
         stars=4,
-        rating=rating,
+        rating=Decimal(str(rating)),
         review_count=review_count,
         price_total=Decimal(price_total),
         price_per_person=round(Decimal(price_total) / (adults + children), 2),

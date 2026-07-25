@@ -1,6 +1,7 @@
+from typing import Any, cast
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from pydantic import HttpUrl, ValidationError
+from pydantic import AnyHttpUrl, HttpUrl, ValidationError
 import pytest
 
 from core.models.common import ProviderName, BoardType
@@ -39,13 +40,13 @@ def sample_domain_offer() -> Offer:
         duration=7,
         board=BoardType.ALL_INCLUSIVE,
         stars=4,
-        rating=4.5,
+        rating=Decimal("4.5"),
         review_count=100,
         price_total=Decimal("1000.00"),
         price_per_person=Decimal("500.00"),
         price_per_day=Decimal("142.86"),
-        referral_url=HttpUrl("https://tui.pl/ref"),
-        image_urls=[HttpUrl("https://tui.pl/img.jpg")],
+        referral_url=AnyHttpUrl("https://tui.pl/ref"),
+        image_urls=[AnyHttpUrl("https://tui.pl/img.jpg")],
         share_url=HttpUrl(
             "https://wakacje-travelis.pl/offer/1a2b3c4d5e6f7a8b/1a2b3c4d5e6f7a8b1a2b3c4d5e6f7a8b"
         ),
@@ -96,8 +97,8 @@ def test_paginated_offers_response_valid():
 def test_paginated_offers_response_invalid_types():
     with pytest.raises(ValidationError):
         PaginatedOffersResponse(
-            offers="not-a-list",
-            next_cursor=123,
-            feed_version="not-an-int",
-            total_count="not-an-int",
+            offers=cast(Any, "not-a-list"),
+            next_cursor=cast(Any, 123),
+            feed_version=cast(Any, "not-an-int"),
+            total_count=cast(Any, "not-an-int"),
         )

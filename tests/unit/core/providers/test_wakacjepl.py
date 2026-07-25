@@ -2,6 +2,7 @@ import pytest
 import respx
 import httpx
 from decimal import Decimal
+from pydantic import AnyHttpUrl, HttpUrl
 from datetime import date, datetime, timezone
 from unittest.mock import patch
 
@@ -211,7 +212,7 @@ def sample_wakacje_offer():
         price_total=Decimal("6148.00"),
         price_per_person=Decimal("3074.00"),
         price_per_day=Decimal("439.14"),
-        referral_url=(
+        referral_url=AnyHttpUrl(
             "https://www.wakacje.pl/oferty/grecja/kreta/ierapetra/kakkos-terra-blue-916232.html"
             "?od-2026-08-26,7-dni,all-inclusive,z-rzeszowa,2dorosle"
         ),
@@ -239,7 +240,7 @@ def sample_wakacje_offer():
         cell_id="1234567890abcdef",
         offer_id="abcdefabcdefabcdefabcdefabcdef12",
         attractiveness_score=0.8,
-        share_url="https://wakacje-travelis.pl/offer/123",
+        share_url=HttpUrl("https://wakacje-travelis.pl/offer/123"),
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
         ttl=1787702400,
@@ -325,6 +326,7 @@ async def test_search_happy_path(wakacjepl_provider):
             assert offer.stars == 5
             assert offer.location == "Grecja/Kreta/Ierapetra"
             assert offer.price_total == Decimal("6148.00")
+            assert offer.metadata.wakacje_pl is not None
             assert offer.metadata.wakacje_pl.tour_op_code == "GRCS"
             assert (
                 str(offer.referral_url)

@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 from datetime import date
 from pydantic import ValidationError
@@ -7,7 +8,7 @@ from core.models.common import BoardType
 
 
 def test_user_preferences_update_valid():
-    data = {
+    data: dict[str, Any] = {
         "countries": ["GR", "DE"],
         "adults": 3,
         "board": ["all-inclusive", "half-board"],

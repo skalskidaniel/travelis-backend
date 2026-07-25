@@ -33,7 +33,7 @@ def patched_content_getter(self):
 
 fset = getattr(AWSResponse.content, "fset", None)
 fdel = getattr(AWSResponse.content, "fdel", None)
-AWSResponse.content = property(patched_content_getter, fset, fdel)
+setattr(AWSResponse, "content", property(patched_content_getter, fset, fdel))
 
 
 @pytest.fixture(scope="function")

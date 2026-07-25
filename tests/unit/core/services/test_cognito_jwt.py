@@ -2,6 +2,7 @@ import time
 
 import httpx
 import jwt
+import jwt.utils
 import pytest
 import respx
 from cryptography.hazmat.primitives import serialization

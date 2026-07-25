@@ -27,6 +27,9 @@ entrypoint = "app.main:app"
 pythonpath = ["src"]
 addopts = "-rf"
 testpaths = ["tests"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
 filterwarnings = [
     "ignore:There is no current event loop:DeprecationWarning:mangum.adapter",
     "ignore::UserWarning:aws_lambda_powertools",
