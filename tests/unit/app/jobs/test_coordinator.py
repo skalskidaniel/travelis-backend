@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.jobs.coordinator import run_scrape_job
+from app.jobs.coordinator import is_cell_month_past, run_scrape_job
 from core.container import Container
 from core.models.cell import MarketCell
 from core.models.common import BoardType, ProviderName
@@ -46,7 +46,7 @@ async def test_run_scrape_job_no_cells(mock_container):
 async def test_run_scrape_job_successful(mock_container):
     cell = MarketCell(
         country="ES",
-        month="2026-07",
+        month="2027-07",
         min_stars=3,
         board=BoardType.ALL_INCLUSIVE,
         adults=2,
@@ -62,8 +62,8 @@ async def test_run_scrape_job_successful(mock_container):
         hotel_name="Sol Hotel",
         location="ES/Mallorca/Palma",
         departure_airport="WAW",
-        departure_date=date(2026, 7, 10),
-        return_date=date(2026, 7, 17),
+        departure_date=date(2027, 7, 10),
+        return_date=date(2027, 7, 17),
         duration=7,
         board=BoardType.ALL_INCLUSIVE,
         stars=3,
@@ -113,7 +113,7 @@ async def test_run_scrape_job_successful(mock_container):
 async def test_run_scrape_job_availability_by_absence(mock_container):
     cell = MarketCell(
         country="ES",
-        month="2026-07",
+        month="2027-07",
         min_stars=3,
         board=BoardType.ALL_INCLUSIVE,
         adults=2,
@@ -129,8 +129,8 @@ async def test_run_scrape_job_availability_by_absence(mock_container):
         hotel_name="Sol Hotel",
         location="ES/Mallorca/Palma",
         departure_airport="WAW",
-        departure_date=date(2026, 7, 10),
-        return_date=date(2026, 7, 17),
+        departure_date=date(2027, 7, 10),
+        return_date=date(2027, 7, 17),
         duration=7,
         board=BoardType.ALL_INCLUSIVE,
         stars=3,
@@ -155,7 +155,7 @@ async def test_run_scrape_job_availability_by_absence(mock_container):
         share_url=HttpUrl("https://wakacje-travelis.pl/offer/dummy/dummy"),
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
-        ttl=1783641600,
+        ttl=1815177600,
         attractiveness_score=0.5,
     )
     existing_offer.external_offer_id = "tui-existing"
@@ -195,7 +195,7 @@ async def test_run_scrape_job_availability_by_absence(mock_container):
 async def test_run_scrape_job_timeout_triggering(mock_container):
     cell1 = MarketCell(
         country="ES",
-        month="2026-07",
+        month="2027-07",
         min_stars=3,
         board=BoardType.ALL_INCLUSIVE,
         adults=2,
@@ -204,7 +204,7 @@ async def test_run_scrape_job_timeout_triggering(mock_container):
     )
     cell2 = MarketCell(
         country="IT",
-        month="2026-07",
+        month="2027-07",
         min_stars=3,
         board=BoardType.ALL_INCLUSIVE,
         adults=2,
@@ -228,8 +228,8 @@ async def test_run_scrape_job_timeout_triggering(mock_container):
         hotel_name="Sol Hotel",
         location="ES/Mallorca/Palma",
         departure_airport="WAW",
-        departure_date=date(2026, 7, 10),
-        return_date=date(2026, 7, 17),
+        departure_date=date(2027, 7, 10),
+        return_date=date(2027, 7, 17),
         duration=7,
         board=BoardType.ALL_INCLUSIVE,
         stars=3,
@@ -276,7 +276,7 @@ async def test_run_scrape_job_timeout_triggering(mock_container):
 async def test_run_scrape_job_retries_exponential(mock_container):
     cell = MarketCell(
         country="ES",
-        month="2026-07",
+        month="2027-07",
         min_stars=3,
         board=BoardType.ALL_INCLUSIVE,
         adults=2,
@@ -302,7 +302,7 @@ async def test_run_scrape_job_skips_cell_when_all_scored_offers_fail_validation(
 ):
     cell = MarketCell(
         country="ES",
-        month="2026-07",
+        month="2027-07",
         min_stars=3,
         board=BoardType.ALL_INCLUSIVE,
         adults=2,
@@ -317,8 +317,8 @@ async def test_run_scrape_job_skips_cell_when_all_scored_offers_fail_validation(
         hotel_name="Sol Hotel",
         location="ES/Mallorca/Palma",
         departure_airport="WAW",
-        departure_date=date(2026, 7, 10),
-        return_date=date(2026, 7, 17),
+        departure_date=date(2027, 7, 10),
+        return_date=date(2027, 7, 17),
         duration=7,
         board=BoardType.ALL_INCLUSIVE,
         stars=3,
@@ -367,7 +367,7 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
 ):
     cell = MarketCell(
         country="ES",
-        month="2026-07",
+        month="2027-07",
         min_stars=3,
         board=BoardType.ALL_INCLUSIVE,
         adults=2,
@@ -382,8 +382,8 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
         hotel_name="Good Hotel",
         location="ES/Mallorca/Palma",
         departure_airport="WAW",
-        departure_date=date(2026, 7, 10),
-        return_date=date(2026, 7, 17),
+        departure_date=date(2027, 7, 10),
+        return_date=date(2027, 7, 17),
         duration=7,
         board=BoardType.ALL_INCLUSIVE,
         stars=3,
@@ -405,8 +405,8 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
         hotel_name="Bad Hotel",
         location="ES/Mallorca/Palma",
         departure_airport="WAW",
-        departure_date=date(2026, 7, 10),
-        return_date=date(2026, 7, 17),
+        departure_date=date(2027, 7, 10),
+        return_date=date(2027, 7, 17),
         duration=7,
         board=BoardType.ALL_INCLUSIVE,
         stars=3,
@@ -431,7 +431,7 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
         share_url=HttpUrl("https://wakacje-travelis.pl/offer/dummy/dummy"),
         scraped_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
-        ttl=1783641600,
+        ttl=1815177600,
         attractiveness_score=0.5,
     )
 
@@ -465,3 +465,63 @@ async def test_run_scrape_job_partial_validation_failure_keeps_existing_availabl
         o for o in saved if o.offer_id == invalid_offer_id and not o.available
     ]
     assert unavailable_existing == []
+
+
+def test_is_cell_month_past():
+    past_cell = MarketCell(
+        country="ES",
+        month="2026-07",
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    current_cell = MarketCell(
+        country="ES",
+        month="2026-08",
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    future_cell = MarketCell(
+        country="ES",
+        month="2026-09",
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    today = date(2026, 8, 2)
+
+    assert is_cell_month_past(past_cell, today=today) is True
+    assert is_cell_month_past(current_cell, today=today) is False
+    assert is_cell_month_past(future_cell, today=today) is False
+
+
+@pytest.mark.asyncio
+async def test_run_scrape_job_skips_past_month_cell(mock_container):
+    cell = MarketCell(
+        country="ES",
+        month="2026-07",
+        min_stars=3,
+        board=BoardType.ALL_INCLUSIVE,
+        adults=2,
+        children=0,
+        activation_count=1,
+    )
+    mock_container.cells_repo.scan.return_value = [cell]
+    mock_container.tui_provider.search = AsyncMock(return_value=[])
+    mock_container.wakacje_provider.search = AsyncMock(return_value=[])
+
+    with patch("app.jobs.coordinator.is_cell_month_past", return_value=True):
+        result = await run_scrape_job(mock_container)
+
+    assert result["scraped_cells"] == []
+    assert result["matched_users"] == []
+    mock_container.tui_provider.search.assert_not_called()
+    mock_container.wakacje_provider.search.assert_not_called()
+    mock_container.cells_repo.update_last_scraped.assert_not_called()

@@ -1,17 +1,19 @@
 import asyncio
 import json
+from datetime import date, datetime, time, timezone
+
 from aws_lambda_powertools import Logger
-from datetime import datetime, time, timezone
 
 from core.container import Container
 from core.models.cell import MarketCell
 from core.models.offer import Offer, RawOffer, ScoredOffer, mark_offer_unavailable
+from core.providers.utils import month_date_bounds
 from core.services.ingest import (
+    compute_offer_id,
     ingest_raw_offers,
     merge_existing_and_new_offer,
-    compute_offer_id,
 )
-from core.services.scoring import get_scorer, StatisticalScorerConfig
+from core.services.scoring import StatisticalScorerConfig, get_scorer
 
 logger = Logger(child=True)
 
@@ -23,6 +25,13 @@ def is_timeout_approaching(context, threshold_ms: int = 15000) -> bool:
     if not hasattr(context, "get_remaining_time_in_millis"):
         return False
     return context.get_remaining_time_in_millis() < threshold_ms
+
+
+def is_cell_month_past(cell: MarketCell, *, today: date | None = None) -> bool:
+    """Return True when the cell's month bounds are entirely before today."""
+    ref = today if today is not None else date.today()
+    departure_from, departure_to = month_date_bounds(cell.month)
+    return departure_from < ref and departure_to < ref
 
 
 async def search_with_retry(
@@ -86,6 +95,12 @@ async def run_scrape_job(container: Container, context=None, payload=None) -> di
 
             cell = await queue.get()
             try:
+                if is_cell_month_past(cell):
+                    logger.info(
+                        f"Skipping cell {cell.cell_id}: month {cell.month} is entirely in the past"
+                    )
+                    continue
+
                 tui_task = search_with_retry(tui.search, cell, "TUI")
                 wakacje_task = search_with_retry(wakacje.search, cell, "WakacjePl")
 
