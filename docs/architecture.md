@@ -76,6 +76,7 @@ See [code-structure.md](architecture/code-structure.md) for the full layering, d
 
 | Job                           | Frequency                               | Handler                                    |
 | ----------------------------- | --------------------------------------- | ------------------------------------------ |
-| Scrape active market cells    | 3× daily                                | `jobs.coordinator` → async scrape per cell |
-| Availability / price check    | 1× daily                                | `jobs.availability`                        |
-| Match users (debounced prefs) | On preferences change or after scraping | `matching service`                         |
+| Scrape active market cells    | 4× daily (06:00, 10:00, 14:00, 18:00 UTC) | `jobs.coordinator` → async scrape per cell |
+| Availability / price check    | 4× daily (08:00, 12:00, 16:00, 20:00 UTC) | `jobs.availability`                        |
+| Inactive user sweep           | Weekly, Mondays 03:00 UTC                 | `jobs.user_inactivity_sweep`               |
+| Match users (debounced prefs) | On preferences change or after scraping   | `matching service`                         |

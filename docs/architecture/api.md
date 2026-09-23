@@ -1,6 +1,6 @@
 # Backend API
 
-All endpoints are prefixed with `/api/v2`. Authentication via Cognito JWT unless noted.
+All endpoints are mounted at `/v2` (API Gateway route `ANY /v2/{proxy+}` on the `$default` stage). Authentication via Cognito JWT unless noted.
 
 Module layout matches `src/app/`:
 
@@ -109,12 +109,29 @@ Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB
 
 **Query parameters:**
 
-| Param    | Default          | Values                                                                                   |
-| -------- | ---------------- | ---------------------------------------------------------------------------------------- |
-| `sort`   | `attractiveness` | `attractiveness`, `departure_date`, `price_total`, `price_per_day`, `rating`, `duration` |
-| `order`  | `desc`           | `asc`, `desc`                                                                            |
-| `limit`  | `20`             | 1–50                                                                                     |
-| `cursor` | —                | Opaque cursor from previous response                                                     |
+| Param     | Default          | Values                                                                                   |
+| --------- | ---------------- | ---------------------------------------------------------------------------------------- |
+| `sort`    | `attractiveness` | `attractiveness`, `departure_date`, `price_total`, `price_per_day`, `rating`, `duration` |
+| `order`   | `desc`           | `asc`, `desc`                                                                            |
+| `limit`   | `20`             | 1–50                                                                                     |
+| `cursor`  | —                | Opaque cursor from previous response                                                     |
+| `country` | —                | ISO 3166-1 alpha-2 (for example `GR`). Must be a supported country code                  |
+| `new`     | `false`          | `true` returns offers matched since the user's session boundary (`Users.new_since`)     |
+
+`country` and `new=true` cannot be combined (`400`, detail `Cannot combine country and new filters`). An unsupported `country` is also `400`.
+
+`country` filters on `MarketCells.country` (the cell's ISO code), not the display name in `offers[].country` (the first segment of `location`, such as `Greece`).
+
+`new=true` keeps offers whose `UserOffers.matched_at` is greater than or equal to `Users.new_since`. A missing user record uses the request time as the cutoff, which returns an empty page. See [pipeline.md](pipeline.md#user-activity-and-inactivity).
+
+Examples:
+
+```
+GET /v2/offers?country=GR&sort=price_total&order=asc
+GET /v2/offers?new=true
+```
+
+Sold offers (`available = false`) are excluded from this feed under every filter. They remain on `GET /v2/offers/favorites` until the offer TTL expires.
 
 **Response `200`:**
 

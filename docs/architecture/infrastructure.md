@@ -82,7 +82,13 @@ aws s3 cp docs/providers/wakacjepl/wakacjepl_geo_catalog.json \
 
 HTTP API (v2) proxying all routes to the Lambda. Routes:
 
-- `ANY /v2/{proxy+}` → Lambda
+- `ANY /v2/{proxy+}` → Lambda (`$default` stage, so the public path is `/v2/...` with no `/api` prefix)
+
+**Custom domain.** `custom_domain` empty skips these resources. When set (for example `api.wakacje-travelis.pl`):
+
+- Terraform looks up an **already issued** ACM certificate for that exact domain in the API region. It does not create the certificate or the DNS record.
+- The domain is a regional HTTP API custom domain with TLS 1.2, mapped to the `$default` stage.
+- Apply outputs `custom_domain_target` and `custom_domain_hosted_zone_id` for an alias record. A missing or pending certificate fails the plan.
 
 ### DynamoDB
 
@@ -101,9 +107,12 @@ No capacity units are configured. Revisit provisioned capacity only if traffic b
 
 | Resource   | Purpose                          |
 | ---------- | -------------------------------- |
-| User Pool  | Email/password or social sign-up |
-| App Client | PWA public client (no secret)    |
+| User Pool  | Email sign-up (`username_attributes = email`) |
+| App Client | Public client (no secret). Flows: user-password, SRP, refresh token |
+| Hosted UI  | Cognito domain `{project}-auth-{account_id}`. Authorization code, scopes `email` `openid` `profile` |
 | JWT        | Validated by FastAPI middleware  |
+
+**Google sign-in** is optional. Both `google_client_id` and `google_client_secret` must be non-empty or the Google identity provider is not created and the app client stays on `COGNITO` only. Callback and logout URLs are `http://localhost:3000`, `FRONTEND_URL`, and the `www.` variant of that origin when the configured URL is not already `www`. Attribute mapping is `email`, `name`, and `username = sub`.
 
 ### EventBridge rules
 
@@ -111,8 +120,9 @@ Only the periodic jobs use fixed schedules. There is **no `match-users` poll** �
 
 | Rule                 | Schedule                     | Target               | Job                 |
 | -------------------- | ---------------------------- | -------------------- | ------------------- |
-| `scrape-offers`      | `cron(0 6,10,14,18 * * ? *)` | Cron Lambda (direct) | `jobs.coordinator`  |
-| `check-availability` | `cron(0 8,12,16,20 * * ? *)` | Cron Lambda (direct) | `jobs.availability` |
+| `scrape-offers`        | `cron(0 6,10,14,18 * * ? *)` | Cron Lambda (direct) | `jobs.coordinator`           |
+| `check-availability`   | `cron(0 8,12,16,20 * * ? *)` | Cron Lambda (direct) | `jobs.availability`          |
+| `sweep-inactive-users` | `cron(0 3 ? * MON *)`        | Cron Lambda (direct) | `jobs.user_inactivity_sweep` |
 
 Cron times are UTC; adjust for desired local schedule.
 
@@ -168,6 +178,8 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 | `RATE_LIMITING_ENABLED`      | SSM / env              | If `False`, rate limiting is bypassed (defaults to `True` if omitted)           |
 | `LAMBDA_FUNCTION_ARN`        | Terraform output / env | ARN of the cron Lambda target used by EventBridge Scheduler.                    |
 | `SCHEDULER_ROLE_ARN`         | Terraform output / env | ARN of the IAM role assumed by EventBridge Scheduler to invoke the cron Lambda. |
+| `INACTIVITY_THRESHOLD_DAYS`  | env                    | Days without a new session before the weekly sweep releases a user's cells. Default `7`. |
+| `SESSION_GAP_MINUTES`        | env                    | Idle gap that starts a new session and moves `Users.new_since`. Default `30`.          |
 
 Never commit secrets. Use `.env.example` with placeholders for local dev.
 

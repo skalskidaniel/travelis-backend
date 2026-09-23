@@ -22,7 +22,7 @@ Users configure trip preferences and receive notifications when new matching dea
 | Monitoring         | Grafana (Sentry on frontend)                                                                                                                                                                                                |
 | AWS SDK            | aioboto3 (async; aiobotocore under the hood)                                                                                                                                                                                |
 | Authentication     | AWS Cognito                                                                                                                                                                                                                 |
-| Availability check | Baseline: availability-by-absence (3× scrape). Optional 1× daily: TUI per-offer API; wakacje.pl two-step calculator API using `metadata.wakacje_pl` (see [contract](../providers/wakacjepl/contract.md#offer-availability)) |
+| Availability check | Scrape soft-deletes offers missing from a cell's latest results (4× daily). A separate 4× daily job rechecks bookable offers via the TUI offer-code API and the wakacje.pl calculator + `checkOfferAvailability` APIs (see [contract](../providers/wakacjepl/contract.md#offer-availability)) |
 
 CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the event loop.
 
@@ -34,7 +34,7 @@ CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the ev
 
 - [ ] Implement CORS middleware (frontend origin whitelist)
 - [ ] Implement health check endpoint (`/v2/health`)
-- [ ] Ensure all API endpoints are mounted under `/api/v2`
+- [x] API endpoints are mounted under `/v2` (API Gateway `$default` stage; no `/api` prefix)
 - [ ] Validate proper use of RESTful HTTP status codes (`200`, `204`, `400`, `401`, `404`, `429`, `500`)
 
 ### Core Business Logic
@@ -121,11 +121,15 @@ Albania (AL), Andorra (AD), Aruba (AW), Austria (AT), Bulgaria (BG), Croatia (HR
 
 ### Notifications
 
-**v1 push:** generic message — _"New deals available"_(in Polish language) — sent after a match job when the user's feed changes. No offer count in the push payload.
+**v1 push:** one randomly chosen Polish template, sent only when a match **inserts** new `UserOffers` rows and push is enabled. Payload is `{ "title", "body" }` — no offer ids or counts.
 
-In-app, the client can show how many offers are new since last open (client-side watermark or `feed_version` metadata from the API).
+| Title            | Body                              |
+| ---------------- | --------------------------------- |
+| Nowe oferty!     | Sprawdź aplikację!                |
+| Nowe wycieczki!  | Zobacz najatrakcyjniejsze opcje!  |
+| Nowe okazje!     | Zobacz zanim znikną!              |
 
-Server does **not** track per-offer seen state.
+The server does **not** track per-offer seen state. It does track a session boundary: authenticated requests refresh Redis `user:{id}:session` (default 30-minute gap). When a new session starts, `Users.new_since` becomes the previous `last_active_at`. `GET /v2/offers?new=true` returns offers whose `UserOffers.matched_at` is at or after that cutoff. `feed_version` still tells the client that the feed was rebuilt.
 
 ### Favorited Offers
 

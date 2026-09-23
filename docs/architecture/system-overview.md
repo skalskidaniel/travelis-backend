@@ -30,8 +30,9 @@ The scheduled job router (`handle_non_http(event, context)`) dispatches tasks ba
 | Event Source                  | Payload / Structure                              | Handler Path                                                           | Description                                       |
 | :---------------------------- | :----------------------------------------------- | :--------------------------------------------------------------------- | :------------------------------------------------ |
 | **API Gateway**               | HTTP request                                     | API Lambda → Mangum → FastAPI routers (async)                          | All `/v2/*` HTTP traffic                          |
-| **EventBridge Cron (Scrape)** | `{ "type": "scrape_offers" }`                    | Cron Lambda → `handle_non_http` → `app.jobs.coordinator`               | Orchestrates cell scraping (4× daily)             |
+| **EventBridge Cron (Scrape)** | `{ "type": "scrape_offers" }` (optional `remaining_cells` on self-continuation) | Cron Lambda → `handle_non_http` → `app.jobs.coordinator` | Orchestrates cell scraping (4× daily) |
 | **EventBridge Cron (Avail)**  | `{ "type": "check_availability" }`               | Cron Lambda → `handle_non_http` → `app.jobs.availability`              | Checks active offer availability (4× daily)       |
+| **EventBridge Cron (Sweep)**  | `{ "type": "sweep_inactive_users" }`             | Cron Lambda → `handle_non_http` → `app.jobs.user_inactivity_sweep`     | Releases cells for users idle past the threshold (weekly) |
 | **EventBridge Scheduler**     | `{ "type": "match_user", "user_id": "usr_123" }` | Cron Lambda → `handle_non_http` → `matching_service.match_user_offers` | Debounced per-user re-match (one-time schedule)   |
 | **Cognito Post-Confirm**      | Cognito `PostConfirmation` event payload         | API Lambda → `handle_non_http` → `get_or_create_user`                  | Creates `Users` row + default cells + first match |
 
@@ -45,7 +46,7 @@ The scheduled job router (`handle_non_http(event, context)`) dispatches tasks ba
 | `health` | `/v2/health` | System health check and telemetry       |
 | `user`   | `/v2/user`   | Preferences, push notification settings |
 | `offers` | `/v2/offers` | Read-only paginated offer feed          |
-| `jobs`   | _(no HTTP)_  | Orchestrate scrape, match, availability |
+| `jobs`   | _(no HTTP)_  | Orchestrate scrape, availability, inactivity sweep |
 
 ### `core/` package
 
@@ -54,7 +55,7 @@ The domain layer, shared between API and jobs. Holds all business logic and infr
 - Pydantic domain models (preferences, offers, market cells)
 - Provider port + adapters (wakacje.pl, tui.pl)
 - Repository ports + DynamoDB/Redis adapters
-- Services: ingest (normalize + dedup + fingerprint), scoring, matching, activation
+- Services: ingest (normalize + dedup + fingerprint), scoring, matching, activation, user activity
 - Composition root (`container.py`)
 
 `core` never imports `app`. See [code-structure.md](code-structure.md).
@@ -92,7 +93,9 @@ Protected routes: `/v2/user/*`, `/v2/offers/*`.
 
 The stack is **asynchronous end-to-end**: FastAPI route handlers are `async def`, repositories use `aioboto3` (async DynamoDB), provider clients use `httpx.AsyncClient`, and the feed cache uses `redis.asyncio`. Mangum drives the FastAPI app on the event loop.
 
-The scrape work is I/O-bound (HTTP + DynamoDB), so within a single cron invocation the coordinator scrapes active market cells **concurrently** on the event loop with bounded concurrency (using an `asyncio` worker pool of ~10 workers). This avoids the 15-minute Lambda timeout as cell count grows, without spawning child Lambdas.
+The scrape work is I/O-bound (HTTP + DynamoDB), so within a single cron invocation the coordinator scrapes active market cells **concurrently** on the event loop with bounded concurrency (using an `asyncio` worker pool of up to 10 workers). Cells whose travel month is entirely in the past are skipped.
+
+If fewer than 15 seconds remain, workers stop. When `LAMBDA_FUNCTION_ARN` is set, the cron function async-invokes itself with `{ "type": "scrape_offers", "remaining_cells": [...] }`. That continues the same job; it is not a per-cell worker fan-out. Cells finished in the current invocation are bulk-matched before the handler returns.
 
 Async rules:
 
