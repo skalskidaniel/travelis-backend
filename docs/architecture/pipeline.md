@@ -6,7 +6,7 @@ End-to-end flow from scraping to user feed.
 
 ```mermaid
 flowchart TD
-    EB1[EventBridge 3x daily] --> COORD[jobs.coordinator]
+    EB1[EventBridge 4x daily] --> COORD[jobs.coordinator]
     COORD --> SCRAPE[Async scrape per active cell]
     SCRAPE --> NORM[Normalize + deduplicate]
     NORM --> SCORE[scoring service]
@@ -15,7 +15,7 @@ flowchart TD
     MATCH --> UO[(UserOffers table)]
     MATCH --> REDIS[(Redis feed rebuild)]
     MATCH --> PUSH[Web Push notification]
-    EB3[EventBridge 1x daily] --> AVAIL[jobs.availability]
+    EB3[EventBridge 4x daily] --> AVAIL[jobs.availability]
     AVAIL --> DDB
     PATCH[PATCH /user/preferences] --> PREFS[(Users table)]
     PATCH --> CELLS[Update cell activation]
@@ -23,6 +23,8 @@ flowchart TD
     SIGNUP[Cognito post-confirmation] --> PROV[Create Users row + activate cells]
     PROV --> SCHED
     SCHED -->|fires once| MATCH
+    EB4[EventBridge weekly Mon 03:00 UTC] --> SWEEP[jobs.user_inactivity_sweep]
+    SWEEP --> CELLS
 ```
 
 Matching is **event-driven** — there is no constant poll. Two independent triggers run the user matching logic (see [Trigger sources](#trigger-sources)).
@@ -56,12 +58,14 @@ To keep cell scraping decoupled from user-specific details (and avoid expensive 
 
 ### Coordinator (`jobs.coordinator`)
 
-Triggered 3× daily by EventBridge.
+Triggered 4× daily by EventBridge (`cron(0 6,10,14,18 * * ? *)`, UTC). A continuation invoke uses the same payload type with `remaining_cells` set (see [Error handling](#error-handling)).
 
-1. Scan the `MarketCells` table (all rows are active by definition — a cell exists only when `activation_count > 0`).
-2. Schedule one async scrape task per cell with bounded concurrency (using an `asyncio` worker pool of ~10 workers).
-3. Each task calls wakacje.pl and tui.pl APIs (see [providers/](../providers/index.md)).
-4. Pass raw results to normalization → scoring → `Offers` table.
+1. Scan the `MarketCells` table (all rows are active by definition — a cell exists only when `activation_count > 0`). On continuation, load only the ids in `remaining_cells`.
+2. Skip a cell whose month is entirely in the past. `month_date_bounds(cell.month)` is the first and last calendar day of `YYYY-MM`; both must be before today. Skipped cells are not scraped, do not update `last_scraped_at`, and do not soft-delete offers by absence. They stay in `MarketCells` until activation drops to 0.
+3. Schedule one async scrape task per remaining cell with bounded concurrency (an `asyncio` worker pool of up to 10 workers).
+4. Each task calls wakacje.pl and tui.pl APIs (see [providers/](../providers/index.md)). Each provider search retries up to 3 times with exponential backoff. A provider failure is logged and the other provider's results are still ingested.
+5. Pass raw results to normalization → scoring → `Offers` table. If every scored offer fails validation, skip persistence for that cell so existing offers are not marked unavailable by an empty result set.
+6. After the pool finishes, bulk-match users whose preferences overlap the cells scraped in **this** invocation.
 
 The worker pool fan-out lives in the orchestrator; per-cell work calls `async` `core` functions, and CPU-bound scoring is offloaded via `asyncio.to_thread`. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
 
@@ -124,7 +128,7 @@ For each claimed user:
    - Diff the new matches against the old matches.
    - Batch-delete obsolete matches and batch-write new matches (limits DynamoDB write churn).
 7. Rebuild Redis feed (increment `feed_version`, invalidating cached ZSETs).
-8. If push enabled and feed changed → send generic _"New deals available"_ notification (in Polish language). If the push endpoint returns HTTP 404/410 (expired subscription), disable push on the user record.
+8. If the feed changed, increment `feed_version`. If the match **inserted** new rows and push is enabled, send one randomly chosen Polish template (`Nowe oferty!`, `Nowe wycieczki!`, or `Nowe okazje!`). The payload is title and body only. If the push endpoint returns HTTP 403, 404, or 410, disable push on the user record.
 
 ## Availability check (`jobs.availability`)
 
@@ -141,21 +145,53 @@ Optional refinement for fresher availability _between_ scrapes (requires provide
 
 Contract details: [providers/wakacjepl/contract.md](../providers/wakacjepl/contract.md#offer-availability). Prototype: `notebooks/wakacje_pl_availability.ipynb`.
 
-If the check determines that the offer is no longer available, the offer is **soft-deleted**: `available = false` and `ttl` set to now + 14 days (DynamoDB TTL). The job then triggers a bulk user re-matching run (`MatchingService.bulk_match_users`) on the affected cells so non-favorited matches leave the feed immediately; favorited `UserOffers` rows are retained until the Offer TTL expires. Otherwise, if the offer is still available but its price has changed, its price attributes (`price_total`, `price_per_person`, and `price_per_day`) are updated in-place.
+If the check determines that the offer is no longer available, the offer is **soft-deleted**: `available = false` and `ttl` set to now + 14 days (DynamoDB TTL). The job then triggers a bulk user re-matching run (`MatchingService.bulk_match_users`) on the affected cells so non-favorited matches leave the feed immediately; favorited `UserOffers` rows are retained until the Offer TTL expires. Otherwise, if the offer is still available but its price has changed, `price_total` is replaced and `price_per_person` / `price_per_day` are recomputed as `price_total / (adults + children)` and `price_total / duration / (adults + children)` (quantized to 0.01 PLN).
+
+The job only checks offers that are still `available` and whose `cell_id` is in the current `MarketCells` scan. A provider error on one offer is logged and that offer is left unchanged.
+
+## User activity and inactivity
+
+There is no per-offer seen flag. Activity is a session boundary plus a weekly cell release.
+
+### Session touch
+
+Every authenticated request (`get_current_user`) schedules `UserActivityService.touch` with `asyncio.create_task`. The handler does not await it, so a request that finishes before the Redis write can miss the session update.
+
+Redis key `user:{user_id}:session` is `SET` with `EX` (TTL = `SESSION_GAP_MINUTES` × 60, default 30 minutes) and `GET`.
+
+- A previous value means the user is still inside the same session. Nothing is written to DynamoDB.
+- A missing key means a new session. `Users.new_since` is set to the previous `last_active_at`, and `last_active_at` advances to now.
+
+`GET /v2/offers?new=true` uses `new_since` as the cutoff and keeps offers with `UserOffers.matched_at >= new_since`.
+
+### Weekly sweep (`jobs.user_inactivity_sweep`)
+
+EventBridge `cron(0 3 ? * MON *)` (Monday 03:00 UTC) sends `{ "type": "sweep_inactive_users" }`.
+
+1. Cutoff is now minus `INACTIVITY_THRESHOLD_DAYS` (default 7).
+2. Scan `Users` where `last_active_at < cutoff` and `is_active = true`.
+3. Decrement `activation_count` for every cell required by those users' current preferences. A cell at 0 is deleted, same as a preference change. If a required cell row is already missing, `decrement_activations` raises and the sweep stops before `is_active` is cleared.
+4. Set `is_active = false` only when it is currently `true`. A later run does not decrement users already marked inactive.
+
+The sweep does not delete the user, preferences, `UserOffers`, or offers. `bulk_match_users` still scans every user. An inactive user is re-matched only when some other user keeps an overlapping cell active.
+
+### Coming back
+
+`GET` or `PATCH /v2/user/preferences` loads the user through `get_or_create_user`. If `is_active` is false, `ensure_active` sets it true, re-activates the preference cells, and schedules `match-{user_id}`. Other authenticated routes only refresh the session key; they do not restore cells.
 
 ## Redis feed rebuild and lazy ZSET pagination
 
 ### Lazy ZSET Building
 
-The ZSET is built lazily on the first `GET /v2/offers` request for a specific sort field and order:
+The ZSET is built lazily on the first `GET /v2/offers` request for a specific sort field, order, and filter:
 
 1. Retrieve the user's current `feed_version` from the key `user:{user_id}:feed_version`.
-2. Check if ZSET key `user:{user_id}:sort:{field}:{order}:v{version}` exists in Redis.
+2. Check if ZSET key `user:{user_id}:sort:{field}:{order}:filter:{filter_mode}:v{version}` exists in Redis. `filter_mode` is `all`, `country:{ISO}`, or `new:{unix_seconds}`.
 3. If not cached:
    - Query all `UserOffers` for the `user_id` from DynamoDB.
-   - Batch-get corresponding offers from the `Offers` table using their `(cell_id, offer_id)` keys.
-   - Sort the offers in Python by the requested field and order, and calculate unique ZSET scores (see [data-model.md](data-model.md#lazy-sort-views-zset)).
-   - Write the members (`offer_id`) and their computed scores to the ZSET key with a TTL of 24 hours.
+   - Batch-get corresponding offers from the `Offers` table using their `(cell_id, offer_id)` keys. Hydration misses prune those `UserOffers` rows and bump `feed_version`.
+   - Drop `available = false` offers, then apply `filter_mode` (country via the cell ISO code, or `new` via `matched_at`).
+   - Write members `offer_id:cell_id` with computed scores (see [data-model.md](data-model.md#lazy-sort-views-zset)). Redis orders the ZSET. TTL: 24 hours.
 4. Paginate using the ZSET:
    - If `order == desc`, execute `ZREVRANGEBYSCORE` or `ZRANGE ... REV`.
    - If `order == asc`, execute `ZRANGEBYSCORE` or `ZRANGE`.
@@ -181,7 +217,7 @@ The ZSET is built lazily on the first `GET /v2/offers` request for a specific so
 | Provider timeout               | Retry up to 3× per cell per run; log and continue                                                      |
 | Scoring error for one offer    | Skip offer; log                                                                                        |
 | Match job failure for one user | EventBridge Scheduler retry policy (max attempts → DLQ); next PATCH or post-scrape run also re-matches |
-| Lambda timeout approaching     | Coordinator stops spawning new tasks; resume next cron                                                 |
+| Lambda timeout approaching     | With under 15s left, workers stop. If `LAMBDA_FUNCTION_ARN` is set, the cron Lambda async-invokes itself with `{ "type": "scrape_offers", "remaining_cells": ["..."] }`. This invocation still bulk-matches cells it finished. Without the ARN, leftover cells wait for the next cron. |
 
 ## Future escape hatch
 

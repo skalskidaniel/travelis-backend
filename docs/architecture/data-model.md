@@ -23,6 +23,9 @@ Four domain tables (on-demand capacity):
 | `push_subscription` | Map     | Web Push subscription JSON |
 | `created_at`        | String  |                            |
 | `updated_at`        | String  |                            |
+| `last_active_at`    | String  | Start of the current session (ISO-8601). Advanced only when Redis `user:{id}:session` has expired |
+| `new_since`         | String  | Previous `last_active_at`, stored when a new session starts. Cutoff for `GET /v2/offers?new=true` |
+| `is_active`         | Boolean | `true` until the weekly inactivity sweep releases this user's cells. Restored on the next preferences read or update |
 
 No `refresh_after` field and no GSI: debouncing is handled by EventBridge Scheduler one-time schedules (see [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler)), not by a polled timestamp.
 
@@ -89,7 +92,7 @@ Canonical attractive offers (post-scoring, deduplicated).
 
 Because there are **no GSIs** on this table, searching for an offer by `offer_id` alone is not supported for unauthenticated or direct share lookups. To view details, the consumer must provide both the `cell_id` and the `offer_id` (reflected in the `share_url` format and the direct look-up API). For standard user feed hydration, the single-offer detail path uses the `cell_id` denormalized onto `UserOffers` (below) to issue a direct `GetItem(cell_id, offer_id)`.
 
-> Hot-partition note: very popular cells (e.g. Greece / 4★ / AI / 2 adults) concentrate writes on one partition. At 3×-daily write volume with spread reads this is acceptable; revisit if throttling appears.
+> Hot-partition note: very popular cells (e.g. Greece / 4★ / AI / 2 adults) concentrate writes on one partition. At 4×-daily write volume with spread reads this is acceptable; revisit if throttling appears.
 
 TTL: `ttl` attribute lets DynamoDB expire rows — departure date while bookable, or 14 days after soft-delete when sold.
 
@@ -226,15 +229,23 @@ Incremented on every feed rebuild. Invalidates cached sort views.
 
 ### Lazy sort views (ZSET)
 
-One ZSET per `(user, sort_field, sort_order, feed_version)`:
+One ZSET per `(user, sort_field, sort_order, filter_mode, feed_version)`:
 
 ```
-user:{user_id}:sort:{field}:{order}:v{version}  →  ZSET
+user:{user_id}:sort:{field}:{order}:filter:{filter_mode}:v{version}  →  ZSET
   member: offer_id:cell_id
   score:  normalized sort key (with tie-breaker)
 ```
 
-Built lazily on first request for that sort. TTL: 24 hours.
+`filter_mode` is `all`, `country:{ISO}` (for example `country:GR`), or `new:{unix_seconds}` taken from `Users.new_since`. Built lazily on first request for that sort and filter. TTL: 24 hours.
+
+### Session marker
+
+```
+user:{user_id}:session → ISO timestamp of the touch
+```
+
+TTL is `SESSION_GAP_MINUTES` × 60 seconds (default 30 minutes). Presence of the key means the user is still in the same session, so `last_active_at` and `new_since` are not rewritten. See [pipeline.md](pipeline.md#user-activity-and-inactivity).
 
 **Score Construction and Tie-Breaking**: Redis ZSET scores must be double-precision floats. Because multiple offers can have identical sort values (e.g. same price or same rating), the score is constructed deterministically to embed a lexicographical tie-breaker:
 
@@ -272,4 +283,4 @@ When user preferences change:
 4. If a cell's `activation_count` drops to `0`, delete the cell row from `MarketCells` table.
 5. If a cell's `activation_count` goes from `0` to `1` (new cell), create the cell row in `MarketCells` with `activation_count = 1` and `last_scraped_at = null`.
 
-Only cells present in the `MarketCells` table are scraped on the 3× daily schedule.
+Only cells present in the `MarketCells` table are scraped on the 4× daily schedule. Cells whose `month` is entirely before today are scanned and then skipped (see [pipeline.md](pipeline.md#coordinator-jobscoordinator)).

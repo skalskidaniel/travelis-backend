@@ -206,8 +206,9 @@ flowchart TB
 ```
                           ┌─────────────────────────────┐
                           │      EventBridge (Cron)      │
-                          │  scrape_offers (3x daily)    │
-                          │  check_availability (1x)     │
+                          │  scrape_offers (4x daily)    │
+                          │  check_availability (4x)     │
+                          │  sweep_inactive_users (weekly) │
                           └──────────┬──────────────────┘
                                      │
                           ┌──────────▼──────────────────┐
@@ -269,7 +270,7 @@ flowchart TB
 | Dedup                | Intra-scrape (lowest price) + cross-provider (fingerprint collision)              |
 | Persistence          | DynamoDB (4 tables, no GSIs) + Redis Cloud (feed cache)                           |
 | Scoring              | Two-stage: Z-score price gate → composite (price 40%, rating 40%, reviews 20%)    |
-| Feed                 | Lazy Redis ZSET per (user, sort, order, version) built on first request           |
+| Feed                 | Lazy Redis ZSET per (user, sort, order, filter, version) built on first request   |
 | Matching             | Event-driven: post-scrape auto-match + debounced preference updates via Scheduler |
 | Account Provisioning | Cognito PostConfirmation trigger creates Users + default cells                    |
 

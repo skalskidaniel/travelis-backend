@@ -41,8 +41,9 @@ src/
 │   ├── services/
 │   │   ├── ingest.py      # normalize + dedup + fingerprint
 │   │   ├── scoring.py     # two-stage attractiveness (pure, numpy)
-│   │   ├── matching.py    # cell resolution + user filter + feed rebuild
-│   │   ├── activation.py  # market-cell ref-counting
+│   │   ├── matching.py      # cell resolution + user filter + feed rebuild
+│   │   ├── activation.py    # market-cell ref-counting
+│   │   ├── user_activity.py # session boundary + inactivity sweep
 │   │   └── notifications.py
 │   ├── exceptions/        # custom exceptions (CoreException, ProviderException, etc.)
 │   ├── config.py          # pydantic-settings Settings
@@ -56,8 +57,9 @@ src/
     ├── offers/
     └── jobs/
         ├── __init__.py
-        ├── coordinator.py    # scrape orchestrator (asyncio fan-out)
-        └── availability.py   # daily availability check
+        ├── coordinator.py           # scrape orchestrator (asyncio fan-out)
+        ├── availability.py          # availability and price check
+        └── user_inactivity_sweep.py # weekly idle-user cell release
 ```
 
 `src/` is the source root. The Lambda deployment artifact places the **contents** of `src/` at the artifact root, so `app` and `core` are importable as top-level packages and the handler is `app.main.handler`. Locally, run with `--app-dir src` (or `PYTHONPATH=src`).
