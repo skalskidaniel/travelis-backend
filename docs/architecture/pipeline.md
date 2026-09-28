@@ -128,7 +128,7 @@ For each claimed user:
    - Diff the new matches against the old matches.
    - Batch-delete obsolete matches and batch-write new matches (limits DynamoDB write churn).
 7. Rebuild Redis feed (increment `feed_version`, invalidating cached ZSETs).
-8. If the feed changed, increment `feed_version`. If the match **inserted** new rows and push is enabled, send one randomly chosen Polish template (`Nowe oferty!`, `Nowe wycieczki!`, or `Nowe okazje!`). The payload is title and body only. If the push endpoint returns HTTP 403, 404, or 410, disable push on the user record.
+8. If the feed changed, increment `feed_version`. If the match **inserted** new rows and push is enabled, send one randomly chosen Polish template (`Nowe oferty!`, `Nowe wycieczki!`, or `Nowe okazje!`). The payload is title and body only. Signing uses VAPID subject `mailto:admin@wakacje-travelis.pl` on a worker thread (`asyncio.to_thread`). If either VAPID key is unset, the send is skipped and the subscription stays enabled. If the push endpoint returns HTTP 403, 404, or 410, push is disabled and the subscription is cleared. Other `WebPushException`s are logged and the subscription is left in place.
 
 ## Availability check (`jobs.availability`)
 

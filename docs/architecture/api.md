@@ -6,6 +6,7 @@ Module layout matches `src/app/`:
 
 ```
 app.include_router(auth_router,   prefix="/v2/auth")
+app.include_router(health_router, prefix="/v2/health")
 app.include_router(offers_router, prefix="/v2/offers")
 app.include_router(user_router,   prefix="/v2/user")
 ```
@@ -18,11 +19,14 @@ app.include_router(user_router,   prefix="/v2/user")
 | Content-Type  | `application/json`                          |
 | Error format  | `{ "detail": "..." }` (FastAPI default)     |
 | Pagination    | Cursor-based (`cursor`, `limit`)            |
-| Rate limiting | Redis-backed custom Rate Limiter dependency |
+| Rate limiting | Redis-backed custom rate limiter dependency |
+| OpenAPI       | `/docs`, `/redoc`, `/openapi.json` when `ENVIRONMENT` is not `prod` |
 
 ## Auth — `/v2/auth`
 
 Sign up and sign in happen in the PWA via Cognito directly. Only account deletion goes through the backend. On sign-up confirmation, a Cognito **post-confirmation** trigger provisions the backend `Users` record (default preferences), activates default market cells, and schedules the first match — so there is no client-facing "create account" endpoint. A lazy get-or-create on the first authenticated request is the fallback.
+
+`CognitoJwtVerifier` accepts Cognito **ID** and **access** tokens (RS256). Required claims are `exp`, `sub`, and `token_use`. An ID token must have `aud` equal to `COGNITO_APP_CLIENT_ID`. An access token must have `client_id` equal to that app client. PyJWT is called with `verify_aud` off because access tokens have no `aud`; the audience check above is manual. JWKS comes from `{issuer}/.well-known/jwks.json` and is fetched again once if `kid` is missing.
 
 ### `DELETE /v2/auth/account`
 
@@ -284,28 +288,42 @@ Single offer detail by cell and offer ID. Used for shared offer lookups (e.g. fr
 
 ### `GET /v2/health`
 
-**Response `200`:**
+No authentication required. The handler pings Redis and calls `DescribeTable` on the users table.
+
+**Response `200`:** both checks succeeded.
 
 ```json
-{ "status": "ok" }
+{
+  "status": "ok",
+  "checks": { "redis": "ok", "dynamodb": "ok" }
+}
 ```
 
-No authentication required.
+**Response `503`:** Redis or DynamoDB failed. `checks` values are `ok`, `error` (call raised), or `unavailable` (client or repository was not initialized).
+
+```json
+{
+  "status": "unhealthy",
+  "checks": { "redis": "error", "dynamodb": "ok" }
+}
+```
 
 ## Middleware & Rate Limiting
 
 The API implements three security and resource management layers:
 
-1. **CORS:** Restricts API consumption to whitelisted origins (e.g. the PWA).
-2. **JWT Validation:** Verifies AWS Cognito JWT tokens on protected routers.
-3. **Redis-backed Rate Limiting:** Enforces route-level request limits using a custom, fail-open rate limiter.
+1. **CORS:** Enforced by API Gateway HTTP API `cors_configuration`, not by FastAPI. `allow_origins` is exactly the Terraform `frontend_url` (no automatic `www` variant). `allow_headers` is `Content-Type` and `Authorization`. `allow_methods` is `GET`, `POST`, `PATCH`, `DELETE`, and `OPTIONS`. `PUT /v2/offers/{offer_id}/favorite` is not in that list, so a browser preflight from the PWA does not receive `PUT` in `Access-Control-Allow-Methods`. Non-browser clients are unaffected. Local `uvicorn` adds no CORS headers.
+2. **JWT Validation:** `get_current_user` verifies Cognito JWTs (see [Auth](#auth--v2auth)). It is a FastAPI dependency, not middleware.
+3. **Redis-backed Rate Limiting:** `app/rate_limiter.py` enforces route-level limits. It is skipped when `RATE_LIMITING_ENABLED` is false (default `true`) or when the Redis client is missing. A Redis error also fails open and the request continues. The key is `rate_limit:{user:<sub>|ip:<host>}:{path}`. The limiter `INCR`s the key and sets `EXPIRE` to the window when the count is 1 or the TTL is missing (`-1`).
 
-If a client exceeds their limit, the API returns a `429 Too Many Requests` response with a `Retry-After` header indicating the cooldown period in seconds.
+If a client exceeds their limit, the API returns `429 Too Many Requests` with `Retry-After` set to the remaining TTL in seconds and body `{ "detail": "Too many requests. Please try again later." }`.
+
+Interactive docs are mounted only when `ENVIRONMENT` is not `prod`. In production, `/docs`, `/redoc`, and `/openapi.json` are unset and return 404.
 
 ### Identifier Tracking
 
-- **Authenticated Requests:** Identified by the Cognito `sub` (User ID) claim extracted from the `Authorization` header.
-- **Unauthenticated/Public Requests:** Identified by the client's host IP address.
+- **Bearer token present:** Cognito `sub` is read **without** signature verification, only to build the rate-limit key. Authentication still goes through `get_current_user`.
+- **Missing, unsigned, or undecodable token:** Client host IP (`ip:<host>`, or `ip:unknown` when the request has no client).
 
 ### Configured Rate Limits
 
@@ -332,3 +350,4 @@ If a client exceeds their limit, the API returns a `429 Too Many Requests` respo
 | `404` | Resource not found          |
 | `429` | Rate limited                |
 | `500` | Internal error              |
+| `503` | Health check failed, or a retryable service/scheduler error (`retryable: true` on the JSON body for the latter) |
