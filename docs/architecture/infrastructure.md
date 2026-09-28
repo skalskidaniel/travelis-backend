@@ -1,6 +1,6 @@
 # Infrastructure
 
-Terraform-managed AWS resources with modular layout. Secrets via Terraform Vault provider and/or AWS SSM Parameter Store.
+Terraform-managed AWS resources with modular layout. The VAPID private key is stored in Secrets Manager. Other runtime settings are Lambda environment variables populated from Terraform variables.
 
 ## Directory layout
 
@@ -50,11 +50,13 @@ The deployment artifact zips the **contents** of `src/`, so `app` and `core` are
 
 **IAM permissions:**
 
-- DynamoDB read/write on all 4 tables
-- Cognito admin delete user
-- EventBridge Scheduler `CreateSchedule` / `UpdateSchedule` / `DeleteSchedule` (+ `iam:PassRole` for the schedule's target role)
-- CloudWatch Logs
-- (Optional) SSM Parameter Store read
+- DynamoDB read/write on all 4 tables (`GetItem`, `PutItem`, `UpdateItem`, `DeleteItem`, `Query`, `Scan`, `BatchGetItem`, `BatchWriteItem`, `DescribeTable`)
+- Cognito `AdminDeleteUser`
+- S3 `GetObject` and `ListBucket` on the geo catalog bucket
+- EventBridge Scheduler `CreateSchedule` / `UpdateSchedule` / `DeleteSchedule` / `GetSchedule` (+ `iam:PassRole` for the schedule's target role)
+- `lambda:InvokeFunction` on `*-lambdalith-*` (scrape continuation targets the cron function)
+- `secretsmanager:GetSecretValue` on the VAPID private key secret
+- CloudWatch Logs via `AWSLambdaBasicExecutionRole`
 
 No VPC attachment required (Redis Cloud is external, providers are public HTTPS).
 
@@ -84,6 +86,8 @@ HTTP API (v2) proxying all routes to the Lambda. Routes:
 
 - `ANY /v2/{proxy+}` → Lambda (`$default` stage, so the public path is `/v2/...` with no `/api` prefix)
 
+**CORS** is this HTTP API's `cors_configuration`, not FastAPI middleware. `allow_origins` is the single Terraform `frontend_url`. `allow_headers` is `Content-Type` and `Authorization`. `allow_methods` is `GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` (`max_age` 300). `PUT` is absent, so browser preflight for `PUT /v2/offers/{offer_id}/favorite` does not allow that method. Cognito callback URLs add a `www` variant; this CORS list does not. Stage throttling is 100 requests/second with a burst of 50, separate from the Redis rate limiter.
+
 **Custom domain.** `custom_domain` empty skips these resources. When set (for example `api.wakacje-travelis.pl`):
 
 - Terraform looks up an **already issued** ACM certificate for that exact domain in the API region. It does not create the certificate or the DNS record.
@@ -110,7 +114,7 @@ No capacity units are configured. Revisit provisioned capacity only if traffic b
 | User Pool  | Email sign-up (`username_attributes = email`) |
 | App Client | Public client (no secret). Flows: user-password, SRP, refresh token |
 | Hosted UI  | Cognito domain `{project}-auth-{account_id}`. Authorization code, scopes `email` `openid` `profile` |
-| JWT        | Validated by FastAPI middleware  |
+| JWT        | Validated by `get_current_user` → `CognitoJwtVerifier` (JWKS) |
 
 **Google sign-in** is optional. Both `google_client_id` and `google_client_secret` must be non-empty or the Google identity provider is not created and the app client stays on `COGNITO` only. Callback and logout URLs are `http://localhost:3000`, `FRONTEND_URL`, and the `www.` variant of that origin when the configured URL is not already `www`. Attribute mapping is `email`, `name`, and `username = sub`.
 
@@ -162,37 +166,64 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 
 ## Environment variables (Lambda)
 
-| Variable                     | Source                 | Description                                                                     |
-| ---------------------------- | ---------------------- | ------------------------------------------------------------------------------- |
-| `REDIS_URL`                  | SSM / Vault            | Redis Cloud connection string                                                   |
-| `COGNITO_USER_POOL_ID`       | Terraform output       |                                                                                 |
-| `COGNITO_APP_CLIENT_ID`      | Terraform output       |                                                                                 |
-| `DYNAMODB_USERS_TABLE`       | Terraform output       |                                                                                 |
-| `DYNAMODB_CELLS_TABLE`       | Terraform output       |                                                                                 |
-| `DYNAMODB_OFFERS_TABLE`      | Terraform output       |                                                                                 |
-| `DYNAMODB_USER_OFFERS_TABLE` | Terraform output       |                                                                                 |
-| `ATTRACTIVENESS_Z_THRESHOLD` | SSM                    | Default `-1.2`                                                                  |
-| `VAPID_PRIVATE_KEY`          | Vault                  | Web Push signing                                                                |
-| `VAPID_PUBLIC_KEY`           | SSM                    | Web Push public key                                                             |
-| `FRONTEND_URL`               | SSM / env              | e.g. `https://wakacje-travelis.pl` (used for `share_url`)                       |
-| `RATE_LIMITING_ENABLED`      | SSM / env              | If `False`, rate limiting is bypassed (defaults to `True` if omitted)           |
-| `LAMBDA_FUNCTION_ARN`        | Terraform output / env | ARN of the cron Lambda target used by EventBridge Scheduler.                    |
-| `SCHEDULER_ROLE_ARN`         | Terraform output / env | ARN of the IAM role assumed by EventBridge Scheduler to invoke the cron Lambda. |
-| `INACTIVITY_THRESHOLD_DAYS`  | env                    | Days without a new session before the weekly sweep releases a user's cells. Default `7`. |
-| `SESSION_GAP_MINUTES`        | env                    | Idle gap that starts a new session and moves `Users.new_since`. Default `30`.          |
+Terraform sets these on **both** Lambda functions (`infra/modules/lambda/main.tf`). `LAMBDA_FUNCTION_ARN` is the cron function ARN on the API function and on the cron function (Scheduler targets and scrape continuation both invoke cron).
+
+| Variable                     | Set by Terraform | Description                                                                 |
+| ---------------------------- | ---------------- | --------------------------------------------------------------------------- |
+| `REDIS_URL`                  | yes              | Redis Cloud connection string                                               |
+| `COGNITO_USER_POOL_ID`       | yes              |                                                                             |
+| `COGNITO_APP_CLIENT_ID`      | yes              |                                                                             |
+| `DYNAMODB_USERS_TABLE`       | yes              |                                                                             |
+| `DYNAMODB_CELLS_TABLE`       | yes              |                                                                             |
+| `DYNAMODB_OFFERS_TABLE`      | yes              |                                                                             |
+| `DYNAMODB_USER_OFFERS_TABLE` | yes              |                                                                             |
+| `VAPID_PUBLIC_KEY`           | yes              | Web Push public key                                                         |
+| `VAPID_PRIVATE_KEY_SECRET_ARN` | yes            | Secrets Manager ARN. At init the container loads `SecretString` and uses it as the private key. |
+| `FRONTEND_URL`               | yes              | e.g. `https://wakacje-travelis.pl` (used for `share_url` and API Gateway CORS) |
+| `ATTRACTIVENESS_Z_THRESHOLD` | yes              | Terraform variable, code default `-1.2` if unset                            |
+| `SCHEDULER_ROLE_ARN`         | yes              | Role EventBridge Scheduler assumes to invoke the cron Lambda                |
+| `LAMBDA_FUNCTION_ARN`        | yes              | Cron Lambda ARN                                                             |
+| `ENVIRONMENT`                | yes              | `dev` or `prod`. `prod` turns off `/docs`, `/redoc`, and `/openapi.json`.   |
+| `POWERTOOLS_SERVICE_NAME`    | yes              | `{project}-backend`                                                         |
+| `POWERTOOLS_LOG_LEVEL`       | yes              | `INFO` in prod, `DEBUG` otherwise                                           |
+
+Not set by Terraform. Code defaults apply unless you add the env var yourself:
+
+| Variable                    | Default | Description                                                                 |
+| --------------------------- | ------- | --------------------------------------------------------------------------- |
+| `RATE_LIMITING_ENABLED`     | `true`  | `false` bypasses the Redis rate limiter                                     |
+| `INACTIVITY_THRESHOLD_DAYS` | `7`     | Days without a new session before the weekly sweep releases a user's cells  |
+| `SESSION_GAP_MINUTES`       | `30`    | Idle gap that starts a new session and moves `Users.new_since`              |
+| `VAPID_PRIVATE_KEY`         | unset   | Local signing key. On Lambda, a non-empty `VAPID_PRIVATE_KEY_SECRET_ARN` replaces this value. |
+| `AWS_PROFILE`               | unset   | Named profile for local `aioboto3`. Lambda uses the execution role.         |
+
+`AWS_REGION` is provided by the Lambda runtime. Locally it defaults to `eu-central-1`.
 
 Never commit secrets. Use `.env.example` with placeholders for local dev.
 
 ## Local development
 
 ```bash
-# Run API locally (no Lambda); src/ is the source root
+uv sync
+
+# REDIS_URL is required (Settings has no default). Table names default to
+# Users, MarketCells, Offers, UserOffers. AWS_REGION defaults to eu-central-1.
 uvicorn app.main:app --reload --port 8000 --app-dir src
 
-# Env vars from .env (DynamoDB Local + Redis Cloud dev instance)
+uv run pytest
 ```
 
-DynamoDB Local or dev AWS account for integration testing. Redis Cloud free database for dev.
+`Settings` loads `.env` from the working directory. The FastAPI lifespan calls `container.initialize()`, which opens DynamoDB, Scheduler, Cognito, Lambda, and Redis clients before the app serves traffic. A missing `REDIS_URL` fails at import. Missing AWS credentials fail during startup, so `/v2/health` never runs.
+
+`GET /v2/health` pings Redis and `DescribeTable` on the users table. Both `ok` is HTTP 200. Either failure is HTTP 503 with `status: unhealthy`. See [api.md](api.md#get-v2health).
+
+`/docs`, `/redoc`, and `/openapi.json` are mounted only when `ENVIRONMENT` is not `prod`.
+
+Local uvicorn does not add CORS headers. Deployed CORS is API Gateway only, and its allow-list omits `PUT`.
+
+For local Web Push, set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` and leave `VAPID_PRIVATE_KEY_SECRET_ARN` unset. A set ARN makes startup call Secrets Manager and replace the env private key. If either key is missing, match still succeeds and the push send is skipped.
+
+Integration tests stay off unless `RUN_INTEGRATION_TESTS=1` or `RUN_PROVIDER_INTEGRATION=1`. Unit tests use `respx`, `moto`, and `fakeredis`.
 
 ## Monitoring
 

@@ -40,7 +40,7 @@ src/
 │   │   └── feed.py        # redis.asyncio feed (ZSET) adapter
 │   ├── services/
 │   │   ├── ingest.py      # normalize + dedup + fingerprint
-│   │   ├── scoring.py     # two-stage attractiveness (pure, numpy)
+│   │   ├── scoring/       # two-stage attractiveness (statistical scorer package)
 │   │   ├── matching.py      # cell resolution + user filter + feed rebuild
 │   │   ├── activation.py    # market-cell ref-counting
 │   │   ├── user_activity.py # session boundary + inactivity sweep

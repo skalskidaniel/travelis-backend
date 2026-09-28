@@ -10,7 +10,7 @@ Finding a good last-minute deal across multiple tour operators is tedious and sl
 
 | Layer    | Stack                                                                |
 | -------- | -------------------------------------------------------------------- |
-| Runtime  | Python 3.12+, FastAPI, Mangum (Lambda adapter)                       |
+| Runtime  | Python 3.13+, FastAPI, Mangum (Lambda adapter)                       |
 | Async    | `aioboto3`, `httpx.AsyncClient`, `redis.asyncio`                     |
 | Data     | DynamoDB (4 tables, no GSIs), Redis Cloud (feed ZSETs)               |
 | Auth     | AWS Cognito + JWT verification                                       |

@@ -12,8 +12,8 @@ Users configure trip preferences and receive notifications when new matching dea
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API runtime        | AWS Lambda + Mangum + FastAPI (`async def` handlers)                                                                                                                                                                        |
 | Concurrency        | Async end-to-end; `asyncio` worker pool for scrape fan-out                                                                                                                                                                  |
-| Rate limiting      | FastAPI Limiter (async Redis)                                                                                                                                                                                               |
-| Infrastructure     | Terraform (+ Vault provider for secrets)                                                                                                                                                                                    |
+| Rate limiting      | Custom Redis limiter in `app/rate_limiter.py` (fail-open). API Gateway stage throttle is separate (100 rps, burst 50).                                                                                                      |
+| Infrastructure     | Terraform. VAPID private key in Secrets Manager; other settings are Lambda environment variables.                                                                                                                           |
 | Primary database   | DynamoDB (on-demand capacity for low operational overhead)                                                                                                                                                                  |
 | Offer feed cache   | Redis Cloud                                                                                                                                                                                                                 |
 | Scraping           | HTTP JSON APIs (no browser required for v1)                                                                                                                                                                                 |
@@ -32,20 +32,20 @@ CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the ev
 
 ### API & Infrastructure
 
-- [ ] Implement CORS middleware (frontend origin whitelist)
-- [ ] Implement health check endpoint (`/v2/health`)
+- [x] CORS origin whitelist on the API Gateway HTTP API (`allow_origins` = `frontend_url`). FastAPI does not add CORS middleware. Gateway `allow_methods` omits `PUT` (see [api.md](api.md#middleware--rate-limiting)).
+- [x] Health check `GET /v2/health` reports Redis and DynamoDB and returns 503 when either check fails.
 - [x] API endpoints are mounted under `/v2` (API Gateway `$default` stage; no `/api` prefix)
-- [ ] Validate proper use of RESTful HTTP status codes (`200`, `204`, `400`, `401`, `404`, `429`, `500`)
+- [x] HTTP status codes `200`, `204`, `400`, `401`, `404`, `429`, `500`, and `503` (health failure and retryable scheduler/service errors)
 
 ### Core Business Logic
 
-- [ ] Implement preference change debouncing using EventBridge Scheduler one-time schedules (see [pipeline.md](pipeline.md))
+- [x] Preference change debouncing using EventBridge Scheduler one-time schedules (see [pipeline.md](pipeline.md))
 
 ### Scraping & Integration
 
-- [x] Find a way to check wakacje.pl offer availability — verified in `notebooks/wakacje_pl_availability.ipynb` (`getCalculatorOfferVariants` + `checkOfferAvailability`). Pipeline integration pending; ingest must persist `metadata.wakacje_pl` (see [data-model.md](data-model.md#metadatawakacje_pl-required-for-availability-checks)).
+- [x] wakacje.pl offer availability uses `getCalculatorOfferVariants` + `checkOfferAvailability` (see [contract](../providers/wakacjepl/contract.md#offer-availability)). Ingest persists `metadata.wakacje_pl`.
 - [x] Persist `metadata.wakacje_pl` on ingest for every wakacje.pl offer.
-- [ ] Wire `jobs.availability` to the wakacje.pl JSON API (after metadata is populated).
+- [x] `jobs.availability` calls `check_availability` on the offer's provider (wakacje.pl calculator APIs or the TUI offer-code API).
 
 ## User preferences
 
