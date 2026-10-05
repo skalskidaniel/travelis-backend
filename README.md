@@ -10,7 +10,7 @@ Finding a good last-minute deal across multiple tour operators is tedious and sl
 
 | Layer    | Stack                                                                |
 | -------- | -------------------------------------------------------------------- |
-| Runtime  | Python 3.12+, FastAPI, Mangum (Lambda adapter)                       |
+| Runtime  | Python 3.13+, FastAPI, Mangum (Lambda adapter)                       |
 | Async    | `aioboto3`, `httpx.AsyncClient`, `redis.asyncio`                     |
 | Data     | DynamoDB (4 tables, no GSIs), Redis Cloud (feed ZSETs)               |
 | Auth     | AWS Cognito + JWT verification                                       |
@@ -112,3 +112,35 @@ flowchart TB
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for execution flows, data flow diagrams, and key architecture decisions.
+
+## Local development
+
+`pyproject.toml` requires Python 3.13+. Install and run tools with `uv`.
+
+```bash
+uv sync
+
+# REDIS_URL is required. Other settings load from .env in the working directory.
+# Table names default to Users, MarketCells, Offers, UserOffers.
+uv run uvicorn app.main:app --reload --port 8000 --app-dir src
+
+# Unit tests. Omit the marker filter and tests/integration runs too.
+uv run pytest -m "not integration"
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
+```
+
+`Settings` has no default for `REDIS_URL`, so a missing value fails at import, before `/v2/health` can answer. Copy placeholders from `.env.example`.
+
+Integration tests are marked `integration` and are not gated by an environment variable. See [infrastructure.md](docs/architecture/infrastructure.md#tests).
+
+Local job triggers use the same functions as the cron Lambda. They read `.env` without overriding variables already set in the shell, and they pass no Lambda context, so the scrape timeout continuation does not fire.
+
+```bash
+uv run python scripts/trigger_scrape.py --list-cells
+uv run python scripts/trigger_scrape.py --run
+uv run python scripts/trigger_scrape.py --run --cells <cell_id>
+
+uv run python scripts/trigger_availability.py --list-cells
+uv run python scripts/trigger_availability.py --run
+```

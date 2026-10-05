@@ -24,7 +24,7 @@ src/
 ├── core/
 │   ├── models/            # domain models (Cell, Offer, RawOffer, Preferences, UserOffer)
 │   ├── providers/
-│   │   ├── base.py        # Provider port (Protocol): async search(cell), check_availability(id)
+│   │   ├── base.py        # OfferProvider: search(cell), check_availability(offer), check_price(offer)
 │   │   ├── wakacjepl/     # wakacje.pl adapter directory
 │   │   │   ├── main.py    # adapter + field mapping + API contracts
 │   │   │   └── utils.py
@@ -39,12 +39,14 @@ src/
 │   │   ├── user_offers.py # aioboto3 (DynamoDB) adapters
 │   │   └── feed.py        # redis.asyncio feed (ZSET) adapter
 │   ├── services/
-│   │   ├── ingest.py      # normalize + dedup + fingerprint
-│   │   ├── scoring.py     # two-stage attractiveness (pure, numpy)
+│   │   ├── ingest.py        # normalize + dedup + fingerprint
+│   │   ├── scoring/         # two-stage attractiveness (statistical scorer package)
 │   │   ├── matching.py      # cell resolution + user filter + feed rebuild
 │   │   ├── activation.py    # market-cell ref-counting
 │   │   ├── user_activity.py # session boundary + inactivity sweep
-│   │   └── notifications.py
+│   │   ├── notifications.py # Web Push
+│   │   ├── scheduler.py     # EventBridge Scheduler debounce
+│   │   └── cognito_jwt.py   # Cognito JWT verification
 │   ├── exceptions/        # custom exceptions (CoreException, ProviderException, etc.)
 │   ├── config.py          # pydantic-settings Settings
 │   └── container.py       # composition root (see below)
@@ -52,6 +54,8 @@ src/
     ├── main.py            # FastAPI app + dual-entry Lambda handler
     ├── dependencies.py    # common API dependencies (auth validation, db session getters)
     ├── exceptions.py      # HTTP-facing custom exceptions (AppException, etc.)
+    ├── rate_limiter.py    # Redis rate-limit dependency (fail-open)
+    ├── health/            # GET /v2/health
     ├── auth/              # controller (def handlers) + request/response schemas
     ├── user/
     ├── offers/
@@ -120,7 +124,7 @@ To solve this, all entry points (the API dependency `get_container()` and the La
 
 ## Provider abstraction
 
-A `Provider` Protocol (`async search(cell) -> list[RawOffer]`, `async check_availability(offer) -> bool`), one adapter per site, behind a registry. All contract messiness is contained in the adapter and never leaks past `RawOffer`:
+An `OfferProvider` Protocol (`async search(cell) -> list[RawOffer]`, `async check_availability(offer) -> bool`, `async check_price(offer) -> Decimal`), one adapter per site, behind a registry. All contract messiness is contained in the adapter and never leaks past `RawOffer`:
 
 - wakacje.pl: `POST` search blob, `YYYY-MM-DD` dates, composite dedup key; ingest persists `metadata.wakacje_pl` for per-offer availability (`getCalculatorOfferVariants` + `checkOfferAvailability`).
 - tui.pl: `tui-api-key` / `x-market` headers, `DD.MM.YYYY` dates, `boardCode` → board-type map, `offerUrl` prefixing.
@@ -130,6 +134,8 @@ Adding a third source later is one new adapter + one registry line. See [provide
 ## Concurrency
 
 The fan-out concurrency strategy lives in the orchestration layer (`app/jobs/coordinator`), not in `core`. `core` exposes `async`, single-unit functions with no shared mutable state; the coordinator schedules them on the event loop with a bounded worker pool (via `asyncio.Queue` and concurrent workers). CPU-bound scoring is offloaded with `asyncio.to_thread` so it never blocks the loop. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
+
+`StatisticalOfferScorer.score` imports NumPy inside the method. `MatchingService._filter_offers_vectorized` imports pandas inside the method. A process that never scores or filters does not import those libraries. The match job calls the filter through `asyncio.to_thread`. `DELETE /v2/offers/{offer_id}/favorite` calls the same filter inline for a single offer while deciding whether to keep the `UserOffers` row.
 
 ## Exception handling
 

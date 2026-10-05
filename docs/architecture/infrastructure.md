@@ -186,13 +186,47 @@ Never commit secrets. Use `.env.example` with placeholders for local dev.
 ## Local development
 
 ```bash
-# Run API locally (no Lambda); src/ is the source root
-uvicorn app.main:app --reload --port 8000 --app-dir src
-
-# Env vars from .env (DynamoDB Local + Redis Cloud dev instance)
+# Run API locally (no Lambda); src/ is the source root. REDIS_URL is required.
+uv run uvicorn app.main:app --reload --port 8000 --app-dir src
 ```
 
-DynamoDB Local or dev AWS account for integration testing. Redis Cloud free database for dev.
+`Settings` loads `.env` from the working directory. DynamoDB Local or a dev AWS account is only required for the repository integration tests below. Redis Cloud (or any Redis URL) is required to boot the API. See [Tests](#tests) and [One-off scripts](#one-off-scripts).
+
+## Tests
+
+`pyproject.toml` puts `src/` on `pythonpath` and registers the `integration` marker. `addopts` is `-rf` only, so the marker does not deselect itself.
+
+| Command | What runs |
+| ------- | --------- |
+| `uv run pytest -m "not integration"` | `tests/unit`. HTTP is `respx`, DynamoDB is `moto`, feed is `fakeredis`. |
+| `uv run pytest -m integration` | `tests/integration` only. |
+| `uv run pytest` | Both. |
+
+There is no `RUN_INTEGRATION_TESTS` or `RUN_PROVIDER_INTEGRATION` check in the suite. A full pytest run will try the live provider tests and the local DynamoDB/Redis tests.
+
+| Path | Needs |
+| ---- | ----- |
+| `tests/integration/providers/test_wakacjepl_integration.py` | Network access to wakacje.pl, plus Playwright Chromium (`playwright` is a dev dependency). Some cases `pytest.skip` when the live search returns no offers. `WAKACJE_TEST_CONCURRENCY` overrides the default of 5 in-flight requests. |
+| `tests/integration/providers/test_tui_integration.py` | Network access to tui.pl via `httpx`. Same skip-when-empty behavior. |
+| `tests/integration/repositories/test_integration.py` | DynamoDB at `DYNAMODB_ENDPOINT_URL` (default `http://localhost:8000`) and Redis at `REDIS_URL` (default `redis://localhost:6379/0`). It creates and deletes its own tables. |
+
+Async tests are marked `@pytest.mark.asyncio`. Sync tests, including parametrized unit tests, are not.
+
+## One-off scripts
+
+`scripts/` is not imported by the application. Terraform calls `scripts/build_lambda_package.sh` from the lambda module. The other scripts are manual probes.
+
+| Script | Purpose |
+| ------ | ------- |
+| `scripts/build_lambda_package.sh` | `uv export` runtime deps, install them for Python 3.13 `x86_64-manylinux_2_28` into `dist/lambda-build`, copy `src/`, drop tests and unused botocore models. |
+| `scripts/trigger_scrape.py` | `--list-cells` scans `MarketCells`. `--run` calls `run_scrape_job`. Optional `--cells` is sent as `remaining_cells`. Loads `.env` with `setdefault`, so an already-exported variable wins. |
+| `scripts/trigger_availability.py` | `--list-cells` or `--run` (`run_availability_job`). Same `.env` loading. |
+| `scripts/fetch_geo_catalog.py` | Refresh provider geo catalogs under `docs/providers/`. |
+| `scripts/generate_wakacjepl_filters.py`, `scripts/generate_tui_filters.py` | Rebuild `src/core/providers/resources/*_filters.json` from the catalogs. |
+| `scripts/probe_wakacjepl_api_contract.py`, `scripts/probe_wakacjepl_image_sizes.py`, `scripts/probe_offer_url_consistency.py` | Live contract probes. See the provider contract docs. |
+| `scripts/benchmark_scoring.py` | Local timing of the production statistical scorer against unused NumPy and pandas copies in the same file. Not used in CI or Lambda. |
+
+`trigger_scrape.py` and `trigger_availability.py` call `container.initialize()` and the job coroutines in-process. They do not invoke Lambda and they pass `context=None`, so `is_timeout_approaching` stays false and a long local scrape will not self-continue.
 
 ## Monitoring
 
