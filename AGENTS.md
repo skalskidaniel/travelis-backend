@@ -23,9 +23,9 @@ ruff format src/ tests/          # Format
 ```
 
 ## Tests
-- **Run**: `uv run pytest` (uses `src/` as pythonpath).
-- **Async**: All tests must be `@pytest.mark.asyncio`.
-- **Integration**: Gated by `RUN_INTEGRATION_TESTS=1` or `RUN_PROVIDER_INTEGRATION=1`.
+- **Run**: `uv run pytest -m "not integration"` for unit tests (`src/` is on `pythonpath`). Plain `uv run pytest` also collects `tests/integration`.
+- **Async**: Async tests use `@pytest.mark.asyncio` (a module-level `pytestmark` is fine). Sync tests do not need the mark.
+- **Integration**: Marked `integration` only. Nothing reads `RUN_INTEGRATION_TESTS` or `RUN_PROVIDER_INTEGRATION`. Provider tests call live wakacje.pl and tui.pl (wakacje.pl also launches Playwright Chromium). Repository tests use DynamoDB at `DYNAMODB_ENDPOINT_URL` (default `http://localhost:8000`) and Redis at `REDIS_URL` (default `redis://localhost:6379/0`).
 - **Mocks**: `respx` (HTTP), `moto` (DynamoDB), `fakeredis`.
 
 ## Architecture Gotchas

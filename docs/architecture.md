@@ -16,7 +16,7 @@ This document is the entry point for architecture documentation. Each linked fil
 | [pipeline.md](architecture/pipeline.md)                 | Scraping, scoring, matching, debouncing, schedules              |
 | [attractiveness.md](architecture/attractiveness.md)     | Two-stage scoring algorithm                                     |
 | [api.md](architecture/api.md)                           | REST API (`/v2/*`) contracts                                    |
-| [infrastructure.md](architecture/infrastructure.md)     | Terraform modules, AWS resources, Redis Cloud                   |
+| [infrastructure.md](architecture/infrastructure.md)     | Terraform modules, AWS resources, Redis Cloud, tests, scripts   |
 
 ## Provider integrations
 

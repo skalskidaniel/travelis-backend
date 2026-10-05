@@ -54,7 +54,7 @@ To keep cell scraping decoupled from user-specific details (and avoid expensive 
 
 1. **Departure Airports**: Scraper requests are always sent with "Any" departure airport. User-specific departure airport preferences are applied as filters on the backend during the user matching phase.
 2. **Duration / Stay Length**: Scraper requests query a wide default range of `2-28` nights. Exact min/max duration filters are applied during the user matching phase.
-3. **Representative Child Age**: Providers require birth dates to calculate prices. Because global cells only track the _number_ of children, cells with `children > 0` are scraped using a representative child age of **8 years old** (birth date calculated as January 1st of `current_year - 8`). Exact matching filters on child ages are applied in Python during matching.
+3. **Representative Child Age**: Providers require birth dates to calculate prices. Because global cells only track the _number_ of children, cells with `children > 0` are scraped using a representative child age of **8 years old** (birth date calculated as January 1st of `current_year - 8`). That age is a scrape-time price input. Matching does not require the child's age to be 8.
 
 ### Coordinator (`jobs.coordinator`)
 
@@ -117,12 +117,14 @@ For each claimed user:
 2. **Self-healing month shift** (open-ended dates only): when `date_from` and `date_to` are both unset, matching compares the reference date to the month stored in `user.updated_at`. If the calendar month changed, re-run cell activation for the rolling 6-month window anchored to the new reference date, then persist `updated_at` with the new month. This keeps active cells aligned with "Any" travel dates without a sweeper cron. Users who never match still rely on the next preference PATCH or bulk post-scrape match to refresh cells.
 3. Resolve required `cell_id` set.
 4. Query `Offers` for those cells.
-5. Filter in Python using the user's exact preferences:
-   - Match departure airports (if list is not empty `[]`).
-   - Match exact stay duration bounds (`duration_min` to `duration_max`).
-   - Match travel date range (`date_from` to `date_to`).
-   - Match minimum TripAdvisor rating (`min_rating`).
-   - Match children exact ages/birthdays (re-checking suitability if children are present).
+5. Filter with `MatchingService._filter_offers_vectorized` (pandas, off the event loop via `asyncio.to_thread`). An offer must pass every check below, in order:
+   - `available` is true.
+   - `rating >= min_rating` (canonical 0–5 scale).
+   - Departure airport is in `departure_airports` when that list is not empty. Comparison is case-insensitive. An empty list means any airport.
+   - `duration >= duration_min`, and `duration <= duration_max` when `duration_max` is set.
+   - `departure_date >= date_from` when `date_from` is set, and `return_date <= date_to` when `date_to` is set.
+   - `offer.children` equals the number of birth dates in `preferences.children`.
+   - When those birth dates are present, every child is age 0–17 on the offer's `departure_date`. Age is year difference, minus one when the departure month/day is before the birthday. A child who would be 18 on departure drops the offer. The representative age of 8 used while scraping is not compared here.
 6. **Sync `UserOffers` rows**:
    - Query existing `UserOffers` keys for the user.
    - Diff the new matches against the old matches.
