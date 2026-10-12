@@ -198,9 +198,23 @@ DynamoDB Local or dev AWS account for integration testing. Redis Cloud free data
 
 | Tool                  | Scope                       |
 | --------------------- | --------------------------- |
-| AWS Lambda Powertools | Structured logging, tracing |
-| Grafana               | Backend dashboards          |
+| AWS Lambda Powertools | Structured JSON logs        |
+| CloudWatch alarms     | Lambda errors, API duration, API Gateway 5xx (below) |
+| Grafana Cloud         | Optional cross-account read of those logs and metrics |
 | Sentry                | Frontend PWA only           |
+
+`modules/monitoring` creates four alarms. None of them set `alarm_actions`, so a breach is visible in CloudWatch and is not paged from this module. `treat_missing_data` is `notBreaching`.
+
+| Alarm suffix | Metric | Condition |
+| ------------ | ------ | --------- |
+| `api-lambda-errors` | `AWS/Lambda` `Errors` `Sum` on the API function | `>= 1` in one 5-minute period |
+| `cron-lambda-errors` | Same metric on the cron function | `>= 1` in one 5-minute period |
+| `api-lambda-duration-p99` | `AWS/Lambda` `Duration` extended statistic `p99` | `> 25000` ms for 2 consecutive 5-minute periods (function timeout is 30s) |
+| `api-gateway-5xx` | `AWS/ApiGateway` `5xx` `Sum` on the HTTP API id | `>= 5` in one 5-minute period |
+
+Names are `${project}-${environment}-<suffix>`.
+
+The Grafana Cloud IAM role and log policy are created only when `grafana_cloud_aws_account_id` is non-empty. Trust is `sts:AssumeRole` from that account with `sts:ExternalId` equal to `grafana_cloud_external_id`. Log reads are limited to `/aws/lambda/${project}-${environment}-*`. Metric reads (`cloudwatch:GetMetricData` and alarm describe calls) are `Resource = "*"`. An empty account id means no Grafana role is created; the four alarms still are.
 
 ## Deployment flow
 

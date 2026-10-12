@@ -28,13 +28,14 @@ Sign up and sign in happen in the PWA via Cognito directly. Only account deletio
 
 Delete the authenticated user's account.
 
-**Side effects:**
+**Side effects** when a `Users` row exists, in this order. A failure raises `AccountDeletionException` and returns `500` with `{ "detail": "<message>" }`. Earlier steps are not rolled back.
 
-1. Delete Cognito user.
-2. Delete `Users` record.
-3. Delete all `UserOffers` for user.
-4. Decrement market cell `activation_count` for user's cells.
-5. Delete Redis keys `user:{id}:*`.
+1. Delete every `UserOffers` row for the user.
+2. `SCAN` and delete Redis keys `user:{id}:*`.
+3. Delete the `Users` row.
+4. Decrement `activation_count` for cells required by the stored preferences. The reference date is `user.updated_at` (date), not "today". A cell at `0` is deleted. A missing cell row raises and the handler returns `500` after the user row is already gone.
+
+Cognito `AdminDeleteUser` runs after that block, including when the `Users` row was already missing. `Username` is the JWT `sub`. If `COGNITO_USER_POOL_ID` is unset, Cognito deletion is skipped and a warning is logged. A Cognito error is also `500`, with the DynamoDB and Redis deletes already applied.
 
 **Response:** `204 No Content`
 
@@ -233,8 +234,12 @@ Retrieve a list of the authenticated user's favorited offers.
 | `limit`  | `20`    | 1–50                                 |
 | `cursor` | —       | Opaque cursor from previous response |
 
-**Response `200`:**
-Same response schema as `GET /v2/offers` (returns a paginated list of favorited offers).
+**Response `200`:** same offer item schema as `GET /v2/offers`. Behavior differs:
+
+- The list is every `UserOffers` row with `favorited = true`, including `available = false`, sorted by `matched_at` descending (ISO string order). There is no `sort`, `country`, or `new` parameter.
+- `total_count` is that favorite count. `feed_version` is `null`.
+- The cursor is base64 JSON `{"offset": <n>}` and does not carry `feed_version`. A bad cursor is `400`.
+- Hydration misses are omitted from the page and are not pruned. They still count toward `total_count`, so a page can be shorter than `limit` while a `next_cursor` exists.
 
 ---
 
@@ -272,7 +277,7 @@ Remove an offer from the authenticated user's favorites.
 
 Single offer detail by cell and offer ID. Used for shared offer lookups (e.g. from the custom `share_url` format `/offer/{cell_id}/{offer_id}`). Does not require the offer to be in the calling user's personal matched feed.
 
-**Behavior**: Fetches directly from the `Offers` table using `(cell_id, offer_id)`. Can be queried by unauthenticated requests (if sharing is public) or authenticated requests.
+**Behavior**: Fetches directly from the `Offers` table using `(cell_id, offer_id)`. The route has no JWT dependency, so it is public. The response includes `referral_url` and the same detail fields as the authenticated detail route, with `favorited` left at its default.
 
 **Response `200`:** Same response schema as `GET /v2/offers/{offer_id}` above.
 

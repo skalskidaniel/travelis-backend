@@ -64,7 +64,7 @@ Canonical attractive offers (post-scoring, deduplicated).
 | `provider`             | String  | `wakacje_pl` or `tui`                                                                                                                                                                                                                                                                                            |
 | `external_offer_id`    | String  | Provider-native ID (e.g. wakacje `offerId`, tui `offerCode`)                                                                                                                                                                                                                                                     |
 | `hotel_name`           | String  |                                                                                                                                                                                                                                                                                                                  |
-| `location`             | String  | Stored in format `Country/Region/City`. **Normalization:** wakacje.pl `placeName` is already in `Country / Region / City` format (normalize separators to `Country/Region/City`); TUI is constructed from `breadcrumbs[0].label` (country) + `breadcrumbs[1].label` (region) + `city` field                      |
+| `location`             | String  | Stored as `Country/Region/City`. `/` inside a segment is replaced with ` - ` so the path stays three parts. wakacje.pl uses the country, region, and city names from the search item. TUI uses `breadcrumbs[0].label`, `breadcrumbs[1].label`, and `breadcrumbs[2].label` when that label exists, otherwise the `city` field. |
 | `departure_airport`    | String  | IATA                                                                                                                                                                                                                                                                                                             |
 | `departure_date`       | String  | ISO date                                                                                                                                                                                                                                                                                                         |
 | `return_date`          | String  | ISO date                                                                                                                                                                                                                                                                                                         |
@@ -74,8 +74,8 @@ Canonical attractive offers (post-scoring, deduplicated).
 | `rating`               | Number  | Canonical 0–5 scale. wakacje.pl ratings (0–10) are divided by 2 during ingest normalization. TUI ratings (0–5, TripAdvisor) are used as-is                                                                                                                                                                       |
 | `review_count`         | Number  |                                                                                                                                                                                                                                                                                                                  |
 | `price_total`          | Number  | PLN                                                                                                                                                                                                                                                                                                              |
-| `price_per_person`     | Number  | PLN; `price_total / (adults + children)`                                                                                                                                                                                                                                                                         |
-| `price_per_day`        | Number  | PLN; `price_total / duration / (adults + children)`                                                                                                                                                                                                                                                              |
+| `price_per_person`     | Number  | PLN, quantized to 0.01. wakacje.pl and the availability price update use `price_total / (adults + children)`. TUI ingest uses `discountPerPersonPrice` when that field is present, and the same division otherwise.                                                                                            |
+| `price_per_day`        | Number  | PLN, quantized to 0.01. wakacje.pl and the availability price update use `price_total / duration / (adults + children)`. TUI ingest uses `discountPerPersonPrice / duration` when that field is present, and the same division otherwise. Stage-1 scoring reads this stored field.                            |
 | `attractiveness_score` | Number  | Stage 2 composite (used for sorting)                                                                                                                                                                                                                                                                             |
 | `referral_url`         | String  | travellead / provider deep link (appends `utm_source=travellead`, `utm_medium=cps`, `utm_campaign`, `a_cid`, `a_aid`)                                                                                                                                                                                            |
 | `room_type`            | String  | Normalized room type used for fingerprinting                                                                                                                                                                                                                                                                     |
@@ -151,16 +151,16 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
    - If they are processed in the same scrape batch, they are collapsed into a single canonical offer based on the lowest price, with both providers' details stored as separate entries in `metadata.sources[]`.
 
 3. **Database-Level Deduplication (Cross-Scrape / Existing Offer in DB)**:
-   - When a scraped offer is being saved, the system checks if an offer with the same `(cell_id, offer_id)` already exists in the `Offers` table.
-   - If it exists, the system **merges** the existing and new items instead of performing a blind overwrite:
-     - The existing item is loaded from DynamoDB.
-     - The `sources` lists from both the existing and new offers are merged and deduplicated (using provider name and native ID).
-     - The top-level winner selection is deterministic and source-aware:
-       - If the existing and new records come from the **same provider**, the **newly scraped record** becomes the winner (fresh snapshot wins).
-       - If they come from **different providers**, the winner is selected by comparing `price_total` between the top-level existing and new records.
-   - The top-level offer fields (`price_total`, `price_per_person`, `price_per_day`, `provider`, `external_offer_id`, `referral_url`) are updated from the selected winner record.
-   - The provider-specific metadata blocks (`metadata.wakacje_pl` and `metadata.tui`) are both preserved if variants from both providers exist in the merged sources list.
-   - The `updated_at` and `scraped_at` timestamps are refreshed, and the merged offer is saved back to DynamoDB.
+   - The coordinator loads the cell, then calls `merge_existing_and_new_offer` for each scored offer whose `(cell_id, offer_id)` is already stored. It does not blindly `PutItem` over the old row.
+   - If `metadata.sources` is empty, one source is synthesized from the top-level `provider`, `external_offer_id`, `price_total`, and, for wakacje.pl, `tour_op_code`.
+   - `merge_sources` drops existing sources for the **newly scraped provider** whose `external_offer_id` is absent from this scrape, then overlays the new sources. The other provider's sources stay. The same `(provider, external_offer_id)` is replaced by the new snapshot.
+   - The cheapest remaining source (`min` of `price_total`) chooses which **whole offer record** supplies the top-level fields, including `price_total`, `price_per_person`, `price_per_day`, `provider`, `external_offer_id`, and `referral_url`. That source's price is not copied onto the other record.
+     - Cheapest source's provider equals the new offer's provider → the new offer wins.
+     - Else if it equals the existing offer's provider → the existing offer wins.
+     - Otherwise the new offer wins.
+   - When every remaining source belongs to the newly scraped provider, the new snapshot wins. That covers the same-provider case; there is no separate overwrite branch.
+   - If any merged source is wakacje.pl, `metadata.wakacje_pl` is the new block when set, otherwise the existing block. The same rule applies to `metadata.tui`.
+   - `price_z_score` comes from the winning record. `scraped_at` and `updated_at` always come from the new offer.
 
 ## Offer metadata
 
@@ -170,10 +170,10 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
 
 | Key             | Type   | Description                                                                             |
 | --------------- | ------ | --------------------------------------------------------------------------------------- |
-| `price_z_score` | Number | Stage-1 price z-score (debugging / attractiveness)                                      |
-| `sources[]`     | List   | Collapsed provider variants after dedup (top-level winner follows DB merge rules above) |
+| `price_z_score` | Number or null | Stage-1 price z-score. `null` when the cell used the small-sample gate. |
+| `sources[]`     | List   | Collapsed variants. Each entry is `provider`, `external_offer_id`, `price_total`, and optional `tour_operator` (wakacje.pl `tour_op_code`). Not a copy of `metadata.wakacje_pl` or `metadata.tui`. |
 
-Each `sources[]` entry mirrors the provider-specific availability block below for that variant (same shape as `metadata.wakacje_pl` or `metadata.tui`).
+`metadata.wakacje_pl` and `metadata.tui` are single blocks for availability checks, not one block per source. Intra-scrape collapse keeps the block from the winning offer, and fills the other provider's block from a sibling in the same fingerprint group when the winner does not have it.
 
 ### `metadata.wakacje_pl` (required for availability checks)
 
@@ -251,7 +251,7 @@ TTL is `SESSION_GAP_MINUTES` × 60 seconds (default 30 minutes). Presence of the
 
 - **Formula**: `score = primary_sort_value + (tie_breaker_fraction)`
 - **Price Sort (`price_total` or `price_per_day`)**: `score = price + (hash_fraction)`
-- **Attractiveness / Rating (`attractiveness_score`, `rating`)**: Since these are normalized values between `[0, 1]`, scale them: `score = (value * 1e8) + (hash_fraction)`.
+- **Attractiveness (`attractiveness_score`) and rating**: `score = (value * 1e8) + hash_fraction`. Attractiveness is in `[0, 1]`. Rating is the stored 0–5 value, so its scores sit on a larger scale. Each sort field has its own ZSET, so the two scales are not compared with each other.
 - **Hash Fraction**: Calculated by taking the first 6 hexadecimal digits of `offer_id`, converting to an integer, and dividing by `1e10` (ensuring it is a small fractional addition `0.0000000` to `0.0016777`). This guarantees distinct scores and stable, deterministic sorting within Redis without relying on client-side sorting.
 
 ### Supported sort fields (v1)
@@ -261,7 +261,7 @@ TTL is `SESSION_GAP_MINUTES` × 60 seconds (default 30 minutes). Presence of the
 | `attractiveness` (default) | `attractiveness_score` desc |
 | `departure_date`           | epoch of departure_date     |
 | `price_total`              | price_total                 |
-| `price_per_day`            | price_per_day_one_person    |
+| `price_per_day`            | `Offers.price_per_day`      |
 | `rating`                   | rating                      |
 | `duration`                 | duration nights             |
 

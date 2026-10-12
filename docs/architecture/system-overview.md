@@ -17,11 +17,19 @@ The codebase is split into two top-level packages under `src/`: `core/` (domain 
 def handler(event: dict, context) -> dict:
     is_http = "requestContext" in event or "httpMethod" in event or "rawPath" in event
 
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
     if is_http:
         return mangum_handler(event, context)
 
-    return asyncio.run(handle_non_http(event, context))
+    return loop.run_until_complete(handle_non_http(event, context))
 ```
+
+`mangum_handler` is built with `lifespan="off"`. The FastAPI lifespan still runs under local `uvicorn`. On Lambda, `get_container` and `handle_non_http` call `container.initialize()`. Do not switch the job path to `asyncio.run()`: that opens and closes a new loop per invoke and detaches aioboto3 futures from the loop the container cached. `initialize()` rebuilds clients only when the running loop identity changes or the previous loop is closed.
 
 ### Event Payload Routing
 
@@ -45,7 +53,7 @@ The scheduled job router (`handle_non_http(event, context)`) dispatches tasks ba
 | `auth`   | `/v2/auth`   | Delete account (Cognito + data cascade) |
 | `health` | `/v2/health` | System health check and telemetry       |
 | `user`   | `/v2/user`   | Preferences, push notification settings |
-| `offers` | `/v2/offers` | Read-only paginated offer feed          |
+| `offers` | `/v2/offers` | Paginated feed, favorites, shared detail |
 | `jobs`   | _(no HTTP)_  | Orchestrate scrape, availability, inactivity sweep |
 
 ### `core/` package
