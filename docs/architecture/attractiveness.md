@@ -30,29 +30,28 @@ Within the comparison group for the current scrape run:
 z = (price_per_day_per_person - mean) / stddev
 ```
 
-_Edge case handling_: If all offers in the comparison group have the same price, `stddev` will be `0.0`. In this case, set `z = 0.0` for all offers to avoid division by zero.
+`stddev` is NumPy's population standard deviation (`np.std`, divisor `N`). If every offer in the cell has the same price, `stddev` is `0.0` and every `z` is set to `0.0`.
 
 ### Gate rule
 
 An offer passes stage 1 if:
 
 ```
-z <= -1.2
+z <= z_threshold
 ```
 
-Offers cheaper than ~88.5% of the comparison group are kept. Configurable via SSM/env (`ATTRACTIVENESS_Z_THRESHOLD`).
+Default `z_threshold` is `-1.2`. Offers at or below the threshold are kept. The scrape job passes `ATTRACTIVENESS_Z_THRESHOLD` (Terraform variable, default `-1.2`) as `StatisticalScorerConfig.z_threshold`. The small-sample size, keep ratio, and stage-2 weights below are the config defaults; the job does not override them.
 
 ### Small sample fallback
 
 If the comparison group has **fewer than 80 offers**, Z-score is unreliable. Fallback:
 
-- Skip Z-score gate.
-- Keep the top **10%** cheapest by `price_per_day_per_person`.
-- **Rounding rule**: Calculate the number of passing offers as `math.ceil(count * 0.1)`, guaranteeing that at least **1** offer always passes the gate (e.g. if there are 5 offers, `math.ceil(0.5) = 1` offer is kept).
+- Skip the Z-score gate. `metadata.price_z_score` is set to `None` for every offer in that run (not `0`).
+- Keep the cheapest `max(1, math.ceil(count * 0.1))` offers by `price_per_day`. Five offers keep 1; 80 or more use the Z-score gate instead.
 
 ## Stage 2 — Composite score
 
-For offers passing stage 1, compute a weighted composite within the same comparison group.
+For offers that passed stage 1, compute a weighted composite. Min and max for each signal are taken from the **full cell sample**, including offers that failed the price gate. Only passers are scored.
 
 ### Signals and weights (v1)
 
@@ -72,9 +71,9 @@ For all three normalization steps, if the denominator evaluates to `0.0` (i.e. `
 attractiveness_score = 0.4 * price_norm + 0.4 * rating_norm + 0.2 * reviews_norm
 ```
 
-All normalized values mapped to `[0, 1]` where 1 is best.
+Each normalized signal is in `[0, 1]` where 1 is best, using the full-sample min and max. The cheapest offer in the cell passes stage 1 and gets `price_norm = 1`. A stored offer is not guaranteed to sit near `0`: offers that failed the price gate still stretch `max_price`, `max_rating`, and `max_log_reviews`, and they are not written. A passer whose rating is below the best rating in the full sample therefore has `rating_norm < 1`.
 
-The composite is **rank-only**, not a second gate. Because each signal is min-max normalized _within the group_, the score is relative — every group always contains offers near `1.0` and near `0.0` regardless of absolute quality, so a fixed absolute cutoff (e.g. `0.6`) would keep an arbitrary, group-size-dependent slice (dropping good offers in strong groups, keeping mediocre ones in weak groups). Persistence is therefore gated by **stage 1** only; the composite drives feed ordering.
+The composite is **rank-only**, not a second gate. `StatisticalOfferScorer.score` returns only stage-1 passers, each with `attractiveness_score` set. The coordinator persists that list. A fixed cutoff on the composite would still be a poor volume cap, because the scale is relative to whoever was scraped into the cell.
 
 If a volume cap is needed later, make it relative (top-N% / percentile) or switch stage 2 to absolute normalization (`rating/5`, log-capped reviews) so a fixed threshold becomes meaningful.
 
@@ -92,7 +91,7 @@ Add in the future versions - to be done later.
 
 ### Weight calibration (future)
 
-v1 uses fixed weights. [AHP](https://en.wikipedia.org/wiki/Analytic_hierarchy_process) may be used offline to derive updated constants; runtime always uses configured values.
+v1 uses the fixed weights in `StatisticalScorerConfig`. [AHP](https://en.wikipedia.org/wiki/Analytic_hierarchy_process) may be used offline to derive new constants. Only `z_threshold` is supplied from the environment today.
 
 ## Persistence rule
 

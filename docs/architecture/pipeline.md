@@ -82,7 +82,9 @@ The worker pool fan-out lives in the orchestrator; per-cell work calls `async` `
 
 See [attractiveness.md](attractiveness.md).
 
-Only offers passing stage 2 are written to `Offers`. If an offer already exists in DynamoDB for the same `(cell_id, offer_id)`, the ingestion process retrieves the existing item, merges the new and old variant sources, updates the primary offer details with the lowest-priced variant, and saves it back (preventing overwrite of other provider data).
+`StatisticalOfferScorer.score` returns stage-1 passers only. Each returned offer already has a stage-2 `attractiveness_score`. The coordinator writes that list. An empty return (nothing passed the price gate) skips the cell: nothing is soft-deleted and `last_scraped_at` is not updated. An offer that fails `Offer` validation is skipped but its id still counts as seen, so absence will not soft-delete it. If every scored offer fails validation, the cell is not written and existing offers are left unchanged.
+
+When `(cell_id, offer_id)` already exists, `merge_existing_and_new_offer` merges `metadata.sources` and keeps one record's top-level fields. The cheapest source chooses which record wins; its price is not copied onto the other record. Rules: [data-model.md](data-model.md#database-level-deduplication-cross-scrape--existing-offer-in-db).
 
 ## User matching (matching service)
 
@@ -182,6 +184,8 @@ The sweep does not delete the user, preferences, `UserOffers`, or offers. `bulk_
 ## Redis feed rebuild and lazy ZSET pagination
 
 ### Lazy ZSET Building
+
+Matching does not build this ZSET. `match_user_offers` increments `feed_version` **once** when the user-offer diff is non-empty: a new row was inserted, a non-favorited row was deleted, or an obsolete favorited row was kept. Favorited rows that no longer match preferences stay until the Offer disappears. If the user has no required cells but still has `UserOffers` rows, those rows are deleted, the version is incremented, and no push is sent. Push runs only when the match inserts rows.
 
 The ZSET is built lazily on the first `GET /v2/offers` request for a specific sort field, order, and filter:
 
