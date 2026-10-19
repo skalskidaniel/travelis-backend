@@ -39,10 +39,11 @@ A global market cell is identified by:
 (country, month, min_stars, board, adults, children)
 ```
 
-- `country` — ISO 3166-1 alpha-2
-- `month` — `YYYY-MM` (derived from user date range)
-  - **Travel Month Expansion**: If a user's date range spans multiple months, they activate cells for all months overlapping that range. If the user's travel dates are not configured ("Any"), they activate cells for the current month and the next 5 months (6 months total).
-- `min_stars`, `board`, `adults`, `children` — from user preferences
+- `country` — code from `country_registry.json` (see [requirements.md](requirements.md#supported-countries))
+- `month` — `YYYY-MM` from `resolve_months_for_range` (see [requirements.md](requirements.md#month-windows)). Open dates activate the reference month and the next 5 months. A start date before the reference date is clipped to that date. A set `date_to` with no `date_from` runs from the reference month through `date_to`'s month. There is no cap on the number of months.
+- `min_stars`, `adults` — from user preferences
+- `board` — one cell per entry in `preferences.board`
+- `children` — `len(preferences.children)` (the count of birth dates)
 
 This same tuple is used for **scraping**, **statistical comparison**, and **scoring**.
 
@@ -108,6 +109,8 @@ On `PATCH /v2/user/preferences`:
 **Target:** the schedule invokes the lambdalith with payload `{ "type": "match_user", "user_id": "..." }` (handled by the dual-entry handler).
 
 **Race handling:** if a PATCH lands while a match is mid-run, the run used near-current preferences and the new PATCH has already scheduled another run in 15s — eventual consistency without an explicit compare-and-swap.
+
+**Scheduler failures:** `schedule_match` needs `LAMBDA_FUNCTION_ARN` and `SCHEDULER_ROLE_ARN`. `PATCH` and lazy user provisioning catch `SchedulerException`, log it, and still return 200 after the `Users` row and cell activations are saved. That user is matched on the next bulk run whose scraped cells overlap `generate_required_cells`.
 
 ### Match logic
 

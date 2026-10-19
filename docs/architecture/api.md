@@ -56,7 +56,7 @@ Return current preferences.
   "date_to": null,
   "adults": 2,
   "children": [],
-  "board": "all-inclusive",
+  "board": ["all-inclusive"],
   "min_stars": 2,
   "min_rating": 0,
   "duration_min": 5,
@@ -64,15 +64,17 @@ Return current preferences.
 }
 ```
 
+`board` is always a list in the response. Limits and the country allow-list are in [requirements.md](requirements.md#user-preferences).
+
 ### `PATCH /v2/user/preferences`
 
 Update preferences. Saves immediately; triggers a debounced match via EventBridge Scheduler.
 
-**Request body:** partial update (same fields as GET).
+**Request body:** partial update (same fields as GET). Unknown fields are rejected (`extra=forbid`). A body that fails `UserPreferencesUpdate` returns **422** with FastAPI's validation `detail` array. A single board string is accepted and stored as a one-element list. Cross-field checks inside the request schema run only when both sides of the pair are present (`date_from`/`date_to`, `duration_min`/`duration_max`, `adults`/`children`). The handler then builds a full `UserPreferences` from the stored document plus the patch. A merge that breaks those rules (occupant cap, date order, duration order) raises inside the handler and returns **500**.
 
 **Response `200`:** full preferences object.
 
-**Side effects:** market cell activation updated; one-time schedule `match-{user_id}` upserted for `at(now + 15s)` (see [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler)).
+**Side effects:** market cell activation updated; one-time schedule `match-{user_id}` upserted for `at(now + 15s)` (see [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler)). If `schedule_match` raises `SchedulerException`, the handler logs a warning and still returns 200. Cells and preferences are already saved. The next overlapping scrape bulk-matches the user.
 
 ### `POST /v2/user/push/enable`
 
