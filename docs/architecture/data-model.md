@@ -80,7 +80,7 @@ Canonical attractive offers (post-scoring, deduplicated).
 | `referral_url`         | String  | travellead / provider deep link (appends `utm_source=travellead`, `utm_medium=cps`, `utm_campaign`, `a_cid`, `a_aid`)                                                                                                                                                                                            |
 | `room_type`            | String  | Normalized room type used for fingerprinting                                                                                                                                                                                                                                                                     |
 | `image_urls`           | List    | Up to 8 image URLs for the offer (provider order preserved). Empty list when none available.                                                                                                                                                                                                                     |
-| `share_url`            | String  | Constructed automatically on save: `f"{settings.FRONTEND_URL}/offer/{cell_id}/{offer_id}"`. Appears in **both** list and detail API responses                                                                                                                                                                    |
+| `share_url`            | String  | Rewritten on validation to `https://wakacje-travelis.pl/offer/{cell_id}/{offer_id}`. Appears in **both** list and detail API responses. See [Referral and share URLs](#referral-and-share-urls).                                                                                                                |
 | `scraped_at`           | String  |                                                                                                                                                                                                                                                                                                                  |
 | `updated_at`           | String  |                                                                                                                                                                                                                                                                                                                  |
 | `available`            | Boolean | Set to `true` on ingest. When sold (availability job or scrape absence), set to `false` with a 14-day TTL rather than hard-deleted. The availability job then triggers `MatchingService.bulk_match_users` on affected cells so non-favorited matches leave the feed; favorited rows stay until Offer TTL expiry. |
@@ -95,6 +95,17 @@ Because there are **no GSIs** on this table, searching for an offer by `offer_id
 > Hot-partition note: very popular cells (e.g. Greece / 4★ / AI / 2 adults) concentrate writes on one partition. At 4×-daily write volume with spread reads this is acceptable; revisit if throttling appears.
 
 TTL: `ttl` attribute lets DynamoDB expire rows — departure date while bookable, or 14 days after soft-delete when sold.
+
+### Referral and share URLs
+
+`RawOffer` and `Offer` rewrite `referral_url` in a field validator (`append_referral_url`):
+
+1. Split the query on `&`.
+2. Drop any segment whose key is `utm_source`, `utm_medium`, `utm_campaign`, `a_cid`, or `a_aid`.
+3. Keep a segment that has no `=` verbatim. wakacje.pl links put the offer selector in the query this way: `od-{departure_date},{duration}-dni,{board},{departure_slug},{occupancy}`.
+4. Append `utm_source=travellead`, `utm_medium=cps`, `utm_campaign=2933-t-HolidayPicker`, `a_cid=11111111`, and `a_aid=2933`.
+
+`share_url` is then set to `https://wakacje-travelis.pl/offer/{cell_id}/{offer_id}` (`SHARE_URL_PREFIX` in `core/models/offer.py`). A value that does not start with that prefix fails validation. `FRONTEND_URL` is the Cognito callback origin and the API Gateway CORS origin.
 
 ### `UserOffers`
 

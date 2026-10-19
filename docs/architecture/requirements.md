@@ -51,15 +51,15 @@ CPU-bound scoring (numpy) runs via `asyncio.to_thread` so it never blocks the ev
 
 Users can configure:
 
-| #   | Field              | Constraints                                                                                  |
-| --- | ------------------ | -------------------------------------------------------------------------------------------- |
-| 1   | Countries          | Unlimited selection                                                                          |
-| 2   | Departure airports | Unlimited selection (IATA codes; represented as an empty list `[]` for "Any")                |
-| 3   | Travel dates       | Date range (as ISO 8601 strings `YYYY-MM-DD`)                                                |
-| 4   | Occupancy          | Adults + children (children require birth dates formatted as `YYYY-MM-DD`). Single room only |
-| 5   | Board type         | `all-inclusive`, `full-board`, `half-board`, `bed-and-breakfast`, `none`                     |
-| 6   | Hotel standard     | Minimum stars (2–5) and minimum rating (0–5)                                                 |
-| 7   | Stay length        | Minimum and maximum nights (the scraper queries `2–28` nights; matching filters user exact)  |
+| #   | Field              | Constraints                                                                                                                                          |
+| --- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Countries          | Up to 20 codes from [`country_registry.json`](../../src/core/providers/resources/country_registry.json) `codes`. An empty list activates no cells.   |
+| 2   | Departure airports | Up to 17 codes matching `^[A-Z]{3}$`. Empty list `[]` means any airport at match time. The code is stored even when no provider catalog emits it. |
+| 3   | Travel dates       | Optional `YYYY-MM-DD`. When both are set, `date_to` is on or after `date_from`. See [month windows](#month-windows).                                 |
+| 4   | Occupancy          | `adults` 1–6. `children` is up to 5 birth dates (`YYYY-MM-DD`). `adults + len(children)` is at most 8. Single room only.                             |
+| 5   | Board type         | One or more of `all-inclusive`, `full-board`, `half-board`, `bed-and-breakfast`, `none`. A JSON string is stored as a one-element list.              |
+| 6   | Hotel standard     | `min_stars` 2–5. `min_rating` 0–5 with one decimal place.                                                                                            |
+| 7   | Stay length        | `duration_min` ≥ 2 (default 5). `duration_max` is null or ≥ `duration_min`. The scraper queries 2–28 nights; matching applies the user's bounds.    |
 
 ### Default preferences
 
@@ -69,7 +69,7 @@ Users can configure:
 | Departure airports | Any                                 | Represented as empty list `[]`                       |
 | Travel dates       | Any                                 | Slid window: current month + next 5 months (6 total) |
 | Occupancy          | 2 adults, 0 children                | `adults = 2`, `children = []`                        |
-| Board type         | All-inclusive                       | `"all-inclusive"`                                    |
+| Board type         | All-inclusive                       | `["all-inclusive"]`                                  |
 | Hotel stars        | 2                                   | `min_stars = 2, min_rating = 0`                      |
 | Stay length        | Minimum 5 nights                    | `duration_min = 5, duration_max = null`              |
 
@@ -87,9 +87,30 @@ No polled `refresh_after` field and no sweeper job.
 
 See [pipeline.md](pipeline.md) for implementation details.
 
+`PATCH /v2/user/preferences` and first-time provisioning still return `200` when `schedule_match` raises `SchedulerException` (missing `LAMBDA_FUNCTION_ARN` or `SCHEDULER_ROLE_ARN`, or an EventBridge create/update error). Preferences and cell counts are already saved. The next scrape whose cells overlap this user runs `bulk_match_users`.
+
+### Month windows
+
+`resolve_months_for_range` (`core/services/activation.py`) turns dates into `YYYY-MM` buckets. The reference date is today unless a caller passes one (matching's self-heal uses that).
+
+| `date_from` | `date_to` | Months activated |
+| ----------- | --------- | ---------------- |
+| null        | null      | Reference month and the next 5 months (6 total). |
+| set         | null      | Start month through start month + 5. A `date_from` before the reference date is clipped to the reference date first. |
+| null        | set       | Reference month through `date_to`'s month. |
+| set         | set       | Clipped start month through `date_to`'s month, inclusive. |
+
+A `date_to` before the clipped start still activates that start month. A `date_to` many months ahead activates every month in the span. Each month is crossed with every selected country and every selected board.
+
+Example with reference date `2026-06-15` (covered by `tests/unit/core/services/test_activation.py`): open dates yield `2026-06` through `2026-11`; `date_from=2026-05-01` and `date_to=2026-07-10` yield `2026-06` and `2026-07`; `date_from=2026-08-10` and `date_to` null yields `2026-08` through `2027-01`.
+
+`generate_required_cells` emits one `MarketCell` per `(country, month, board, min_stars, adults, len(children))`. The cell stores the child **count**. Birth dates are applied later, during matching.
+
+A default user (5 countries, open dates, one board) activates 30 cells. Selecting all 5 boards multiplies that by 5.
+
 ## Supported departure airports
 
-Stored as IATA codes:
+Preference validation accepts any 3-letter uppercase IATA code. Ingest keeps an offer only when that code is in the provider catalog below. Matching then compares the user's list to `offer.departure_airport`.
 
 | City         | IATA Code | Notes |
 | ------------ | --------- | ----- |
@@ -106,16 +127,61 @@ Stored as IATA codes:
 | Poznań       | POZ       |       |
 | Rzeszów      | RZE       |       |
 | Szczecin     | SZZ       |       |
-| Warsaw       | WAW/WMI   |       |
-| Warsaw-Radom | RDO       |       |
-| Wrocław      | WRO       |       |
-| Zielona Góra | IEG       |
+| Warsaw        | WAW       |       |
+| Warsaw-Modlin | WMI       |       |
+| Warsaw-Radom  | RDO       |       |
+| Wrocław       | WRO       |       |
+| Zielona Góra  | IEG       |       |
+
+wakacje.pl `departurePlaces` contains every code in this table. tui.pl `departureAirports` omits `BER`, `DRS`, `IEG`, `OSR`, and `SZY`, so those airports appear only on wakacje.pl offers.
 
 ## Supported countries
 
-Stored as ISO 3166-1 alpha-2; regions as ISO 3166-2 where applicable.
+`UserPreferences` accepts only keys of `codes` in [`country_registry.json`](../../src/core/providers/resources/country_registry.json). `IC` (Canary Islands) and `UK` (United Kingdom) are registry codes.
 
-Albania (AL), Andorra (AD), Aruba (AW), Austria (AT), Bulgaria (BG), Croatia (HR), Curaçao (CW), Cyprus (CY), Montenegro (ME), Czech Republic (CZ), Denmark (DK), Dominican Republic (DO), Egypt (EG), France (FR), Greece (GR), Spain (ES), Jamaica (JM), Qatar (QA), Kenya (KE), Cuba (CU), Maldives (MV), Malta (MT), Morocco (MA), Mauritius (MU), Mexico (MX), Oman (OM), Portugal (PT), Senegal (SN), Seychelles (SC), Singapore (SG), Sri Lanka (LK), United States (US), Thailand (TH), Tunisia (TN), Turkey (TR), Hungary (HU), United Kingdom (GB), Vietnam (VN), Italy (IT), Cape Verde (CV), United Arab Emirates (AE), Switzerland (CH), Indonesia (ID), Tanzania (TZ).
+| Code | Name | wakacje.pl search | tui.pl search |
+| ---- | ---- | ----------------- | ------------- |
+| AE | United Arab Emirates | no | yes |
+| AL | Albania | yes | yes |
+| AT | Austria | yes | yes |
+| BG | Bulgaria | yes | yes |
+| CV | Cape Verde | yes | yes |
+| CW | Curaçao | yes | yes |
+| CY | Cyprus | yes | yes |
+| CZ | Czech Republic | yes | yes |
+| DE | Germany | yes | yes |
+| DK | Denmark | yes | yes |
+| DO | Dominican Republic | yes | yes |
+| EG | Egypt | yes | yes |
+| ES | Spain | yes | yes |
+| FR | France | yes | yes |
+| GR | Greece | yes | yes |
+| HR | Croatia | yes | yes |
+| IC | Canary Islands | no | yes |
+| ID | Indonesia | yes | yes |
+| IT | Italy | yes | yes |
+| JM | Jamaica | yes | yes |
+| KE | Kenya | yes | yes |
+| LK | Sri Lanka | yes | yes |
+| MA | Morocco | yes | yes |
+| ME | Montenegro | yes | yes |
+| MT | Malta | yes | yes |
+| MU | Mauritius | yes | yes |
+| MV | Maldives | yes | yes |
+| MX | Mexico | yes | yes |
+| OM | Oman | no | yes |
+| PT | Portugal | yes | yes |
+| SC | Seychelles | yes | yes |
+| SG | Singapore | yes | yes |
+| SN | Senegal | yes | yes |
+| TH | Thailand | yes | yes |
+| TN | Tunisia | yes | yes |
+| TR | Turkey | yes | yes |
+| UK | United Kingdom | no | yes |
+| US | United States | yes | yes |
+| VN | Vietnam | yes | yes |
+
+`AE`, `IC`, `OM`, and `UK` are absent from wakacje.pl `countryId`. `WakacjePlProvider.search` raises `CountryNotFoundException`. The coordinator retries that provider 3 times, logs the failure, and still ingests TUI results for the cell.
 
 ## Offers
 
