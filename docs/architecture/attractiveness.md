@@ -96,9 +96,11 @@ v1 uses fixed weights. [AHP](https://en.wikipedia.org/wiki/Analytic_hierarchy_pr
 
 ## Persistence rule
 
-Only **stage-1 passers** (the price gate) are written to the `Offers` table. There is **no per-cell quantity cap** — all qualifying attractive offers are stored. Stage 2 only assigns the ranking score.
+Only **stage-1 passers** (the price gate) are written to the `Offers` table. Stage 2 only assigns the ranking score. The scorer itself has no per-cell quantity cap; the search adapters cap how many raw offers reach it (wakacje.pl at most 29 pages of 500, TUI at most 30 pages of 500). See [pipeline.md](pipeline.md#provider-search-bounds).
 
 `attractiveness_score` is stored on the offer for sorting; `price_z_score` is kept under the offer's `metadata` map for debugging.
+
+A later scrape that persists the cell soft-deletes stored offers missing from that run's stage-1 set. In the example below, if offer B was already in `Offers`, this run marks it sold (`available = false`, 14-day TTL) even though the provider returned it. See [pipeline.md](pipeline.md#absence-and-skipped-cells).
 
 ## Worked example
 

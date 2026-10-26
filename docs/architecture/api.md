@@ -120,7 +120,7 @@ Paginated, sortable offer list. Served from Redis (lazy sort ZSET) with DynamoDB
 
 `country` and `new=true` cannot be combined (`400`, detail `Cannot combine country and new filters`). An unsupported `country` is also `400`.
 
-`country` filters on `MarketCells.country` (the cell's ISO code), not the display name in `offers[].country` (the first segment of `location`, such as `Greece`).
+`country` filters on `MarketCells.country` (the cell's ISO code), not the display name in `offers[].country` (the first segment of `location`, such as `Greece`). The lookup is the current cell row. After `activation_count` hits 0 and the row is deleted, that offer is omitted from the country page. It stays on the unfiltered feed until matching removes the `UserOffers` row.
 
 `new=true` keeps offers whose `UserOffers.matched_at` is greater than or equal to `Users.new_since`. A missing user record uses the request time as the cutoff, which returns an empty page. See [pipeline.md](pipeline.md#user-activity-and-inactivity).
 
@@ -159,7 +159,7 @@ Sold offers (`available = false`) are excluded from this feed under every filter
       "favorited": false
     }
   ],
-  "next_cursor": "eyJzY29yZSI6...",
+  "next_cursor": "eyJvZmZzZXQiOiAyMCwgImZlZWRfdmVyc2lvbiI6IDQyfQ==",
   "feed_version": 42,
   "total_count": 125
 }

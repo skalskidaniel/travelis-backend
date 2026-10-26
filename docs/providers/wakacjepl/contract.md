@@ -21,7 +21,7 @@ Wakacje.pl JSON APIs use a **two-layer** status model. Always inspect the JSON b
 - Most bad requests: **HTTP `200`**, `success: false`, `error.status: 400`.
 - Structural breakage (e.g. removing `params.query`): occasionally **HTTP `500`** with no parseable JSON envelope.
 
-**Availability** can return **HTTP `200`**, `success: false`, `msg: "checkOfferAvailability"`, `data: null` with **no** nested `error.status` — e.g. stale `offerHash`, sold-out variant, or upstream operator error. TraveLis treats this as `ProviderAPIException` when `success` is `false`.
+**Availability** (`GET /v2/api/checkOfferAvailability`) can return **HTTP `200`**, `success: false`, `msg: "checkOfferAvailability"`, `data: null` with **no** nested `error.status` — e.g. stale `offerHash`, sold-out variant, or upstream operator error. The adapter does not call that GET. On the calculator POST, `success: false` raises `ProviderAPIException` (see [Offer availability](#offer-availability)).
 
 Example (search, invalid `content-type`):
 
@@ -382,10 +382,11 @@ Combined format:
 
 ### Pipeline (no HTML scrape at check time)
 
-If ingest persisted [metadata.wakacje_pl](../../architecture/data-model.md#metadatawakacje_pl-required-for-availability-checks), the daily job can check availability using only HTTP JSON APIs:
+If ingest persisted [metadata.wakacje_pl](../../architecture/data-model.md#metadatawakacje_pl-required-for-availability-checks), the daily job checks availability with one HTTP JSON call:
 
-1. **Resolve room variant** — `POST /v2/api/getCalculatorOfferVariants/{offerId}`
-2. **Live check** — `GET /v2/api/checkOfferAvailability` (only when step 1 returns variants)
+1. **Resolve room variant** — `POST /v2/api/getCalculatorOfferVariants/{offerId}`. A variant with an `id` means available. An empty `offers` list, or a variant without `id`, means unavailable.
+
+`GET /v2/api/checkOfferAvailability` is documented below from the contract probe. `WakacjePlProvider.check_availability` does not call it.
 
 Canonical offer columns supply `offerId` (`external_offer_id`), dates, duration, board, and occupancy. `metadata.wakacje_pl` supplies geo/operator/airport IDs.
 
@@ -461,9 +462,11 @@ referer: https://www.wakacje.pl/oferty/...  # metadata.wakacje_pl.offer_page_pat
 ```
 
 - **`data.offers: []`** — exact configuration not sold (same as on-site _“Oferta w tej konfiguracji jest niedostępna”_). Treat as **unavailable**; do not call step 2.
-- Variant `id` is the long **`offerHash`** required by step 2. The short search `offerHash` (e.g. `GRCS:6935`) is not valid here.
+- Variant `id` is the long room id. The adapter treats a non-empty `id` as available and stops. The short search `offerHash` (e.g. `GRCS:6935`) is not valid on this request.
 
-### Step 2 — Live availability
+### Step 2 — Live availability (provider API, not called by the adapter)
+
+Probed endpoint. The daily job does not call it.
 
 - Method: `GET`
 - URL: `https://www.wakacje.pl/v2/api/checkOfferAvailability`

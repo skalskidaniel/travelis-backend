@@ -195,13 +195,13 @@ Persisted at **ingest** from the wakacje.pl search response (and airport catalog
 
 **Not stored** — resolved at check time:
 
-- `offer_hash` (long room variant id): returned by `POST /v2/api/getCalculatorOfferVariants/{offerId}` for the stored configuration. The short `offerHash` from search (e.g. `GRCS:6935`) is not usable for live checks.
+- Calculator variant `id` (long room variant id): returned by `POST /v2/api/getCalculatorOfferVariants/{offerId}` for the stored configuration. `WakacjePlProvider.check_availability` treats a variant with that `id` as available. The short `offerHash` from search (e.g. `GRCS:6935`) is not usable for that call. The id is not sent to `checkOfferAvailability`; the adapter does not call that endpoint.
 
 **Availability semantics** (see [pipeline.md](pipeline.md#availability-check-jobsavailability)):
 
 1. `getCalculatorOfferVariants` with stored params + canonical dates/occupancy.
-2. `offers: []` → configuration unavailable (`available = false`); skip step 3.
-3. Otherwise `checkOfferAvailability` with the chosen variant's `id` as `offerHash`.
+2. `offers: []`, or a first variant with no `id`, means this configuration is unavailable.
+3. A first variant with an `id` means available. `GET /v2/api/checkOfferAvailability` is not part of this check.
 
 Canonical columns already cover: `external_offer_id` (= wakacje `offerId`), `departure_date`, `return_date`, `duration`, normalized `board`, `departure_airport` (IATA, feed-facing), and occupancy from the scrape cell (`adults`, `children`).
 
