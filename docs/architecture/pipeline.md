@@ -63,11 +63,38 @@ Triggered 4× daily by EventBridge (`cron(0 6,10,14,18 * * ? *)`, UTC). A contin
 1. Scan the `MarketCells` table (all rows are active by definition — a cell exists only when `activation_count > 0`). On continuation, load only the ids in `remaining_cells`.
 2. Skip a cell whose month is entirely in the past. `month_date_bounds(cell.month)` is the first and last calendar day of `YYYY-MM`; both must be before today. Skipped cells are not scraped, do not update `last_scraped_at`, and do not soft-delete offers by absence. They stay in `MarketCells` until activation drops to 0.
 3. Schedule one async scrape task per remaining cell with bounded concurrency (an `asyncio` worker pool of up to 10 workers).
-4. Each task calls wakacje.pl and tui.pl APIs (see [providers/](../providers/index.md)). Each provider search retries up to 3 times with exponential backoff. A provider failure is logged and the other provider's results are still ingested.
-5. Pass raw results to normalization → scoring → `Offers` table. If every scored offer fails validation, skip persistence for that cell so existing offers are not marked unavailable by an empty result set.
+4. Each task calls wakacje.pl and tui.pl (see [Provider search bounds](#provider-search-bounds)). A provider failure is logged and the other provider's results are still ingested.
+5. Pass raw results through normalization and stage-1 scoring, then persist. Which rows are soft-deleted, and which cells are left untouched, is in [Absence and skipped cells](#absence-and-skipped-cells).
 6. After the pool finishes, bulk-match users whose preferences overlap the cells scraped in **this** invocation.
 
 The worker pool fan-out lives in the orchestrator; per-cell work calls `async` `core` functions, and CPU-bound scoring is offloaded via `asyncio.to_thread`. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
+
+## Provider search bounds
+
+Both adapters share the `httpx.AsyncClient` created in `Container` (`timeout=15.0` seconds). TUI search passes `timeout=30.0` on that POST. Wakacje.pl search, and both providers' availability calls, use the 15-second client timeout.
+
+| Adapter    | Page size                         | Loop                                                                                          | Hard stop                                      |
+| ---------- | --------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| wakacje.pl | 500 (`limit`)                     | Page 1 upward. A page shorter than 500 ends the loop.                                         | `page < 30`, so at most pages 1–29 (14,500 rows) |
+| tui.pl     | 500 (`pageSize`)                  | Page 0 upward. Stops once `page >= pagination.pagesCount`.                                    | `page < 30`, so at most 30 pages (15,000 rows) |
+
+The request also sends wakacje.pl `sort: 13`, `order: 1`, and TUI `sorting: qualifier42DESC`. Rows past the hard stop never reach ingest. Contracts: [providers/](../providers/index.md).
+
+Per item, a Pydantic `ValidationError` is skipped and the page continues. Wakacje.pl mapping also drops an item whose departure date is outside the cell month, whose country id disagrees with the cell, or whose board code is unknown. TUI mapping drops an offer whose departure airport is missing from `tui_filters.json` → `departureAirports`.
+
+`CountryNotFoundException`, `BoardTypeNotSupportedException`, and `MinStarsNotSupportedException` are raised before any HTTP call. `search_with_retry` still treats them as retryable failures: 3 attempts, sleeping `0.2 * 2^attempt` seconds after attempt 1 (0.4s) and attempt 2 (0.8s). The two searches run together with `return_exceptions=True`, so one provider's exception leaves the other's list intact.
+
+## Absence and skipped cells
+
+`seen_offer_ids` is the `offer_id` of every **stage-1** result (`StatisticalOfferScorer.score`), including scored rows that later fail `Offer` validation. Those invalid rows are logged and omitted from the write. An existing row with the same id is left in place.
+
+When at least one stage-1 row validates, the cell is persisted: new and merged rows are written, every available offer outside the seen set is soft-deleted (`available = false`, `ttl` = now + 14 days), and `last_scraped_at` is updated. That removes:
+
+- Offers the provider still returned that failed the price gate or the small-sample cutoff.
+- Offers that only the failed provider would have returned, when the other provider still produced a valid stage-1 row.
+- Offers past the page stop, dropped while mapping, or removed by the TUI airport list.
+
+The cell is left unchanged — no soft-delete and no `last_scraped_at` write — when the month is entirely in the past, both providers return an empty list or both raise, ingest collapses to nothing, stage 1 returns nothing, or every stage-1 row fails `Offer` validation.
 
 ## Scrape → normalize
 
@@ -82,7 +109,7 @@ The worker pool fan-out lives in the orchestrator; per-cell work calls `async` `
 
 See [attractiveness.md](attractiveness.md).
 
-Only offers passing stage 2 are written to `Offers`. If an offer already exists in DynamoDB for the same `(cell_id, offer_id)`, the ingestion process retrieves the existing item, merges the new and old variant sources, updates the primary offer details with the lowest-priced variant, and saves it back (preventing overwrite of other provider data).
+Only stage-1 passers are written to `Offers`. Stage 2 assigns `attractiveness_score` on those rows. If an offer already exists in DynamoDB for the same `(cell_id, offer_id)`, the ingestion process retrieves the existing item, merges the new and old variant sources, updates the primary offer details with the lowest-priced variant, and saves it back (preventing overwrite of other provider data). A stored offer that misses this run's stage-1 set is soft-deleted, as described in [Absence and skipped cells](#absence-and-skipped-cells).
 
 ## User matching (matching service)
 
@@ -134,20 +161,24 @@ For each claimed user:
 
 Triggered 4× daily.
 
-Baseline is **availability-by-absence**, which works for both providers without a per-offer endpoint: an offer no longer returned by the latest scrape of its cell is marked `available = false` and given a 14-day DynamoDB TTL; DynamoDB eventually removes the row.
+Baseline is **availability-by-absence** during scrape: an available offer whose `offer_id` is outside this run's stage-1 seen set is marked `available = false` and given a 14-day DynamoDB TTL (see [Absence and skipped cells](#absence-and-skipped-cells)). DynamoDB eventually removes the row.
 
-Optional refinement for fresher availability _between_ scrapes (requires provider metadata persisted at ingest — see [data-model.md](data-model.md#offer-metadata)):
+Optional refinement for fresher availability between scrapes (requires provider metadata persisted at ingest — see [data-model.md](data-model.md#offer-metadata)):
 
-- **tui.pl:** `GET /api/www/hotel-cards/offers?offerCode={metadata.tui.offer_code}` (returns `OK` / `UNAVAILABLE`).
-- **wakacje.pl:** two-step JSON API using stored `metadata.wakacje_pl` + canonical offer fields (no offer-page HTML fetch):
-  1. `POST /v2/api/getCalculatorOfferVariants/{external_offer_id}` — empty `offers` ⇒ unavailable for this configuration.
-  2. `GET /v2/api/checkOfferAvailability` — `data.availability` + `data.status === "OK"`.
+- **tui.pl:** `GET /api/www/hotel-cards/offers?offerCode={metadata.tui.offer_code}`. `status == "OK"` means still available. Any other status is unavailable.
+- **wakacje.pl:** `POST /v2/api/getCalculatorOfferVariants/{external_offer_id}` with stored `metadata.wakacje_pl` and the canonical dates and occupancy. The first variant is the only one read. An `id` on that variant means available. An empty `offers` list, a first variant with no `id`, or a calculator `ProviderAPIException` whose message contains `calculator` or `400` means unavailable. The adapter does not call `GET /v2/api/checkOfferAvailability`.
 
 Contract details: [providers/wakacjepl/contract.md](../providers/wakacjepl/contract.md#offer-availability). Prototype: `notebooks/wakacje_pl_availability.ipynb`.
 
 If the check determines that the offer is no longer available, the offer is **soft-deleted**: `available = false` and `ttl` set to now + 14 days (DynamoDB TTL). The job then triggers a bulk user re-matching run (`MatchingService.bulk_match_users`) on the affected cells so non-favorited matches leave the feed immediately; favorited `UserOffers` rows are retained until the Offer TTL expires. Otherwise, if the offer is still available but its price has changed, `price_total` is replaced and `price_per_person` / `price_per_day` are recomputed as `price_total / (adults + children)` and `price_total / duration / (adults + children)` (quantized to 0.01 PLN).
 
-The job only checks offers that are still `available` and whose `cell_id` is in the current `MarketCells` scan. A provider error on one offer is logged and that offer is left unchanged.
+The job only checks offers that are still `available` and whose `cell_id` is in the current `MarketCells` scan. It reaches that set by scanning `MarketCells`, then scanning the whole `Offers` table. Checks share one `asyncio.Semaphore(15)`.
+
+`run_availability_job` accepts a Lambda `context` and does not read it, so this job has no 15-second self-continuation. `put_batch` runs after every check has finished. An invocation that ends during the checks persists none of those results and does not bulk-match.
+
+Each offer is checked on `offer.provider` (the stored winning source). Other `metadata.sources` entries are not queried. A provider exception is logged and that offer stays as stored. On wakacje.pl, a `ProviderAPIException` whose message contains `calculator` or `400` is treated as unavailable by `check_availability`, and `check_price` returns the stored `price_total`. TUI `check_availability` and `check_price` each GET hotel-card details. Wakacje.pl `check_availability` and `check_price` each POST the calculator.
+
+A live offer with a new `price_total` updates `price_per_person`, `price_per_day` (quantized to 0.01 PLN), and `updated_at`. `attractiveness_score` stays at the last scrape value. `bulk_match_users` runs only for cells that had a soft-delete. A price-only change leaves `feed_version` as it is. The next `GET /v2/offers` hydrates price fields from DynamoDB. Sort order stays on the cached ZSET until that key expires (24 hours) or a membership change increments `feed_version`. After the ZSET is rebuilt, price sorts use the new price; the attractiveness sort still uses the stored composite until a later scrape re-scores the offer.
 
 ## User activity and inactivity
 
