@@ -78,6 +78,12 @@ The worker pool fan-out lives in the orchestrator; per-cell work calls `async` `
 5. Attach `cell_id` from the scrape context.
 6. Forward to scoring.
 
+### Rows dropped before persistence
+
+Each adapter skips a search item when required fields are missing, the departure date is outside the cell month, the country does not match the cell, or the board code is unknown. A `ValidationError` on `RawOffer` skips that item and the page continues. See [wakacje.pl](../providers/wakacjepl/contract.md#notes--gotchas) and [TUI](../providers/tui/contract.md#other-fields).
+
+After scoring, `Offer` construction applies the checks in [data-model.md](data-model.md#offer-construction-checks). A failure is logged and that scored row is not written. TUI's stored duration is the date span, so the ±1 night check passes for rows that mapped. wakacje.pl `durationNights` can fail that check.
+
 ## Scoring (scoring service)
 
 See [attractiveness.md](attractiveness.md).

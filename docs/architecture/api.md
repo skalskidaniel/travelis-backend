@@ -206,19 +206,21 @@ Single offer detail for an offer in the user's feed.
       "provider": "wakacje_pl",
       "external_offer_id": "916232",
       "price_total": 6148,
-      "tour_operator": "Grecos"
+      "tour_operator": "GRCS"
     },
     {
       "provider": "wakacje_pl",
       "external_offer_id": "916240",
       "price_total": 6350,
-      "tour_operator": "Itaka"
+      "tour_operator": null
     }
   ],
   "scraped_at": "2026-04-20T06:00:00Z",
   "updated_at": "2026-04-20T06:00:00Z"
 }
 ```
+
+`sources[].tour_operator` is wakacje.pl `tourOpCode` when the search item has one. TUI sources and wakacje.pl rows without `tourOpCode` send `null`.
 
 **Response `404`:** offer not in user's feed or does not exist.
 
