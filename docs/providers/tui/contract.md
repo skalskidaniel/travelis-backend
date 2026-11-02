@@ -287,7 +287,7 @@ This means a TUI result can have a valid `departureDate` but still have a `retur
 **Required behavior for TUI ingest/matching:** after receiving offers, enforce that the offer's `departure_date` falls within the cell's departure month window. We do **not** restrict the `return_date` to the departure month, as a package departing near the end of the month will naturally return in the following month (up to the maximum package duration of 28 nights).
 
 - `offer.departure_date` must be within `[departure_from, departure_to]` computed from `cell.month`.
-- `offer.return_date` has no upper month boundary enforced, but trip `duration` must be positive.
+- `offer.return_date` has no upper month boundary enforced. Stored `duration` is `(return_date - departure_date).days`. A span under 1 night is discarded.
 
 ### Destination Codes / Geo Catalog
 
@@ -337,11 +337,10 @@ When regenerating `tui_filters.json`, generated `destinationsCodes` keys must be
 ### Other Fields
 
 - `offerUrl` must be prefixed with `https://www.tui.pl` (e.g., `https://www.tui.pl/wypoczynek/...`).
-- Location in the application is normalized to `Country/Region/City`. It is derived from `breadcrumbs[0].label` (country), `breadcrumbs[1].label` (region), and either `breadcrumbs[2].label` (city) if present or the fallback `city` field. All slashes (`/`) in labels are normalized to `-`.
-- Country label consistency caveat: for some destination codes, TUI can return mixed top-level country labels in one result set when the destination/departure combination maps to cross-border inventory. Observed and accepted mixed pairs:
-  - `Portugalia` + `Hiszpania`
-  - `Hiszpania` + `Wyspy Kanaryjskie`
-    Any other mixed top-level country-label combination should be treated as unexpected and investigated.
+- Location is `Country/Region/City`. Country is `breadcrumbs[0].label`, region is `breadcrumbs[1].label`, and city is `breadcrumbs[2].label` when that label exists, otherwise the `city` field. A `/` inside a label is replaced with ` - ` (space, hyphen, space) so the path stays three segments. Fewer than two breadcrumbs, or a missing `roomName` and `roomCode`, drops the row.
+- The country label must equal `country_registry.json` `codes[cell.country]` exactly (`IC` expects `Wyspy Kanaryjskie`, `ES` expects `Hiszpania`, `PT` expects `Portugalia`). Any other label is discarded, including cross-border rows in the same response (a Canary Islands cell does not keep a row labeled `Hiszpania`).
+- `price_total` is `Decimal(str(discountFullPrice))` with no extra rounding. `PricePLN` allows at most two decimal places, so a longer fractional part fails `RawOffer` validation and that item is skipped. `price_per_person` uses `discountPerPersonPrice` when present, otherwise `price_total / (adults + children)`, quantized to 0.01. `price_per_day` is that per-person price divided by `duration`, also quantized to 0.01.
+- `stars` is `int(hotelStandard)` and must land in 1–5. `tripAdvisorRating` must already be a 0–5 value with at most one decimal place. `ValidationError` skips the item.
 
 ### Offer Availability
 

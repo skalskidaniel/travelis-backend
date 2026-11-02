@@ -308,6 +308,7 @@ Observation from the UI (selecting "Grecja → Kreta"):
 
 - wakacje.pl represents hotel standard as numbers multiplied by 10 (e.g., 3 stars = 30, 4 stars = 40, 5 stars = 50).
 - In search parameters, pass `minCategory = min_stars * 10` and `maxCategory = 50`.
+- Stored `stars` is `category // 10` when `category >= 10`, otherwise `int(category)`. A `min_stars` 4 cell therefore keeps both 4-star and 5-star hotels (`40`–`50`). Matching does not apply `min_stars` again; the cell is the floor.
 
 ### Rating Normalization
 
@@ -348,6 +349,8 @@ To ensure that package tours departing near the end of a month (e.g., June 28th)
 2. **In-Memory Filtering**:
    - Because the extended `arrivalDate` allows the API to return tours that both depart and return in the following month (e.g. departing July 3rd), the adapter's mapping code enforces cell month limits on the departure date.
    - Any raw offer where `offer.departure_date` does not fall strictly within `[departure_from, departure_to]` is discarded.
+   - Any raw offer whose `place.country.id` is not `wakacjepl_filters.json` `countryId` for the cell is discarded.
+   - A `ValidationError` on `RawOffer` (stars outside 1–5, rating outside 0–5 with one decimal, a price with more than two decimal places, or a location that is not three segments) skips that item. The rest of the page is kept.
 
 ### Referral URL (Deep Link) Construction
 
@@ -374,9 +377,8 @@ Combined format:
 - Deduplication involves:
   - Grouping offers by the same fingerprint.
   - Keeping the variant with the lowest `price`.
-- Storing remaining variants in `metadata.sources[]` for debugging/history purposes. Each source entry includes a full `metadata.wakacje_pl` block (see below) so availability can be re-checked for any collapsed variant.
-- Composite key for unique provider-level variant identification: `offerHash + departureDate + returnDate + departurePlace + serviceDesc + roomType`.
-- Semantic fingerprint for `offer_id` is computed as described in [data-model.md](../../architecture/data-model.md#semantic-fingerprint).
+- Storing remaining variants in `metadata.sources[]`. Each entry is `provider`, `external_offer_id`, `price_total`, and optional `tour_operator` (wakacje.pl `tourOpCode`). It is not a copy of `metadata.wakacje_pl`.
+- The grouping key is the semantic fingerprint in [data-model.md](../../architecture/data-model.md#semantic-fingerprint). Search `offerHash` (for example `GRCS:6935`) is not that key.
 
 ## Offer availability
 

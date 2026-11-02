@@ -64,7 +64,7 @@ Canonical attractive offers (post-scoring, deduplicated).
 | `provider`             | String  | `wakacje_pl` or `tui`                                                                                                                                                                                                                                                                                            |
 | `external_offer_id`    | String  | Provider-native ID (e.g. wakacje `offerId`, tui `offerCode`)                                                                                                                                                                                                                                                     |
 | `hotel_name`           | String  |                                                                                                                                                                                                                                                                                                                  |
-| `location`             | String  | Stored in format `Country/Region/City`. **Normalization:** wakacje.pl `placeName` is already in `Country / Region / City` format (normalize separators to `Country/Region/City`); TUI is constructed from `breadcrumbs[0].label` (country) + `breadcrumbs[1].label` (region) + `city` field                      |
+| `location`             | String  | `Country/Region/City` (three non-empty segments). A `/` inside a name becomes ` - ` before the segments are joined. wakacje.pl uses `place.country.name`, `place.region.name`, and `place.city.name`. TUI uses `breadcrumbs[0].label`, `breadcrumbs[1].label`, and `breadcrumbs[2].label` when that label exists, otherwise `city`. The fingerprint hashes country and region only. |
 | `departure_airport`    | String  | IATA                                                                                                                                                                                                                                                                                                             |
 | `departure_date`       | String  | ISO date                                                                                                                                                                                                                                                                                                         |
 | `return_date`          | String  | ISO date                                                                                                                                                                                                                                                                                                         |
@@ -119,21 +119,61 @@ User-to-offer matches with denormalized sort fields for Redis rebuild.
 
 ### Semantic fingerprint
 
-Canonical `offer_id` is a hash of the trip semantics, not the provider's native ID:
+`offer_id` is the first 32 hex characters of SHA-256 over one UTF-8 string built in `compute_offer_id` (`core/services/ingest.py`). It is the trip identity. The provider's native id stays on `external_offer_id`.
+
+`location` is split on `/`. Segment 0 is the country and segment 1 is the region. The city segment is not hashed. `normalize_text` is applied to the hotel name, country, region, and room type:
+
+1. Lowercase.
+2. Replace `ł` with `l` and `ß` with `ss`.
+3. NFKD-decompose and drop combining marks (`Włochy` → `wlochy`, `Hôtel` → `hotel`).
+4. Delete every character that is not `a-z`, `0-9`, or a space (`Hotel-Foo` → `hotelfoo`).
+5. Collapse whitespace.
+
+The hashed string is these fields joined with `:`:
+
+| Field | Value written into the key |
+| ----- | -------------------------- |
+| Hotel | `{hotel}:{country}:{region}` after `normalize_text` |
+| Dates | `departure_date` and `return_date` as `YYYY-MM-DD` |
+| Airport | `departure_airport` uppercased and stripped |
+| Board | canonical board value, lowercased (`all-inclusive`) |
+| Room | `normalize_text(room_type)` |
+| Occupancy | scrape-cell `adults` and `children` as decimal integers |
+
+Stored `hotel_name` and `room_type` keep the provider's stripped text. Only the hash input is normalized. The same key from wakacje.pl and tui.pl is one offer. City, stars, price, rating, provider, and the provider id are not in the key.
+
+Example (same string `compute_offer_id` hashes):
 
 ```
-fingerprint = sha256(join([
-  normalize_hotel(hotel_name, country, region),
-  departure_date,
-  return_date,
-  departure_airport,   # IATA
-  board,               # normalized
-  room_type,           # normalized
-  adults,
-  children,
-]))
-offer_id = fingerprint[:32]
+hotel_name:       Kakkos Terra Blue
+location:         Greece/Crete/Ierapetra
+departure_date:   2026-04-26
+return_date:      2026-05-03
+departure_airport: WAW
+board:            all-inclusive
+room_type:        Double Room
+adults / children: 2 / 0
+
+key: kakkos terra blue:greece:crete:2026-04-26:2026-05-03:WAW:all-inclusive:double room:2:0
+offer_id: c718f1389023360ab00ac94790bd9160
 ```
+
+### Offer construction checks
+
+`jobs.coordinator` builds an `Offer` after scoring. A validation error is logged and that scored row is not written. When every scored row fails, the cell is not persisted, so existing offers are not marked unavailable.
+
+| Check | Rule |
+| ----- | ---- |
+| Dates | `return_date` is on or after `departure_date` |
+| Duration | `abs(duration - (return_date - departure_date).days) <= 1` |
+| wakacje.pl | `metadata.wakacje_pl` is present |
+| tui.pl | `metadata.tui` is present and `external_offer_id` equals `offer_code` |
+| Bookable TTL | when `available` is true, `ttl` is `departure_date` at 00:00 UTC as epoch seconds |
+| Share URL | rewritten to `https://wakacje-travelis.pl/offer/{cell_id}/{offer_id}` |
+
+TUI sets `duration` to `(return_date - departure_date).days`, so a mapped TUI row passes the duration check. wakacje.pl stores `durationNights`. A night count more than one night away from that date span is skipped at this step.
+
+Search items that never become a `RawOffer` are described in the provider contracts (missing fields, month window, country mismatch, unknown board, `ValidationError`).
 
 ### Deduplication and variant collapsing
 
@@ -144,7 +184,7 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
    - We keep the variant with the **lowest `price_total`**.
    - All collapsed provider variants are stored in `metadata.sources[]`.
    - The top-level `external_offer_id` is set to the winning variant's ID.
-   - Reference key fields for wakacje.pl variant matching: `offerHash`, `departureDate`, `returnDate`, `departurePlace`, `service`, `roomType`.
+   - The grouping key is the semantic fingerprint above. wakacje.pl `offerHash` (for example `GRCS:6935`) is a provider room-variant id, not this key.
 
 2. **Cross-Provider Deduplication (Fingerprint Collision)**:
    - When the same trip (same hotel, dates, airport, board, room, occupancy) is offered by both wakacje.pl and tui.pl, they compute to the same `offer_id`.
@@ -164,7 +204,7 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
 
 ## Offer metadata
 
-`metadata` holds fields needed for background jobs and provider-specific follow-up calls. None of it is returned in the user feed.
+`metadata` holds fields needed for background jobs and provider-specific follow-up calls. The list feed omits it. Offer detail returns `sources` only.
 
 ### Common keys (all providers)
 
@@ -173,7 +213,7 @@ Deduplication occurs at multiple levels to ensure a clean, unified feed with the
 | `price_z_score` | Number | Stage-1 price z-score (debugging / attractiveness)                                      |
 | `sources[]`     | List   | Collapsed provider variants after dedup (top-level winner follows DB merge rules above) |
 
-Each `sources[]` entry mirrors the provider-specific availability block below for that variant (same shape as `metadata.wakacje_pl` or `metadata.tui`).
+Each `sources[]` entry is `provider`, `external_offer_id`, `price_total`, and optional `tour_operator` (wakacje.pl `tourOpCode`). It is not a copy of `metadata.wakacje_pl` or `metadata.tui`.
 
 ### `metadata.wakacje_pl` (required for availability checks)
 
