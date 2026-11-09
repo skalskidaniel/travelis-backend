@@ -138,6 +138,9 @@ Preference changes and new-account provisioning create **one-time** schedules in
 | Expression              | `at(now + 15s)`                                                            |
 | `ActionAfterCompletion` | `DELETE` (self-cleaning)                                                   |
 | Target                  | Cron Lambda (direct), payload `{ "type": "match_user", "user_id": "..." }` |
+| Retry / DLQ             | Not set. `create_schedule` / `update_schedule` omit `RetryPolicy` and `DeadLetterConfig`. |
+
+Cron rules in `infra/modules/eventbridge/main.tf` also omit `retry_policy` and `dead_letter_config`. No dead-letter queue is declared. A failed invoke is not captured by this Terraform. See [pipeline.md](pipeline.md#error-handling).
 
 See [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler).
 

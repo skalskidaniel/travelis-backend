@@ -192,9 +192,7 @@ The ZSET is built lazily on the first `GET /v2/offers` request for a specific so
    - Batch-get corresponding offers from the `Offers` table using their `(cell_id, offer_id)` keys. Hydration misses prune those `UserOffers` rows and bump `feed_version`.
    - Drop `available = false` offers, then apply `filter_mode` (country via the cell ISO code, or `new` via `matched_at`).
    - Write members `offer_id:cell_id` with computed scores (see [data-model.md](data-model.md#lazy-sort-views-zset)). Redis orders the ZSET. TTL: 24 hours.
-4. Paginate using the ZSET:
-   - If `order == desc`, execute `ZREVRANGEBYSCORE` or `ZRANGE ... REV`.
-   - If `order == asc`, execute `ZRANGEBYSCORE` or `ZRANGE`.
+4. Paginate using the ZSET with `ZRANGE` from `offset` through `offset + limit - 1`. `order=desc` sets `REV`. Scores are not used as the page bounds.
 
 ### Cursor-Based Pagination
 
@@ -206,18 +204,20 @@ The ZSET is built lazily on the first `GET /v2/offers` request for a specific so
   }
   ```
 - **Query Resolution**:
-  - The API decodes the cursor and reads the limit (default `20`).
-  - If the cursor's `feed_version` matches the current `feed_version` in Redis, fetch ZSET elements from index `offset` to `offset + limit - 1`.
-  - If the `feed_version` does not match, the feed has changed. The API resets the request to page 1 (`offset = 0`), rebuilds the ZSET, and returns the new `feed_version` in the response, allowing the client to reset pagination and reload the feed.
+  - The API decodes the cursor and reads the limit (default `20`, max `50`).
+  - If the cursor's `feed_version` matches the current `feed_version` in Redis, fetch ZSET elements from index `offset` to `offset + limit - 1` (`ZRANGE`, `REV` when `order=desc`).
+  - If the `feed_version` does not match, the handler sets `offset` back to `0` and continues. It does not return an error.
+- **`next_cursor`**: emitted when that page's ZSET slice length equals `limit`. The payload is `{"offset": offset + limit, "feed_version": <current>}`. A last page whose length is exactly `limit` still has a cursor; the next call is an empty page. Favorites use a different rule (`offset + limit < total_count`, and the cursor has no `feed_version`).
+- **Hydration prune on a cached page**: missing Offer rows are deleted from `UserOffers` and `feed_version` is incremented. `total_count` is then `ZCARD` of the new version's key. That key does not exist yet, so the response reports `total_count: 0` while still returning the hydrated survivors of the old page. The cursor, if any, points at the new version and the advanced offset. The following request builds the new ZSET and applies that offset, which skips the start of the rebuilt feed.
 
 ## Error handling
 
 | Failure                        | Behavior                                                                                               |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| Provider timeout               | Retry up to 3× per cell per run; log and continue                                                      |
-| Scoring error for one offer    | Skip offer; log                                                                                        |
-| Match job failure for one user | EventBridge Scheduler retry policy (max attempts → DLQ); next PATCH or post-scrape run also re-matches |
-| Lambda timeout approaching     | With under 15s left, workers stop. If `LAMBDA_FUNCTION_ARN` is set, the cron Lambda async-invokes itself with `{ "type": "scrape_offers", "remaining_cells": ["..."] }`. This invocation still bulk-matches cells it finished. Without the ARN, leftover cells wait for the next cron. |
+| Provider search error          | `search_with_retry` tries 3 times and sleeps `0.2 * 2**attempt` seconds after attempts 1 and 2 (0.4s, then 0.8s). One provider's exception is logged; the other provider's list is still ingested. An exception around the rest of the cell is logged and that cell is left unchanged. |
+| `Offer` validation error       | That scored row is skipped and logged. Its `offer_id` is still in the seen set, so absence does not soft-delete an existing row with the same id. If every scored row fails validation, the cell is not written. |
+| Match schedule or match invoke | `schedule_match` does not set `RetryPolicy` or `DeadLetterConfig`. Cron targets in `infra/modules/eventbridge/main.tf` omit `retry_policy` and `dead_letter_config`. This repo defines no DLQ. `PATCH` and first-time provisioning catch `SchedulerException`, log it, and still return 200 after the user row and cell counts are saved. A failed `match_user` invoke is not retried by application code. The next PATCH rewrites `match-{user_id}`. A later scrape bulk-matches users whose generated cells overlap the cells scraped in that invocation. |
+| Lambda timeout approaching     | With under 15s left, workers stop. If `LAMBDA_FUNCTION_ARN` is set, the cron Lambda async-invokes itself with `{ "type": "scrape_offers", "remaining_cells": ["..."] }`. This invocation still bulk-matches cells it finished. Without the ARN, leftover cells wait for the next cron. The availability job does not read the Lambda context and does not continue itself. |
 
 ## Future escape hatch
 
