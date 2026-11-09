@@ -159,13 +159,15 @@ Sold offers (`available = false`) are excluded from this feed under every filter
       "favorited": false
     }
   ],
-  "next_cursor": "eyJzY29yZSI6...",
+  "next_cursor": "eyJvZmZzZXQiOiAyMCwgImZlZWRfdmVyc2lvbiI6IDQyfQ==",
   "feed_version": 42,
   "total_count": 125
 }
 ```
 
-`feed_version` lets the client detect feed changes (e.g. for in-app "new offers" badge). `total_count` indicates the total number of matched offers in the user's feed.
+`next_cursor` is present when the Redis page length equals `limit`. The example decodes to `{"offset": 20, "feed_version": 42}`. A page that fills `limit` still returns a cursor when it is the last full page; the following request returns `offers: []` and `next_cursor: null`. A cursor that does not decode to an object, whose `offset` is negative, or whose `feed_version` is present and not an integer, is `400` with detail `Invalid pagination cursor`. If the cursor's `feed_version` differs from Redis, the handler resets `offset` to `0` and returns the current version. See [pipeline.md](pipeline.md#cursor-based-pagination).
+
+`feed_version` lets the client detect feed changes (e.g. for in-app "new offers" badge). `total_count` is the size of this sort/order/filter ZSET, not a second count of the page. If hydrating a cached page finds missing `Offers` rows, those `UserOffers` rows are deleted and `feed_version` increments. `total_count` is then read from the new version's ZSET, which has not been built yet, so that response reports `0`. The offers in the body are the survivors of the old page. The next request rebuilds the ZSET.
 
 ### `GET /v2/offers/{offer_id}`
 
@@ -233,8 +235,9 @@ Retrieve a list of the authenticated user's favorited offers.
 | `limit`  | `20`    | 1–50                                 |
 | `cursor` | —       | Opaque cursor from previous response |
 
-**Response `200`:**
-Same response schema as `GET /v2/offers` (returns a paginated list of favorited offers).
+**Response `200`:** same offer item schema as `GET /v2/offers`. The list is every `UserOffers` row with `favorited = true`, including sold offers (`available = false`), sorted by `matched_at` descending. There is no `sort`, `country`, or `new` parameter. `feed_version` is `null`. `total_count` is the favorite count.
+
+The cursor is base64 JSON `{"offset": <n>}` and does not carry `feed_version`. A cursor that does not decode, or whose `offset` is negative, is `400`. `next_cursor` is omitted when `offset + limit` is past `total_count` (unlike the main feed, which keys the cursor off page length). A missing `Offers` row deletes that `UserOffers` row, including a favorite whose Offer TTL has expired, then the handler reloads and re-slices the list before responding.
 
 ---
 
@@ -260,7 +263,7 @@ Mark an offer as favorited by the authenticated user.
 
 Remove an offer from the authenticated user's favorites.
 
-**Behavior**: If the offer is still in the user's matched feed, the `favorited` attribute is set to `false`. If the offer is no longer matched by preferences, the `UserOffers` row is deleted immediately.
+**Behavior**: The handler loads the offer and runs the same match filter used by `MatchingService` (`available`, rating, airports, duration, dates, children count and ages). If the offer still matches, `favorited` is set to `false` and the row stays. If it does not match, including when the Offer row is missing or `available` is false, the `UserOffers` row is deleted. A missing favorite row is `404` before that filter runs.
 
 **Response `204`:** No Content
 

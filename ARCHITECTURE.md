@@ -19,7 +19,7 @@ The codebase decomposes into 12 functional areas, auto-detected by GitNexus comm
 | Area             | Symbols | Description                                                                          |
 | ---------------- | ------- | ------------------------------------------------------------------------------------ |
 | **App**          | 12      | Entrypoints: FastAPI app, Lambda handler, auth, rate limiter, FastAPI dependencies   |
-| **Jobs**         | 7       | Background job orchestrators: scrape coordinator, availability checker               |
+| **Jobs**         | 7       | Background job orchestrators: scrape coordinator, availability checker, inactivity sweep |
 | **Auth**         | 5       | JWT verification dependencies, account deletion controller                           |
 | **User**         | 7       | User preferences controller, push notification settings                              |
 | **Offers**       | 5       | Paginated offer feed controller, API schemas                                         |
@@ -67,30 +67,29 @@ GET /v2/offers?sort=attractiveness&order=desc&limit=20
 ### 3. User Preferences Update
 
 ```
-PUT /v2/user/preferences
-  └─ update_preferences()           # src/app/user/controller.py:64
-       ├─ get_current_user()        # JWT validation
-       ├─ get_container()           # DI
-       ├─ container.initialize()
-       ├─ activation_service.update_cells()  # Compute new cell set, ref-count
-       ├─ scheduler_service.schedule_match()  # EventBridge Scheduler (debounced at(now+15s))
-       └─ users_repo.put()          # Save preferences to DynamoDB
+PATCH /v2/user/preferences
+  └─ update_preferences()           # src/app/user/controller.py
+       ├─ get_or_create_user()
+       ├─ users_repo.put()          # preferences saved first
+       ├─ activation_service.update_cell_activations()
+       └─ scheduler_service.schedule_match()  # at(now+15s); SchedulerException is logged, response stays 200
 ```
 
 ### 4. Account Deletion (Cascade)
 
+Order when a `Users` row exists. Earlier steps are not rolled back. There is no scheduler cleanup.
+
 ```
 DELETE /v2/auth/account
-  └─ delete_account()               # src/app/auth/controller.py:31
-       ├─ get_current_user()
-       ├─ get_container()
-       ├─ container.initialize()
-       ├─ cognito_client.admin_delete_user()  # Cognito user removal
-       ├─ users_repo.delete()       # DynamoDB Users row
-       ├─ user_offers_repo.delete_all()  # All UserOffers for this user
-       ├─ feed_repo.delete_all()    # All Redis keys for this user
-       └─ scheduler_service.delete_all()  # Pending Scheduler schedules
+  └─ delete_account()               # src/app/auth/controller.py
+       ├─ user_offers_repo.delete_batch()
+       ├─ feed_repo.clear_user()    # Redis SCAN user:{id}:*
+       ├─ users_repo.delete()
+       ├─ cells_repo.decrement_activations()  # cells from stored preferences; reference date is updated_at
+       └─ cognito_client.admin_delete_user()  # last; Username is the JWT sub
 ```
+
+If the `Users` row is already missing, only the Cognito delete runs (and only when `COGNITO_USER_POOL_ID` is set).
 
 ### 5. Availability Check (wakacje.pl, intra-provider)
 
@@ -106,11 +105,14 @@ run_availability_job()
 ### 6. Bulk User Matching (post-scrape or debounced)
 
 ```
-MatchingService.bulk_match_users()    # src/core/services/matching.py:248
-  └─ match_user_offers()              # src/core/services/matching.py
-       └─ ActivationService.generate_required_cells()  # src/core/services/activation.py:59
-            └─ resolve_months_for_range()  # Expand month range to YYYY-MM strings
+MatchingService.bulk_match_users()    # src/core/services/matching.py
+  └─ users_repo.scan()                # full Users table; no cell-to-user index
+       └─ generate_required_cells()   # function in src/core/services/activation.py
+            └─ match_user_offers()    # only when the user's cells overlap the affected set
+                 └─ resolve_months_for_range()
 ```
+
+Inactive users are not skipped. They are matched when some other user still keeps an overlapping cell in `MarketCells`.
 
 ---
 
