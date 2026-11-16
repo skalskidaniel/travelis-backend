@@ -182,11 +182,13 @@ wakacje.pl exposes "dictionaries" to fetch current IDs:
 - Regions and cities within a country: `GET https://www.wakacje.pl/v2/api/geoCatalogRegionsAndCities/{countryId}`
   - Example: `Kreta` in `Grecja (29)` has `value: "29004"`.
 
-A minimal ID snapshot is checked in at [wakacjepl_geo_catalog.json](wakacjepl_geo_catalog.json) (~80 KB). Regenerate with:
+A minimal ID snapshot is checked in at [wakacjepl_geo_catalog.json](wakacjepl_geo_catalog.json) (~80 KB). The scrape adapter does not open this file. It imports [`wakacjepl_filters.json`](../../../src/core/providers/resources/wakacjepl_filters.json). Regenerate that packaged file from this catalog with:
 
 ```bash
-uv run python scripts/fetch_geo_catalog.py
+uv run python scripts/generate_wakacjepl_filters.py
 ```
+
+`scripts/fetch_geo_catalog.py` is the downloader for this snapshot. It reads `docs/providers/wakacjepl/wakacjepl_filters.json` while building `departure_airports`, and that path is not in the repo, so the command stops before it replaces the catalog. A copy in the Terraform geo-catalog bucket is not loaded by Lambda.
 
 Shape:
 
@@ -213,7 +215,7 @@ Shape:
 - `cities` — `cityId` → parent IDs + name (`checkOfferAvailability` / `metadata.wakacje_pl`)
 - `departure_airports` — `departureCityId` → IATA, **name**, URL **slug** (`getCalculatorOfferVariants` / `metadata.wakacje_pl.departure_slug`)
 
-Airport IDs are merged from [wakacjepl_filters.json](wakacjepl_filters.json) and `offerConfiguratorV2/filters` labels.
+Airport IDs are merged from [`wakacjepl_filters.json`](../../../src/core/providers/resources/wakacjepl_filters.json) and `offerConfiguratorV2/filters` labels. `scripts/fetch_geo_catalog.py` still opens the old `docs/providers/wakacjepl/wakacjepl_filters.json` path, which is not checked in.
 
 Observation from the UI (selecting "Grecja → Kreta"):
 

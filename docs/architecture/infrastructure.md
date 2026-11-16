@@ -60,23 +60,35 @@ No VPC attachment required (Redis Cloud is external, providers are public HTTPS)
 
 ### S3 (provider geo catalogs)
 
-Private bucket for refreshed destination/departure catalogs used at scrape time:
+Terraform creates a private bucket and the Lambda role may `s3:GetObject` / `s3:ListBucket` on it. The running process does not. `Container.initialize` opens DynamoDB, Scheduler, Cognito, Lambda, and Secrets Manager when `VAPID_PRIVATE_KEY_SECRET_ARN` is set. It does not open S3. Search, availability, and matching never read this bucket or `docs/providers/*_geo_catalog.json`.
 
-| Setting  | Value                                                                                         |
-| -------- | --------------------------------------------------------------------------------------------- |
-| Module   | `modules/geo_catalog`                                                                         |
-| Objects  | `providers/tui/tui_geo_catalog.json`, `providers/wakacjepl/wakacjepl_geo_catalog.json`        |
-| Access   | Lambda read (IAM added with `lambda` module); writes via `scripts/fetch_geo_catalog.py` or CI |
-| Security | SSE-S3, public access blocked, versioning enabled                                             |
+| Setting  | Value                                                                                                      |
+| -------- | ---------------------------------------------------------------------------------------------------------- |
+| Module   | `modules/geo_catalog`                                                                                      |
+| Bucket   | `{project}-{environment}-geo-catalog-{account_id}`                                                         |
+| Security | SSE-S3 (AES256), public access blocked, versioning enabled when `enable_versioning` is true                |
+| Runtime  | Unused. Replacing objects in the bucket does not change scrape results, even after a new Lambda deployment |
 
-Populate after `terraform apply`:
+Mappings that do affect scrape results are JSON shipped inside the Lambda zip. `core.providers.resources` loads them once at import via `importlib.resources`:
+
+| Packaged file                                              | Read by                                                                 |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `src/core/providers/resources/country_registry.json`       | Country allow-list (`codes`)                                            |
+| `src/core/providers/resources/tui_filters.json`            | TUI destination codes, board, min stars, and the kept departure IATAs   |
+| `src/core/providers/resources/wakacjepl_filters.json`      | wakacje.pl country ids, board service ids, and departure place metadata |
+
+`scripts/build_lambda_package.sh` rsyncs `src/` into the zip, so both functions get these files. A warm execution environment keeps the dicts until AWS replaces it. No environment variable reloads them.
+
+To change what a scrape sends or keeps:
 
 ```bash
-aws s3 cp docs/providers/tui/tui_geo_catalog.json \
-  s3://<bucket>/providers/tui/tui_geo_catalog.json
-aws s3 cp docs/providers/wakacjepl/wakacjepl_geo_catalog.json \
-  s3://<bucket>/providers/wakacjepl/wakacjepl_geo_catalog.json
+uv run python scripts/generate_tui_filters.py
+uv run python scripts/generate_wakacjepl_filters.py
 ```
+
+Those scripts rewrite the packaged JSON from the checked-in catalogs under `docs/providers/`. Board and service codes are constants in the scripts, not values taken from the catalog. Deploy a new zip afterwards (`terraform apply` rebuilds it when `src/` changes).
+
+`scripts/fetch_geo_catalog.py` is not that path. Before it can write a catalog it reads `docs/providers/tui/tui_filters.json` and `docs/providers/wakacjepl/wakacjepl_filters.json`. Those paths are not in the repo. See [providers/index.md](../providers/index.md#runtime-mappings).
 
 ### API Gateway
 
@@ -154,7 +166,7 @@ Folded into the lambdalith via the dual-entry handler (`event.triggerSource`). A
 | Setting    | Value                                                                |
 | ---------- | -------------------------------------------------------------------- |
 | Provider   | [Redis Cloud](https://redis.com/redis-enterprise-cloud/) (free tier) |
-| Purpose    | User offer feed ZSETs, rate limiting, optional offer payload cache   |
+| Purpose    | User offer feed ZSETs, the session key, and rate-limit counters      |
 | Connection | `REDIS_URL` env var on Lambda                                        |
 | TLS        | Required (Redis Cloud default)                                       |
 
@@ -250,4 +262,4 @@ Lambda deployment artifact: zip built from the contents of `src/` (`app/` + `cor
 | ------------------------ | ------------------------------------------------------- |
 | Lambda timeout on scrape | Fan out from the cron Lambda to per-cell worker Lambdas |
 | DynamoDB throttling      | Revisit hot partitions or provisioned capacity          |
-| Redis memory limit       | Upgrade Redis Cloud plan or trim payload cache          |
+| Redis memory limit       | Upgrade the Redis Cloud plan or shorten ZSET TTL        |

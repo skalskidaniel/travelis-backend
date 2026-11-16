@@ -63,7 +63,7 @@ Triggered 4× daily by EventBridge (`cron(0 6,10,14,18 * * ? *)`, UTC). A contin
 1. Scan the `MarketCells` table (all rows are active by definition — a cell exists only when `activation_count > 0`). On continuation, load only the ids in `remaining_cells`.
 2. Skip a cell whose month is entirely in the past. `month_date_bounds(cell.month)` is the first and last calendar day of `YYYY-MM`; both must be before today. Skipped cells are not scraped, do not update `last_scraped_at`, and do not soft-delete offers by absence. They stay in `MarketCells` until activation drops to 0.
 3. Schedule one async scrape task per remaining cell with bounded concurrency (an `asyncio` worker pool of up to 10 workers).
-4. Each task calls wakacje.pl and tui.pl APIs (see [providers/](../providers/index.md)). Each provider search retries up to 3 times with exponential backoff. A provider failure is logged and the other provider's results are still ingested.
+4. Each task calls wakacje.pl and tui.pl APIs (see [providers/](../providers/index.md)). Request ids and the airports kept after the response come from packaged JSON, not from the S3 geo-catalog bucket ([runtime mappings](../providers/index.md#runtime-mappings)). Each provider search retries up to 3 times with exponential backoff. A provider failure is logged and the other provider's results are still ingested.
 5. Pass raw results to normalization → scoring → `Offers` table. If every scored offer fails validation, skip persistence for that cell so existing offers are not marked unavailable by an empty result set.
 6. After the pool finishes, bulk-match users whose preferences overlap the cells scraped in **this** invocation.
 

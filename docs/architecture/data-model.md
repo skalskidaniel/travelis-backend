@@ -265,13 +265,9 @@ TTL is `SESSION_GAP_MINUTES` × 60 seconds (default 30 minutes). Presence of the
 | `rating`                   | rating                      |
 | `duration`                 | duration nights             |
 
-### Offer payload cache (optional)
+### Offer payload cache
 
-```
-user:{user_id}:offer:{offer_id} → JSON blob
-```
-
-Populated during feed rebuild for fast page hydration. Alternatively, batch-get from DynamoDB `Offers` table on read.
+No Redis key stores an offer body. `RedisFeedRepository` only reads and writes `feed_version` and the sort ZSETs above. Feed and detail handlers hydrate with `OffersRepository.get_batch` / `get` on DynamoDB. A key such as `user:{user_id}:offer:{offer_id}` is not written.
 
 ## Market cell activation
 
