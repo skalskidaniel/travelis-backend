@@ -297,11 +297,13 @@ TUI exposes the destination tree and departure airports via the search bootstrap
   - `filters` entry with `filterType: "REGION"` — countries and nested regions (or leaf single-destination countries such as `MLA` for Malta)
   - `filters` entry with `filterType: "AIRPORT"` — Polish departure airports
 
-A minimal ID snapshot is checked in at [tui_geo_catalog.json](tui_geo_catalog.json) (~13 KB). Regenerate with:
+A minimal ID snapshot is checked in at [tui_geo_catalog.json](tui_geo_catalog.json) (~13 KB). The scrape adapter does not open this file. It imports [`tui_filters.json`](../../../src/core/providers/resources/tui_filters.json). Regenerate that packaged file from this catalog with:
 
 ```bash
-uv run python scripts/fetch_geo_catalog.py --provider tui
+uv run python scripts/generate_tui_filters.py
 ```
+
+`scripts/fetch_geo_catalog.py --provider tui` is the downloader for this snapshot. After the `gs/initial` response it reads `docs/providers/tui/tui_filters.json` to map destination codes to ISO codes. That path is not in the repo, so the command stops before it replaces the catalog. A copy in the Terraform geo-catalog bucket is not loaded by Lambda.
 
 Shape:
 

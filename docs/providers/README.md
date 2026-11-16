@@ -13,7 +13,7 @@ This folder holds **locally versioned** documentation for external service integ
 - `docs/providers/index.md` — Integration index and quick links.
 - `docs/providers/<provider>/contract.md` — Contract description: endpoints, parameters, examples, errors.
 - `docs/providers/<provider>/openapi.yaml` (optional) — Formal OpenAPI spec if maintainable.
-- `docs/providers/<provider>/<provider>_filters.json` — Filter/mapping dictionaries for request construction.
+- `src/core/providers/resources/<provider>_filters.json` — Filter dictionaries the adapters import. The geo catalogs in this folder are generator inputs, not runtime data. See [index.md](index.md#runtime-mappings).
 
 ## Quality guidelines (agent-friendly)
 

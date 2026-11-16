@@ -127,6 +127,8 @@ A `Provider` Protocol (`async search(cell) -> list[RawOffer]`, `async check_avai
 
 Adding a third source later is one new adapter + one registry line. See [providers/](../providers/index.md) for the reverse-engineered contracts.
 
+Country, board, and airport dictionaries are not fetched at scrape time. `core.providers.resources` loads `country_registry.json`, `tui_filters.json`, and `wakacjepl_filters.json` from the package at import. The S3 geo-catalog bucket is not read. See [providers/index.md](../providers/index.md#runtime-mappings).
+
 ## Concurrency
 
 The fan-out concurrency strategy lives in the orchestration layer (`app/jobs/coordinator`), not in `core`. `core` exposes `async`, single-unit functions with no shared mutable state; the coordinator schedules them on the event loop with a bounded worker pool (via `asyncio.Queue` and concurrent workers). CPU-bound scoring is offloaded with `asyncio.to_thread` so it never blocks the loop. See [system-overview.md](system-overview.md#concurrency-model-for-jobs).
