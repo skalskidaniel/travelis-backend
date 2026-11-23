@@ -28,13 +28,14 @@ Sign up and sign in happen in the PWA via Cognito directly. Only account deletio
 
 Delete the authenticated user's account.
 
-**Side effects:**
+**Side effects** when a `Users` row exists, in order. A failure returns `500` and earlier steps are not rolled back.
 
-1. Delete Cognito user.
-2. Delete `Users` record.
-3. Delete all `UserOffers` for user.
-4. Decrement market cell `activation_count` for user's cells.
-5. Delete Redis keys `user:{id}:*`.
+1. Delete `UserOffers` for the user.
+2. Delete Redis keys `user:{id}:*` (feed, session, and anything else under that prefix).
+3. Delete the `Users` row.
+4. Decrement `activation_count` for cells required by the stored preferences as of `user.updated_at` (the date, not today). See [pipeline.md](pipeline.md#cell-window-reference-date).
+
+Cognito `AdminDeleteUser` runs only after that block finishes, including when the `Users` row was already missing. A failure in the block skips Cognito. `Username` is the JWT `sub`. If `COGNITO_USER_POOL_ID` is unset, that delete is skipped.
 
 **Response:** `204 No Content`
 
@@ -72,7 +73,7 @@ Update preferences. Saves immediately; triggers a debounced match via EventBridg
 
 **Response `200`:** full preferences object.
 
-**Side effects:** market cell activation updated; one-time schedule `match-{user_id}` upserted for `at(now + 15s)` (see [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler)).
+**Side effects:** `updated_at` is set to now, then market-cell counts are diffed using today for both the previous and the new preferences. That diff does not release a month that has aged out. A one-time schedule `match-{user_id}` is upserted for `at(now + 15s)` (see [pipeline.md](pipeline.md#preference-debouncing-eventbridge-scheduler) and [cell window reference date](pipeline.md#cell-window-reference-date)).
 
 ### `POST /v2/user/push/enable`
 
@@ -91,9 +92,11 @@ Register Web Push subscription.
 
 **Response:** `204 No Content`
 
+Also sets `Users.updated_at` to now. That moves the month used by open-ended cell self-heal; it does not change cell counts. See [pipeline.md](pipeline.md#cell-window-reference-date).
+
 ### `POST /v2/user/push/disable`
 
-Disable push notifications.
+Disable push notifications. Clears `push_subscription` and sets `updated_at` to now, with the same cell-window effect as enable.
 
 **Response:** `204 No Content`
 

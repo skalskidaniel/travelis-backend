@@ -22,7 +22,7 @@ Four domain tables (on-demand capacity):
 | `push_enabled`      | Boolean | Web push opt-in            |
 | `push_subscription` | Map     | Web Push subscription JSON |
 | `created_at`        | String  |                            |
-| `updated_at`        | String  |                            |
+| `updated_at`        | String  | ISO-8601. Month anchor for open-ended cell self-heal, and the reference date for account-deletion cell release. Also rewritten by preference PATCH and push enable/disable, which can skip that self-heal. See [pipeline.md](pipeline.md#cell-window-reference-date). |
 | `last_active_at`    | String  | Start of the current session (ISO-8601). Advanced only when Redis `user:{id}:session` has expired |
 | `new_since`         | String  | Previous `last_active_at`, stored when a new session starts. Cutoff for `GET /v2/offers?new=true` |
 | `is_active`         | Boolean | `true` until the weekly inactivity sweep releases this user's cells. Restored on the next preferences read or update |
@@ -275,12 +275,11 @@ Populated during feed rebuild for fast page hydration. Alternatively, batch-get 
 
 ## Market cell activation
 
-When user preferences change:
+When user preferences change, `ActivationService.update_cell_activations` diffs the two cell sets and:
 
-1. Compute old and new sets of required `cell_id` values.
-2. Decrement `activation_count` on cells no longer needed.
-3. Increment `activation_count` on newly required cells.
-4. If a cell's `activation_count` drops to `0`, delete the cell row from `MarketCells` table.
-5. If a cell's `activation_count` goes from `0` to `1` (new cell), create the cell row in `MarketCells` with `activation_count = 1` and `last_scraped_at = null`.
+1. Increments cells only in the new set (`ADD activation_count` with `if_not_exists` on the dimension attributes). A new row starts at count `1` and has no `last_scraped_at`.
+2. Decrements cells only in the old set. A count at or below `0` deletes the row, unless a concurrent increment won the conditional delete.
 
-Only cells present in the `MarketCells` table are scraped on the 4× daily schedule. Cells whose `month` is entirely before today are scanned and then skipped (see [pipeline.md](pipeline.md#coordinator-jobscoordinator)).
+Both sets are built from a reference date. A preference PATCH uses today for both, so a month that has rolled off is not released. The open-ended self-heal in matching is the path that passes the previous `updated_at` as the old reference. Sweep, reactivation, and account deletion each pick their own reference. See [pipeline.md](pipeline.md#cell-window-reference-date).
+
+Only cells present in the `MarketCells` table are scraped on the 4× daily schedule. Cells whose `month` is entirely before today are scanned and then skipped (see [pipeline.md](pipeline.md#coordinator-jobscoordinator)). A skipped cell is not deleted; its `activation_count` stays until a caller decrements that id.

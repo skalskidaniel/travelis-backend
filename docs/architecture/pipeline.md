@@ -114,7 +114,7 @@ On `PATCH /v2/user/preferences`:
 For each claimed user:
 
 1. Load preferences.
-2. **Self-healing month shift** (open-ended dates only): when `date_from` and `date_to` are both unset, matching compares the reference date to the month stored in `user.updated_at`. If the calendar month changed, re-run cell activation for the rolling 6-month window anchored to the new reference date, then persist `updated_at` with the new month. This keeps active cells aligned with "Any" travel dates without a sweeper cron. Users who never match still rely on the next preference PATCH or bulk post-scrape match to refresh cells.
+2. **Self-healing month shift** (open-ended dates only). See [Cell window reference date](#cell-window-reference-date). This is the only path that releases the previous open-ended window.
 3. Resolve required `cell_id` set.
 4. Query `Offers` for those cells.
 5. Filter in Python using the user's exact preferences:
@@ -170,14 +170,49 @@ EventBridge `cron(0 3 ? * MON *)` (Monday 03:00 UTC) sends `{ "type": "sweep_ina
 
 1. Cutoff is now minus `INACTIVITY_THRESHOLD_DAYS` (default 7).
 2. Scan `Users` where `last_active_at < cutoff` and `is_active = true`.
-3. Decrement `activation_count` for every cell required by those users' current preferences. A cell at 0 is deleted, same as a preference change. If a required cell row is already missing, `decrement_activations` raises and the sweep stops before `is_active` is cleared.
+3. Decrement `activation_count` for every cell in today's window (see [Cell window reference date](#cell-window-reference-date)), not the window stored on `updated_at`. One DynamoDB `ADD -1` is issued per user per cell, concurrently. A count at or below 0 deletes the row. A missing row raises `ItemNotFoundException`. Updates that already succeeded are not rolled back, and `is_active` is cleared only after the whole decrement returns. The next Monday selects the same users and decrements again.
 4. Set `is_active = false` only when it is currently `true`. A later run does not decrement users already marked inactive.
 
-The sweep does not delete the user, preferences, `UserOffers`, or offers. `bulk_match_users` still scans every user. An inactive user is re-matched only when some other user keeps an overlapping cell active.
+The sweep ignores the Lambda `context` and does not continue itself.
+
+The sweep does not delete the user, preferences, `UserOffers`, or offers. `bulk_match_users` still scans every user, including inactive ones. Overlap uses today's window, so a past-month cell that is still counted does not select that user. A scraped cell in today's window does, and matching runs without setting `is_active` back to true.
 
 ### Coming back
 
-`GET` or `PATCH /v2/user/preferences` loads the user through `get_or_create_user`. If `is_active` is false, `ensure_active` sets it true, re-activates the preference cells, and schedules `match-{user_id}`. Other authenticated routes only refresh the session key; they do not restore cells.
+`GET` or `PATCH /v2/user/preferences` loads the user through `get_or_create_user`. If `is_active` is false, `ensure_active` sets it true and then increments today's cell window. It does not decrement the window from when the user went idle. `get_or_create_user` schedules `match-{user_id}` only after that increment returns. If the increment raises, the user stays marked active and a later preferences read does not retry it. Other authenticated routes only refresh the session key; they do not restore cells.
+
+## Cell window reference date
+
+`generate_required_cells` builds `YYYY-MM` buckets from a reference date. Callers that omit it use `date.today()`.
+
+- Both `date_from` and `date_to` are unset: the reference month plus the next five months (six buckets).
+- Otherwise the start month is `max(date_from, reference)` (a missing `date_from` uses the reference). Months before the reference are not included. The end month is `date_to` when set, otherwise five months after the start. The day inside `date_from` / `date_to` does not split a month.
+- Country codes are not de-duplicated. A repeated code activates and releases that cell once per copy.
+
+| Caller | Reference date | Cells it changes |
+| --- | --- | --- |
+| `PATCH /v2/user/preferences` | Today for **both** the saved preferences and the incoming ones | Only dimensions that differ (country, board, stars, adults, child count). A month that has aged out is in neither set, so its count stays. |
+| New user (`get_or_create_user`) | Today | Activates the current window. |
+| `match_user_offers` self-heal | Old window: `user.updated_at` date. New window: the match reference (today unless the caller passes one) | Runs only when **both** travel dates are unset and `updated_at` is in a different calendar month. Writes `updated_at` as that reference date at the current UTC time of day, then shifts cells. |
+| `bulk_match_users` overlap test | Argument from the caller. The coordinator passes none, so today | A user is matched only when today's window overlaps a cell this run actually scraped. |
+| Inactivity sweep | Today | Decrements today's window. |
+| `ensure_active` | Today | Increments today's window. Does not decrement. |
+| `DELETE /v2/auth/account` | `user.updated_at.date()` | Decrements that window, which can differ from the cells still holding a count. |
+
+`updated_at` is the month self-heal compares. These writes move it:
+
+- Creating the user.
+- `PATCH /v2/user/preferences` (set to now **before** the cell diff).
+- `POST /v2/user/push/enable` and `POST /v2/user/push/disable`.
+- Self-heal itself.
+
+Session touch updates `last_active_at` and `new_since` only.
+
+A preference save or a push toggle in a new month makes `updated_at` current, so the match 15 seconds later skips self-heal. The preference diff used today on both sides, so the previous open-ended months stay incremented. Past months are still loaded by the coordinator and then skipped (`is_cell_month_past`). A fixed date range never enters self-heal, so months that fall before today leak the same way.
+
+Example: open dates activated in June 2026 cover `2026-06` through `2026-11`. A preference PATCH on 2 July diffs July–December against itself, sets `updated_at` to July, and leaves the June cell in place. After 30 June that cell is not scraped.
+
+If self-heal's `put` succeeds and the following activation raises, `updated_at` is already this month. The next match will not try the shift again. Successful `ADD`s from that attempt are not rolled back.
 
 ## Redis feed rebuild and lazy ZSET pagination
 
